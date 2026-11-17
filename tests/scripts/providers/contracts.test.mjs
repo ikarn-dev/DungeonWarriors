@@ -39,6 +39,38 @@ const policy = {
   maxExponent: 0,
 };
 
+test("captured hosted feeds preserve zero writer pins and positive exponents", () => {
+  const [slot, now, ...accounts] = readFileSync(
+    new URL(
+      "../../fixtures/providers/oracle-v3-devnet-as.csv",
+      import.meta.url,
+    ),
+    "utf8",
+  )
+    .trim()
+    .split("\n")[1]
+    .split(",");
+  assert.equal(accounts.length, 3);
+  for (const hex of accounts) {
+    const bytes = Buffer.from(hex, "hex");
+    const quote = decodeOracleQuote(bytes, "11111111111111111111111111111111");
+    assert.equal(quote.writeAuthority, "11111111111111111111111111111111");
+    assert.equal(quote.exponent, 8);
+    validateOracleQuote(quote, {
+      nowSeconds: BigInt(now),
+      currentSlot: BigInt(slot),
+      maxAgeSeconds: 2n,
+      maxFutureSkewSeconds: 1n,
+      minExponent: 8,
+      maxExponent: 8,
+    });
+    assert.throws(
+      () => decodeOracleQuote(bytes, publicKey),
+      /ORACLE_AUTHORITY_MISMATCH/,
+    );
+  }
+});
+
 test("provider configuration parses exact budgets and rejects unsafe or mismatched destinations", () => {
   const config = providerConfigSchema.parse(environment);
   assert.equal(config.SPONSOR_MIN_BALANCE_LAMPORTS, 10_000_000n);

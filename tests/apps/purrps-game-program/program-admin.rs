@@ -322,3 +322,57 @@ fn oracle_inspection_returns_real_decoded_fields_without_progress_or_rewards() {
     assert_eq!(inspected.quote.exponent, -8);
     assert_eq!(h.svm.get_account(&h.config).unwrap().data, before);
 }
+
+#[test]
+fn initialize_and_inspect_accept_captured_hosted_feeds_and_enforce_zero_writer_pin() {
+    let mut h = Harness::new();
+    let admin = Keypair::try_from(h.admin.to_bytes().as_slice()).unwrap();
+    let bindings = [Market::Btc, Market::Eth, Market::Sol].map(fixtures::hosted_binding);
+    let mut instruction = init_instruction(&h, admin.pubkey());
+    instruction.data = purrps_game::instruction::InitializeConfig {
+        args: InitializeConfigArgs {
+            oracle_bindings: bindings,
+        },
+    }
+    .data();
+    h.send(instruction, &admin).unwrap();
+    let config: GameConfig = h.read(h.config);
+    assert_eq!(config.oracle_bindings, bindings);
+    assert!(!config.allow_starter && !config.allow_purchases && !config.allow_reservations);
+    let (clock, accounts) = fixtures::hosted_oracles();
+    h.svm.set_sysvar(&clock);
+    let before = h.svm.get_account(&h.config).unwrap().data;
+    for ((market, binding), bytes) in [Market::Btc, Market::Eth, Market::Sol]
+        .into_iter()
+        .zip(bindings)
+        .zip(accounts)
+    {
+        let mut account = h.svm.get_account(&admin.pubkey()).unwrap();
+        account.owner = binding.program;
+        account.data = bytes;
+        h.svm.set_account(binding.account, account.clone()).unwrap();
+        let instruction = Instruction::new_with_bytes(
+            purrps_game::ID,
+            &purrps_game::instruction::InspectOracle { market }.data(),
+            purrps_game::accounts::InspectOracle {
+                config: h.config,
+                price_update: binding.account,
+            }
+            .to_account_metas(None),
+        );
+        let result = h.send(instruction.clone(), &admin).unwrap();
+        let inspected = InspectedOracle::try_from_slice(&result.return_data.data).unwrap();
+        assert_eq!(inspected.market, market);
+        assert_eq!(inspected.quote.write_authority, Pubkey::default());
+        assert_eq!(inspected.quote.exponent, 8);
+        account.data[8] = 1;
+        h.svm.set_account(binding.account, account).unwrap();
+        let error = h.send(instruction, &admin).unwrap_err();
+        assert!(error
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("InvalidOracleData")));
+        assert_eq!(h.svm.get_account(&h.config).unwrap().data, before);
+    }
+}

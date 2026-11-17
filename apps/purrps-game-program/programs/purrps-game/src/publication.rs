@@ -22,6 +22,7 @@ pub fn validate_oracle_binding(binding: &OracleBinding, market: Market) -> Resul
     )
     .0;
     require_keys_eq!(binding.account, expected, ErrorCode::InvalidOracleBinding);
+    // Hosted feeds can have a zero writer; inspection still pins the owner, PDA and exact header value.
     require!(
         binding.feed_id == market.feed_id()
             && binding.schema_version == 3
@@ -29,8 +30,7 @@ pub fn validate_oracle_binding(binding: &OracleBinding, market: Market) -> Resul
             && binding.min_exponent >= -18
             && binding.max_exponent <= 18
             && binding.min_exponent <= binding.max_exponent
-            && binding.validator != Pubkey::default()
-            && binding.write_authority != Pubkey::default(),
+            && binding.validator != Pubkey::default(),
         ErrorCode::InvalidOracleBinding
     );
     Ok(())

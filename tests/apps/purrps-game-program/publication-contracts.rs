@@ -196,7 +196,7 @@ fn oracle_reads_validate_identity_full_precision_padding_and_chain_clock() {
 }
 
 #[test]
-fn bindings_require_exact_markets_schemas_and_nonzero_authorities() {
+fn bindings_require_exact_markets_schemas_and_nonzero_validator() {
     let original = fixtures::binding(Market::Btc);
     assert!(validate_oracle_binding(&original, Market::Btc).is_ok());
     let mut value = original;
@@ -209,12 +209,80 @@ fn bindings_require_exact_markets_schemas_and_nonzero_authorities() {
     value.validator = Pubkey::default();
     assert!(validate_oracle_binding(&value, Market::Btc).is_err());
     value = original;
-    value.write_authority = Pubkey::default();
-    assert!(validate_oracle_binding(&value, Market::Btc).is_err());
-    value = original;
     value.max_age_seconds = 0;
     assert!(validate_oracle_binding(&value, Market::Btc).is_err());
     value = original;
     value.min_exponent = 1;
     assert!(validate_oracle_binding(&value, Market::Btc).is_err());
+}
+
+#[test]
+fn captured_hosted_feeds_accept_zero_writer_without_bypassing_identity_or_policy() {
+    let (clock, accounts) = fixtures::hosted_oracles();
+    for (market, bytes) in [Market::Btc, Market::Eth, Market::Sol]
+        .into_iter()
+        .zip(accounts)
+    {
+        let binding = fixtures::hosted_binding(market);
+        let inspect = |key: &Pubkey, owner: &Pubkey, data: &[u8], now| {
+            inspect_account(key, owner, data, &binding, market, now, clock.slot)
+        };
+        let result = inspect(
+            &binding.account,
+            &binding.program,
+            &bytes,
+            clock.unix_timestamp,
+        )
+        .unwrap();
+        assert_eq!(result.quote.write_authority, Pubkey::default());
+        assert_eq!(result.quote.exponent, 8);
+        assert!(inspect(
+            &Pubkey::default(),
+            &binding.program,
+            &bytes,
+            clock.unix_timestamp
+        )
+        .is_err());
+        assert!(inspect(
+            &binding.account,
+            &Pubkey::default(),
+            &bytes,
+            clock.unix_timestamp
+        )
+        .is_err());
+        assert!(inspect(
+            &binding.account,
+            &binding.program,
+            &bytes,
+            clock.unix_timestamp + 3
+        )
+        .is_err());
+        let mut forged = bytes.clone();
+        forged[8] = 1;
+        assert!(inspect(
+            &binding.account,
+            &binding.program,
+            &forged,
+            clock.unix_timestamp
+        )
+        .is_err());
+        forged = bytes.clone();
+        forged[40] = 0;
+        assert!(inspect(
+            &binding.account,
+            &binding.program,
+            &forged,
+            clock.unix_timestamp
+        )
+        .is_err());
+        forged = bytes.clone();
+        forged[89..93].copy_from_slice(&(-8_i32).to_le_bytes());
+        assert!(inspect(
+            &binding.account,
+            &binding.program,
+            &forged,
+            clock.unix_timestamp
+        )
+        .is_err());
+    }
 }
