@@ -1,0 +1,10 @@
+scenario,tick,action,x,y,vx,vy,grounded
+ground,1,none,1024,0,1024,0,true
+ground,2,none,2048,0,1024,0,true
+jump,1,jump,1024,-2944,1024,-2944,false
+jump,2,none,2048,-5760,1024,-2816,false
+jump,3,none,3072,-8448,1024,-2688,false
+dash,1,dash,3072,0,3072,0,true
+dash,2,none,6144,0,3072,0,true
+double,1,boost_jump,1024,-2944,1024,-2944,false
+double,2,jump,2048,-5888,1024,-2944,false

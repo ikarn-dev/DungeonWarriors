@@ -28,6 +28,8 @@ pub struct WorldEntity {
     pub width_subpixels: i32,
     pub height_subpixels: i32,
     pub designated_coin: Option<u8>,
+    // Zero-based checkpoint window; late coins cannot qualify a later window.
+    pub designated_checkpoint: u64,
     pub consumed: bool,
 }
 
@@ -44,6 +46,7 @@ pub struct OracleObservation {
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunnerState {
+    // Top-left of the fixed body, not the sprite's padded frame.
     pub x_subpixels: i32,
     pub y_subpixels: i32,
     pub vx_subpixels_per_tick: i32,

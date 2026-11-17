@@ -9,6 +9,7 @@ pub mod oracle;
 pub mod protocol;
 pub mod publication;
 pub mod rules;
+pub mod simulation;
 pub mod state;
 
 use anchor_lang::prelude::*;
