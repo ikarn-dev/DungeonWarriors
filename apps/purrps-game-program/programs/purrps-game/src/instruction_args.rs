@@ -8,15 +8,12 @@ use crate::{
     state::{draws::CapsuleKind, economy::SponsorPurpose},
 };
 
-// These are argument contracts, not callable handlers or generated IDL. Account
-// constraints/signers and atomic effects are implemented in P2/P3/P4. No client
+// Argument contracts for callable administration and planned gameplay/economy
+// handlers. Each handler enforces its accounts/signers and atomic effects. No client
 // argument carries earned score, progress, payout or technical-refund eligibility.
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
 pub struct InitializeConfigArgs {
     pub oracle_bindings: [OracleBinding; 3],
-    pub vrf_program: Pubkey,
-    pub vrf_queue: Pubkey,
-    pub vrf_callback_authority: Pubkey,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]

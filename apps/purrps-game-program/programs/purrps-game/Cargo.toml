@@ -22,6 +22,14 @@ path = "../../../../tests/apps/purrps-game-program/account-contracts.rs"
 name = "protocol_contracts"
 path = "../../../../tests/apps/purrps-game-program/protocol-contracts.rs"
 
+[[test]]
+name = "publication_contracts"
+path = "../../../../tests/apps/purrps-game-program/publication-contracts.rs"
+
+[[test]]
+name = "program_admin"
+path = "../../../../tests/apps/purrps-game-program/program-admin.rs"
+
 [lib]
 crate-type = ["cdylib", "lib"]
 name = "purrps_game"
@@ -42,6 +50,7 @@ anchor-lang = "=1.1.2"
 anchor-spl = "=1.1.2"
 ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank"] }
 session-keys = { version = "=3.1.1", features = ["no-entrypoint"] }
+solana-sha256-hasher = { version = "=3.1.0", features = ["sha2"] }
 
 [dev-dependencies]
 litesvm = "=0.10.0"

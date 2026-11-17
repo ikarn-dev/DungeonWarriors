@@ -8,6 +8,7 @@ pub enum ContractError {
     EmptyDrawPool,
     Unqualified,
     NumericOverflow,
+    InvalidObservation,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,6 +39,30 @@ pub struct GameRules {
     pub max_world_entities: u8,
     pub max_recent_observations: u8,
     pub physics: PhysicsRules,
+    pub generation: GenerationRules,
+    pub score: ScoreRules,
+}
+
+// Price changes use same-exponent positive i64 observations, widened to i128.
+// Delta BPS truncate toward zero, clamp before mapping to a terrain step, and
+// values inside the flat band produce zero rise. Positive price -> negative y.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GenerationRules {
+    pub segment_width_subpixels: i32,
+    pub lookahead_segments: u8,
+    pub flat_band_bps: u16,
+    pub sharp_move_bps: u16,
+    pub max_sample_change_bps: u16,
+    pub designated_coin_ticks: [u16; 5],
+    pub max_hazards_per_segment: u8,
+    pub max_optional_pickups_per_segment: u8,
+    pub booster_stride_segments: u16,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScoreRules {
+    pub coin_points: u16,
+    pub star_points: u16,
 }
 
 /// Positions are segment-local signed subpixels (256/pixel), y increases down.
@@ -130,7 +155,53 @@ pub const RULES_V1: GameRules = GameRules {
         min_landing_width_subpixels: 8_192,
         min_required_coin_spacing_ticks: 90,
     },
+    generation: GenerationRules {
+        segment_width_subpixels: 32_768,
+        lookahead_segments: 8,
+        flat_band_bps: 5,
+        sharp_move_bps: 100,
+        max_sample_change_bps: 1_000,
+        designated_coin_ticks: [90, 180, 270, 360, 450],
+        max_hazards_per_segment: 1,
+        max_optional_pickups_per_segment: 1,
+        booster_stride_segments: 16,
+    },
+    score: ScoreRules {
+        coin_points: 1,
+        star_points: 5,
+    },
 };
+
+pub fn price_change_bps(
+    previous_price: i64,
+    previous_exponent: i32,
+    next_price: i64,
+    next_exponent: i32,
+) -> std::result::Result<i32, ContractError> {
+    if previous_price <= 0
+        || next_price <= 0
+        || previous_exponent != next_exponent
+        || !(-18..=18).contains(&previous_exponent)
+    {
+        return Err(ContractError::InvalidObservation);
+    }
+    let delta =
+        (i128::from(next_price) - i128::from(previous_price)) * 10_000 / i128::from(previous_price);
+    let bound = i128::from(RULES_V1.generation.max_sample_change_bps);
+    i32::try_from(delta.clamp(-bound, bound)).map_err(|_| ContractError::NumericOverflow)
+}
+
+pub fn terrain_step_subpixels(change_bps: i32) -> i32 {
+    let generation = RULES_V1.generation;
+    let bound = i32::from(generation.max_sample_change_bps);
+    let change = change_bps.clamp(-bound, bound);
+    if change.abs() <= i32::from(generation.flat_band_bps) {
+        return 0;
+    }
+    // Both factors are bounded by the immutable v1 rules, well inside i64/i32.
+    (-i64::from(change) * i64::from(RULES_V1.physics.max_required_rise_subpixels)
+        / i64::from(bound)) as i32
+}
 
 pub fn run_level(active_ticks: u64) -> u64 {
     active_ticks / u64::from(RULES_V1.checkpoint_ticks) + 1

@@ -1,0 +1,14 @@
+{
+  "extends": "../packages/config/tsconfig/base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["node"],
+    "typeRoots": ["../apps/web/node_modules/@types"],
+    "paths": {
+      "vitest": ["../apps/web/node_modules/vitest"],
+      "@/*": ["../apps/web/*"]
+    }
+  },
+  "include": ["apps/web/**/*.ts", "vitest.config.mts"]
+}

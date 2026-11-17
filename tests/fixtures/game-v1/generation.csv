@@ -1,0 +1,2 @@
+segment_width_subpixels,lookahead_segments,flat_band_bps,sharp_move_bps,max_sample_change_bps,coin_tick_1,coin_tick_2,coin_tick_3,coin_tick_4,coin_tick_5,max_hazards_per_segment,max_optional_pickups_per_segment,booster_stride_segments,coin_points,star_points
+32768,8,5,100,1000,90,180,270,360,450,1,1,16,1,5

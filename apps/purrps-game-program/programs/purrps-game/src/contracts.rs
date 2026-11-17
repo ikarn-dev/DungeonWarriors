@@ -23,6 +23,8 @@ impl Market {
     }
 }
 
+// Published rules/catalog hashes separate type + schema domain and program ID.
+// Catalog hashes additionally bind its media manifest, not just numeric values.
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VersionBinding {
     pub version: u32,

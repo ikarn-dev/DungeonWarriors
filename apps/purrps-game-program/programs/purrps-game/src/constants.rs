@@ -10,6 +10,8 @@ pub const HELLO_WORLD_LAMPORTS: u64 = 1;
 pub const MAX_COUNT: u64 = 10;
 
 pub const SCHEMA_VERSION: u16 = 1;
+pub const USDC_MINT: Pubkey = pubkey!("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+pub const HOSTED_ORACLE_PROGRAM: Pubkey = pubkey!("PriCems5tHihc6UDXDjzjeawomAwBduWMGAi8ZUjppd");
 pub const GAME_CONFIG_SEED: &[u8] = b"game-config";
 pub const RULES_SEED: &[u8] = b"rules";
 pub const CATALOG_SEED: &[u8] = b"catalog";

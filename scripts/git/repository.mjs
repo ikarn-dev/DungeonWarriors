@@ -15,6 +15,7 @@ const roots = [
   "apps/purrps-game-program/",
   "packages/",
   "scripts/",
+  "tests/",
   ".githooks/",
   ".github/",
   "docs/",

@@ -6,4 +6,28 @@ pub enum ErrorCode {
     Unauthorized,
     #[msg("Counter has reached the maximum value")]
     CounterOverflow,
+    #[msg("Only the program upgrade authority can initialize configuration")]
+    InvalidUpgradeAuthority,
+    #[msg("Only the configured admin can publish versions")]
+    InvalidAdmin,
+    #[msg("Unsupported configuration schema")]
+    InvalidConfiguration,
+    #[msg("Only official six-decimal Devnet USDC is supported")]
+    InvalidMint,
+    #[msg("Oracle identity, schema or numeric policy does not match the market")]
+    InvalidOracleBinding,
+    #[msg("Oracle account data is malformed or does not match its binding")]
+    InvalidOracleData,
+    #[msg("Oracle observation is stale")]
+    StaleOracle,
+    #[msg("Published rules must preserve the reviewed numeric contract")]
+    InvalidRules,
+    #[msg("Published catalog must preserve the approved product values")]
+    InvalidCatalog,
+    #[msg("Publication version is stale or does not advance exactly once")]
+    StaleVersion,
+    #[msg("A nonzero version and content hash are required for media")]
+    InvalidManifest,
+    #[msg("Integer range exceeded")]
+    ArithmeticOverflow,
 }

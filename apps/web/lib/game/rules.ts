@@ -57,7 +57,64 @@ export const RULES_V1 = {
     minLandingWidthSubpixels: 8_192,
     minRequiredCoinSpacingTicks: 90,
   },
+  generation: {
+    segmentWidthSubpixels: 32_768,
+    lookaheadSegments: 8,
+    flatBandBps: 5,
+    sharpMoveBps: 100,
+    maxSampleChangeBps: 1_000,
+    designatedCoinTicks: [90, 180, 270, 360, 450],
+    maxHazardsPerSegment: 1,
+    maxOptionalPickupsPerSegment: 1,
+    boosterStrideSegments: 16,
+  },
+  score: { coinPoints: 1, starPoints: 5 },
 } as const;
+
+export function priceChangeBps(
+  previousPrice: bigint,
+  previousExponent: number,
+  nextPrice: bigint,
+  nextExponent: number,
+): number {
+  const i64Max = (1n << 63n) - 1n;
+  if (
+    previousPrice <= 0n ||
+    nextPrice <= 0n ||
+    previousPrice > i64Max ||
+    nextPrice > i64Max ||
+    !Number.isInteger(previousExponent) ||
+    previousExponent < -18 ||
+    previousExponent > 18 ||
+    previousExponent !== nextExponent
+  ) {
+    throw new RangeError(
+      "Positive same-exponent i64 observations are required",
+    );
+  }
+  const delta = ((nextPrice - previousPrice) * 10_000n) / previousPrice;
+  const bound = BigInt(RULES_V1.generation.maxSampleChangeBps);
+  return Number(delta < -bound ? -bound : delta > bound ? bound : delta);
+}
+
+export function terrainStepSubpixels(changeBps: number): number {
+  if (
+    !Number.isInteger(changeBps) ||
+    changeBps < -0x8000_0000 ||
+    changeBps > 0x7fff_ffff
+  )
+    throw new RangeError("An i32 price change is required");
+  const rules = RULES_V1.generation;
+  const change = Math.max(
+    -rules.maxSampleChangeBps,
+    Math.min(rules.maxSampleChangeBps, changeBps),
+  );
+  if (Math.abs(change) <= rules.flatBandBps) return 0;
+  return Math.trunc(
+    (-change * RULES_V1.physics.maxRequiredRiseSubpixels) /
+      rules.maxSampleChangeBps,
+  );
+}
 
 export type GameRulesV1 = typeof RULES_V1;
 

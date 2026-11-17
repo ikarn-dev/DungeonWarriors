@@ -7,7 +7,8 @@ use crate::{
 };
 
 // Base-only PDA [GAME_CONFIG_SEED]. Admin signatures govern publication and
-// admission. Initialization validates Devnet, Circle mint and token program.
+// admission. Initialization pins the Circle mint/token program; the deployment
+// and provider preflight verify Devnet. No instruction here enables admission.
 #[account]
 #[derive(InitSpace)]
 pub struct GameConfig {
@@ -17,8 +18,8 @@ pub struct GameConfig {
     pub usdc_mint: Pubkey,
     pub token_program: Pubkey,
     pub usdc_decimals: u8,
-    pub rules: VersionBinding,
-    pub catalog: VersionBinding,
+    pub rules: Option<VersionBinding>,
+    pub catalog: Option<VersionBinding>,
     pub oracle_bindings: [OracleBinding; 3],
     pub vrf_program: Pubkey,
     pub vrf_queue: Pubkey,

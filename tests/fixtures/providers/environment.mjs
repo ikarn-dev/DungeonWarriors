@@ -1,0 +1,25 @@
+export const publicKey = "3qbR1eZRqXUWroWKKYhbDmR3FfqTHfqSU8zZSxtANzYh";
+
+export const environment = {
+  APP_ORIGIN: "https://purrps.example",
+  HELIUS_DEVNET_RPC_URL:
+    "https://devnet.helius-rpc.com/?api-key=TEST_ONLY_RPC_CREDENTIAL",
+  UPSTASH_REDIS_REST_URL: "https://purrps-test.upstash.io",
+  UPSTASH_REDIS_REST_TOKEN: "TEST_ONLY_REDIS_CREDENTIAL",
+  MAGICBLOCK_ROUTER_HTTP_URL: "https://devnet-router.magicblock.app",
+  MAGICBLOCK_ER_HTTP_URL: "https://devnet-as.magicblock.app",
+  MAGICBLOCK_ER_WS_URL: "wss://devnet-as.magicblock.app",
+  MAGICBLOCK_VALIDATOR_IDENTITY: publicKey,
+  MAGICBLOCK_ORACLE_BTC_WRITE_AUTHORITY: publicKey,
+  MAGICBLOCK_ORACLE_ETH_WRITE_AUTHORITY: publicKey,
+  MAGICBLOCK_ORACLE_SOL_WRITE_AUTHORITY: publicKey,
+  ORACLE_MAX_AGE_SECONDS: "2",
+  ORACLE_MAX_FUTURE_SKEW_SECONDS: "0",
+  ORACLE_MIN_EXPONENT: "-18",
+  ORACLE_MAX_EXPONENT: "0",
+  SPONSOR_PUBLIC_KEY: publicKey,
+  SPONSOR_MIN_BALANCE_LAMPORTS: "10000000",
+  SPONSOR_OPERATION_LIMIT_LAMPORTS: "5000000",
+  SPONSOR_COMPLETION_RESERVE_LAMPORTS: "1000000",
+  SPONSOR_MAX_ATTEMPTS: "3",
+};
