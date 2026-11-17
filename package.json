@@ -1,24 +1,17 @@
 {
-  "name": "mb-blitz",
-  "version": "0.1.0",
+  "name": "purrps",
   "private": true,
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.4.6",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "git:setup": "node scripts/git/setup.mjs",
+    "git:check": "node scripts/git/check-files.mjs",
+    "task:commit": "node scripts/git/task-commit.mjs",
+    "typecheck": "pnpm --recursive typecheck",
+    "lint": "biome check",
+    "format": "biome check --write"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.6",
-    "typescript": "^5"
+    "@biomejs/biome": "2.4.2",
+    "@purrps/config": "workspace:*"
   }
 }

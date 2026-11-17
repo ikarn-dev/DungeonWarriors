@@ -1,0 +1,23 @@
+packages:
+  # Rust/Anchor lives in apps/purrps-game-program and is managed by Cargo.
+  - apps/web
+  - packages/*
+
+savePrefix: ""
+
+# esbuild is used by the web tooling. Optional native accelerators use fallbacks;
+# the unused Cloudflare runtime must not run an installation build script.
+allowBuilds:
+  bigint-buffer: false
+  bufferutil: false
+  esbuild: true
+  sharp: false
+  utf-8-validate: false
+  workerd: false
+
+# @sentry/nextjs still includes @sentry/cloudflare transitively. Keep its optional
+# peer versions pinned for reproducible resolution within the minimum release age;
+# these dependencies do not introduce a Cloudflare application or deployment.
+overrides:
+  "@cloudflare/workers-types": 5.20261114.1
+  wrangler: 4.162.0
