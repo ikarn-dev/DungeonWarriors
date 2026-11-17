@@ -1,5 +1,12 @@
 use anchor_lang::prelude::*;
 
+pub mod collection;
+pub mod config;
+pub mod draws;
+pub mod economy;
+pub mod records;
+pub mod run;
+
 #[account]
 #[derive(InitSpace)]
 pub struct Counter {

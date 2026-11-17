@@ -4,6 +4,23 @@ version = "0.1.0"
 description = "PURRPS vault, wager and settlement program"
 edition.workspace = true
 rust-version.workspace = true
+autotests = false
+
+[[test]]
+name = "rule_contracts"
+path = "../../../../tests/apps/purrps-game-program/rule-contracts.rs"
+
+[[test]]
+name = "test_initialize"
+path = "../../../../tests/apps/purrps-game-program/initialize.rs"
+
+[[test]]
+name = "account_contracts"
+path = "../../../../tests/apps/purrps-game-program/account-contracts.rs"
+
+[[test]]
+name = "protocol_contracts"
+path = "../../../../tests/apps/purrps-game-program/protocol-contracts.rs"
 
 [lib]
 crate-type = ["cdylib", "lib"]

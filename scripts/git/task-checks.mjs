@@ -37,11 +37,18 @@ export function checkChangedFiles(paths) {
       "--project",
       join(root, "apps/web/tsconfig.json"),
     ]);
+    checked(process.execPath, [
+      compiler,
+      "--noEmit",
+      "--project",
+      join(root, "tests/tsconfig.json"),
+    ]);
   }
   if (
     paths.some(
       (path) =>
-        path.startsWith("apps/purrps-game-program/") &&
+        (path.startsWith("apps/purrps-game-program/") ||
+          path.startsWith("tests/apps/purrps-game-program/")) &&
         /\.(?:rs|toml)$/.test(path),
     )
   ) {

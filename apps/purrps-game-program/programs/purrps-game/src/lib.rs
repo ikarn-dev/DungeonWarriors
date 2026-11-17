@@ -1,8 +1,11 @@
 pub mod catalog;
 pub mod constants;
+pub mod contracts;
 pub mod economy;
 pub mod error;
+pub mod instruction_args;
 pub mod instructions;
+pub mod protocol;
 pub mod rules;
 pub mod state;
 
@@ -10,7 +13,7 @@ use anchor_lang::prelude::*;
 
 pub use constants::*;
 pub use instructions::*;
-pub use state::*;
+pub use state::Counter;
 
 declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 
