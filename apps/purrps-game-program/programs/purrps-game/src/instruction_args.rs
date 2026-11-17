@@ -82,10 +82,10 @@ pub struct SubmitIntentsArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+// Hydra reuses these bytes; progress/order come from verified execution context.
 pub struct AdvanceRunArgs {
     pub delegation_epoch: u64,
     pub task_generation: u64,
-    pub execution_ordinal: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]

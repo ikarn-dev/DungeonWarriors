@@ -40,7 +40,7 @@ custom-panic = []
 [dependencies]
 anchor-lang = "=1.1.2"
 anchor-spl = "=1.1.2"
-ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor"] }
+ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank"] }
 session-keys = { version = "=3.1.1", features = ["no-entrypoint"] }
 
 [dev-dependencies]

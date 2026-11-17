@@ -1,21 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+import { publicKeySchema } from "../solana/addresses.mts";
 import { RULES_V1, U64_MAX } from "./rules";
+
+export { publicKeySchema } from "../solana/addresses.mts";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_INTENTS_PER_SUBMISSION = 8;
-
-export const publicKeySchema = z
-  .string()
-  .min(32)
-  .max(44)
-  .refine((value) => {
-    try {
-      return new PublicKey(value).toBase58() === value;
-    } catch {
-      return false;
-    }
-  }, "Invalid canonical Solana public key");
 
 const u64Schema = z.bigint().min(0n).max(U64_MAX);
 const inputAxisSchema = z.enum(["left", "neutral", "right"]);

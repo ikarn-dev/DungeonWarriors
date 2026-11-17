@@ -66,9 +66,12 @@ pub struct PowerState {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
+// Hydra uses static templates and slot intervals. Authenticate the preceding
+// Trigger via instructions sysvar; derive an ordinal in-program, never from args.
+// Millisecond budget fields require verified trusted time before funded entry.
 pub struct CrankState {
     pub task: Pubkey,
-    pub authority: Pubkey,
+    pub cancel_authority: Pubkey,
     pub generation: u64,
     pub last_execution_ordinal: u64,
     pub trusted_elapsed_ms: u64,
