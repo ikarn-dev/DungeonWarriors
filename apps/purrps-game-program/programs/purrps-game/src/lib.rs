@@ -1,6 +1,9 @@
+pub mod catalog;
 pub mod constants;
+pub mod economy;
 pub mod error;
 pub mod instructions;
+pub mod rules;
 pub mod state;
 
 use anchor_lang::prelude::*;
