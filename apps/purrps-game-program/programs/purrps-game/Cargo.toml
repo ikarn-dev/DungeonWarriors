@@ -52,7 +52,7 @@ custom-panic = []
 [dependencies]
 anchor-lang = "=1.1.2"
 anchor-spl = "=1.1.2"
-ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank"] }
+ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank", "solana-system-interface"] }
 session-keys = { version = "=3.1.1", features = ["no-entrypoint"] }
 solana-sha256-hasher = { version = "=3.1.0", features = ["sha2"] }
 
