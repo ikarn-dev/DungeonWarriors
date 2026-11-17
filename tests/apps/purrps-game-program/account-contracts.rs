@@ -1,4 +1,6 @@
-use anchor_lang::{Discriminator, Space};
+use anchor_lang::{
+    AccountDeserialize, AccountSerialize, AnchorDeserialize, AnchorSerialize, Discriminator, Space,
+};
 use purrps_game::{
     contracts::Market,
     rules::RULES_V1,
@@ -11,6 +13,9 @@ use purrps_game::{
         run::{RunGameState, MAX_QUEUED_INTENTS, MAX_RECENT_OBSERVATIONS, MAX_WORLD_ENTITIES},
     },
 };
+
+#[path = "support/run-state.rs"]
+mod run_fixture;
 
 fn account_size<T: Space + Discriminator>() -> usize {
     T::DISCRIMINATOR.len() + T::INIT_SPACE
@@ -41,8 +46,80 @@ fn every_account_has_bounded_rent_and_fits_a_single_initial_allocation() {
     }
     assert!(
         account_size::<RunGameState>() > 4_096,
-        "game state must use boxed account access"
+        "serialized capacity still exceeds one SBF stack frame"
     );
+    assert!(std::mem::size_of::<RunGameState>() < 4096);
+}
+
+#[test]
+fn full_run_buffers_round_trip_with_the_reserved_account_space() {
+    let state = run_fixture::max_layout();
+    let mut bytes = Vec::new();
+    state.try_serialize(&mut bytes).unwrap();
+    assert_eq!(bytes.len(), account_size::<RunGameState>());
+    let decoded = RunGameState::try_deserialize(&mut bytes.as_slice()).unwrap();
+    assert_eq!(decoded.entities, state.entities);
+    assert_eq!(decoded.observations, state.observations);
+    assert_eq!(decoded.intents, state.intents);
+    assert_eq!(decoded.terminal, state.terminal);
+}
+
+fn encoded_size<T: AnchorSerialize>(value: &T) -> usize {
+    let mut bytes = Vec::new();
+    value.serialize(&mut bytes).unwrap();
+    bytes.len()
+}
+
+#[test]
+fn run_buffer_lengths_are_checked_before_allocating_or_reading_elements() {
+    let state = run_fixture::max_layout();
+    let mut bytes = Vec::new();
+    state.try_serialize(&mut bytes).unwrap();
+    let entities = RunGameState::DISCRIMINATOR.len()
+        + encoded_size(&(
+            state.schema_version,
+            state.bump,
+            state.escrow,
+            state.snapshot,
+            state.snapshot_hash,
+            state.phase,
+            state.active_ticks,
+            state.world_origin_pixels,
+            state.runner,
+        ));
+    let observations = entities + encoded_size(&state.entities) + 1 + 8;
+    let intents = observations
+        + encoded_size(&state.observations)
+        + 2
+        + encoded_size(&state.start_observation);
+    for (offset, capacity) in [
+        (entities, MAX_WORLD_ENTITIES),
+        (observations, MAX_RECENT_OBSERVATIONS),
+        (intents, MAX_QUEUED_INTENTS),
+    ] {
+        for bad in [0, capacity as u32 + 1, u32::MAX] {
+            let mut corrupt = bytes[..offset + 4].to_vec();
+            corrupt[offset..offset + 4].copy_from_slice(&bad.to_le_bytes());
+            let body = &corrupt[RunGameState::DISCRIMINATOR.len()..];
+            match RunGameState::deserialize_reader(&mut &body[..]) {
+                Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::InvalidData),
+                Ok(_) => panic!("malformed capacity accepted"),
+            }
+        }
+    }
+}
+
+#[test]
+fn run_buffer_serialization_rejects_resizing_the_fixed_slot_buffers() {
+    let mut state = run_fixture::max_layout();
+    state.entities.pop();
+    assert!(state.try_serialize(&mut Vec::new()).is_err());
+    let mut state = run_fixture::max_layout();
+    state.observations.push(state.observations[0]);
+    assert!(state.try_serialize(&mut Vec::new()).is_err());
+    let mut state = run_fixture::max_layout();
+    state.intents.clear();
+    assert!(state.try_serialize(&mut Vec::new()).is_err());
 }
 
 #[test]

@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use std::io::{self, Read};
+use std::io::{self, Read, Write};
 
 use crate::{
     catalog::Power,
@@ -9,6 +11,36 @@ use crate::{
 pub const MAX_WORLD_ENTITIES: usize = 64;
 pub const MAX_RECENT_OBSERVATIONS: usize = 16;
 pub const MAX_QUEUED_INTENTS: usize = 32;
+
+// Fixed-capacity ring storage lives on the heap. Reject its length prefix before
+// allocating; InitSpace's max_len sets rent space, not deserialization limits.
+fn read_buffer<T: AnchorDeserialize, R: Read, const N: usize>(
+    reader: &mut R,
+) -> io::Result<Vec<T>> {
+    if u32::deserialize_reader(reader)? as usize != N {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid run buffer length",
+        ));
+    }
+    let mut items = Vec::with_capacity(N);
+    for _ in 0..N {
+        items.push(T::deserialize_reader(reader)?);
+    }
+    Ok(items)
+}
+
+fn read_entities<R: Read>(reader: &mut R) -> io::Result<Vec<WorldEntity>> {
+    read_buffer::<_, _, MAX_WORLD_ENTITIES>(reader)
+}
+
+fn read_observations<R: Read>(reader: &mut R) -> io::Result<Vec<OracleObservation>> {
+    read_buffer::<_, _, MAX_RECENT_OBSERVATIONS>(reader)
+}
+
+fn read_intents<R: Read>(reader: &mut R) -> io::Result<Vec<Option<AcceptedIntent>>> {
+    read_buffer::<_, _, MAX_QUEUED_INTENTS>(reader)
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -103,9 +135,9 @@ pub struct RunTerminal {
 }
 
 // [RUN_GAME_SEED, owner, nonce.to_le_bytes()]. Only this and SDK-required SOL
-// records are delegated. Use boxed accounts in future handlers: this bounded
-// layout exceeds one SBF stack frame. Buffers have explicit length/head; unused
-// slots do not authorize events. Earliest liveness deadline wins, never extends.
+// records are delegated. Heap buffers have exactly their declared capacity;
+// count/head select live entries. Unused slots do not authorize events.
+// Earliest liveness deadline wins, never extends.
 #[account]
 #[derive(InitSpace)]
 pub struct RunGameState {
@@ -118,14 +150,23 @@ pub struct RunGameState {
     pub active_ticks: u64,
     pub world_origin_pixels: u64,
     pub runner: RunnerState,
-    pub entities: [WorldEntity; MAX_WORLD_ENTITIES],
+    #[max_len(MAX_WORLD_ENTITIES)]
+    #[borsh(deserialize_with = "read_entities", serialize_with = "write_entities")]
+    pub entities: Vec<WorldEntity>,
     pub entity_count: u8,
     pub next_entity_id: u64,
-    pub observations: [OracleObservation; MAX_RECENT_OBSERVATIONS],
+    #[max_len(MAX_RECENT_OBSERVATIONS)]
+    #[borsh(
+        deserialize_with = "read_observations",
+        serialize_with = "write_observations"
+    )]
+    pub observations: Vec<OracleObservation>,
     pub observation_head: u8,
     pub observation_count: u8,
     pub start_observation: Option<OracleObservation>,
-    pub intents: [Option<AcceptedIntent>; MAX_QUEUED_INTENTS],
+    #[max_len(MAX_QUEUED_INTENTS)]
+    #[borsh(deserialize_with = "read_intents", serialize_with = "write_intents")]
+    pub intents: Vec<Option<AcceptedIntent>>,
     pub intent_head: u8,
     pub intent_count: u8,
     pub last_accepted_sequence: u64,
@@ -145,4 +186,56 @@ pub struct RunGameState {
     pub crank: CrankState,
     pub suspension: Option<Suspension>,
     pub terminal: Option<RunTerminal>,
+}
+
+// Read elements directly into the bounded heap allocation; array deserialization
+// would create a large stack temporary even inside Box<Account<RunGameState>>.
+fn read_buffer<T: AnchorDeserialize, R: Read>(
+    reader: &mut R,
+    capacity: usize,
+) -> io::Result<Vec<T>> {
+    if u32::deserialize_reader(reader)? != capacity as u32 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid run buffer capacity",
+        ));
+    }
+    let mut values = Vec::with_capacity(capacity);
+    for _ in 0..capacity {
+        values.push(T::deserialize_reader(reader)?);
+    }
+    Ok(values)
+}
+
+fn write_buffer<T: AnchorSerialize, W: Write>(
+    values: &[T],
+    writer: &mut W,
+    capacity: usize,
+) -> io::Result<()> {
+    if values.len() != capacity {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid run buffer capacity",
+        ));
+    }
+    values.serialize(writer)
+}
+
+fn read_entities<R: Read>(reader: &mut R) -> io::Result<Vec<WorldEntity>> {
+    read_buffer(reader, MAX_WORLD_ENTITIES)
+}
+fn write_entities<W: Write>(values: &[WorldEntity], writer: &mut W) -> io::Result<()> {
+    write_buffer(values, writer, MAX_WORLD_ENTITIES)
+}
+fn read_observations<R: Read>(reader: &mut R) -> io::Result<Vec<OracleObservation>> {
+    read_buffer(reader, MAX_RECENT_OBSERVATIONS)
+}
+fn write_observations<W: Write>(values: &[OracleObservation], writer: &mut W) -> io::Result<()> {
+    write_buffer(values, writer, MAX_RECENT_OBSERVATIONS)
+}
+fn read_intents<R: Read>(reader: &mut R) -> io::Result<Vec<Option<AcceptedIntent>>> {
+    read_buffer(reader, MAX_QUEUED_INTENTS)
+}
+fn write_intents<W: Write>(values: &[Option<AcceptedIntent>], writer: &mut W) -> io::Result<()> {
+    write_buffer(values, writer, MAX_QUEUED_INTENTS)
 }
