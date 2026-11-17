@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use std::io::{self, Read};
 use std::io::{self, Read, Write};
 
 use crate::{
@@ -188,25 +187,6 @@ pub struct RunGameState {
     pub terminal: Option<RunTerminal>,
 }
 
-// Read elements directly into the bounded heap allocation; array deserialization
-// would create a large stack temporary even inside Box<Account<RunGameState>>.
-fn read_buffer<T: AnchorDeserialize, R: Read>(
-    reader: &mut R,
-    capacity: usize,
-) -> io::Result<Vec<T>> {
-    if u32::deserialize_reader(reader)? != capacity as u32 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "invalid run buffer capacity",
-        ));
-    }
-    let mut values = Vec::with_capacity(capacity);
-    for _ in 0..capacity {
-        values.push(T::deserialize_reader(reader)?);
-    }
-    Ok(values)
-}
-
 fn write_buffer<T: AnchorSerialize, W: Write>(
     values: &[T],
     writer: &mut W,
@@ -221,20 +201,11 @@ fn write_buffer<T: AnchorSerialize, W: Write>(
     values.serialize(writer)
 }
 
-fn read_entities<R: Read>(reader: &mut R) -> io::Result<Vec<WorldEntity>> {
-    read_buffer(reader, MAX_WORLD_ENTITIES)
-}
 fn write_entities<W: Write>(values: &[WorldEntity], writer: &mut W) -> io::Result<()> {
     write_buffer(values, writer, MAX_WORLD_ENTITIES)
 }
-fn read_observations<R: Read>(reader: &mut R) -> io::Result<Vec<OracleObservation>> {
-    read_buffer(reader, MAX_RECENT_OBSERVATIONS)
-}
 fn write_observations<W: Write>(values: &[OracleObservation], writer: &mut W) -> io::Result<()> {
     write_buffer(values, writer, MAX_RECENT_OBSERVATIONS)
-}
-fn read_intents<R: Read>(reader: &mut R) -> io::Result<Vec<Option<AcceptedIntent>>> {
-    read_buffer(reader, MAX_QUEUED_INTENTS)
 }
 fn write_intents<W: Write>(values: &[Option<AcceptedIntent>], writer: &mut W) -> io::Result<()> {
     write_buffer(values, writer, MAX_QUEUED_INTENTS)
