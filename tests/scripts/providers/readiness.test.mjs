@@ -15,6 +15,10 @@ const oracle = Buffer.from(
   ).trim(),
   "hex",
 );
+const devnetGenesis = readFileSync(
+  new URL("../../fixtures/providers/devnet-genesis.txt", import.meta.url),
+  "utf8",
+).trim();
 
 function account(owner, data, executable = false) {
   return {
@@ -26,21 +30,26 @@ function account(owner, data, executable = false) {
 }
 
 function providerResponse(method, host, overrides = {}) {
-  if (method === "getGenesisHash") return DEVNET.genesisHash;
+  if (method === "getGenesisHash") return devnetGenesis;
   if (method === "getIdentity") return { identity: publicKey };
   if (method === "getBalance")
     return { context: { slot: 123_456_790 }, value: 10_000_000 };
-  if (method === "getMultipleAccounts" && host.includes("helius")) {
+  if (
+    method === "getMultipleAccounts" &&
+    (host.includes("helius") || host.includes("router"))
+  ) {
     const mint = Buffer.alloc(82);
     mint[44] = 6;
     mint[45] = 1;
     return {
       context: { slot: 123_456_790 },
-      value: [
-        account(DEVNET.tokenProgram, mint),
-        account(DEVNET.program, Buffer.alloc(0), true),
-        account(DEVNET.vrfProgram, Buffer.alloc(0)),
-      ],
+      value: host.includes("router")
+        ? [account(DEVNET.tokenProgram, mint)]
+        : [
+            account(DEVNET.tokenProgram, mint),
+            account(DEVNET.program, Buffer.alloc(0), true),
+            account(DEVNET.vrfProgram, Buffer.alloc(0)),
+          ],
     };
   }
   if (method === "getMultipleAccounts") {
@@ -118,9 +127,16 @@ test("bad configuration stops before contacting a provider", async (context) => 
 
 test("wrong chains, spoofed identities and underfunding fail without leaking errors", async (context) => {
   stubProviders(context, (body, url) => {
-    if (body.method === "getGenesisHash" && url.includes("router"))
+    if (body.method === "getMultipleAccounts" && url.includes("router"))
       return new Response(
-        JSON.stringify({ jsonrpc: "2.0", id: 1, result: "wrong-chain" }),
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            context: { slot: 1 },
+            value: [account(DEVNET.program, Buffer.alloc(82))],
+          },
+        }),
       );
     if (body.method === "getIdentity")
       return new Response(
@@ -148,12 +164,28 @@ test("wrong chains, spoofed identities and underfunding fail without leaking err
     report.checks.map((item) => item.code),
     [
       "SPONSOR_UNDERFUNDED",
-      "WRONG_NETWORK",
+      "MINT_MISMATCH",
       "VALIDATOR_MISMATCH",
       "PROVIDER_UNAVAILABLE_OR_INVALID",
     ],
   );
   assert.ok(!JSON.stringify(report).includes("TEST_ONLY_RPC_CREDENTIAL"));
+});
+
+test("base RPC must return the full Devnet genesis hash, not its CAIP prefix", async (context) => {
+  stubProviders(context, (body) => {
+    if (body.method === "getGenesisHash")
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: devnetGenesis.slice(0, 32),
+        }),
+      );
+    return undefined;
+  });
+  const report = await runReadiness(environment);
+  assert.equal(report.checks[0].code, "WRONG_NETWORK");
 });
 
 test("oversized responses are rejected before JSON parsing", async (context) => {

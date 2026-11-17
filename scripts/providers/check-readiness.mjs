@@ -174,12 +174,17 @@ export async function runReadiness(environment) {
     [
       "router_devnet",
       async () => {
-        if (
-          genesisSchema.parse(
-            await rpc(config.MAGICBLOCK_ROUTER_HTTP_URL, "getGenesisHash"),
-          ) !== DEVNET.genesisHash
-        )
-          throw new Error("WRONG_NETWORK");
+        // The Router does not implement getGenesisHash; check its Devnet mint.
+        const accounts = accountsSchema.parse(
+          await rpc(config.MAGICBLOCK_ROUTER_HTTP_URL, "getMultipleAccounts", [
+            [DEVNET.usdcMint],
+            { encoding: "base64", commitment: "finalized" },
+          ]),
+        );
+        const mint = accounts.value[0];
+        if (accounts.value.length !== 1 || mint == null)
+          throw new Error("MISSING_BASE_ACCOUNT");
+        validateUsdcMint(mint);
       },
     ],
     ["er_identity_and_oracles", () => checkEr(config)],

@@ -16,7 +16,7 @@ export const publicKeySchema = z
   );
 
 export const DEVNET = {
-  genesisHash: "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+  genesisHash: "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
   program: "F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx",
   usdcMint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
   tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
