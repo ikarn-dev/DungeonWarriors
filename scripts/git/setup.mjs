@@ -14,6 +14,24 @@ function shellQuote(value) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
+function isTaskCommitHandler(handler) {
+  return (
+    handler?.type === "command" &&
+    handler.statusMessage === "Committing completed PURRPS task" &&
+    typeof handler.command === "string" &&
+    handler.command.includes("/scripts/git/task-commit.mjs")
+  );
+}
+
+function otherStopHooks(stop) {
+  return stop
+    .map((entry) => ({
+      ...entry,
+      hooks: entry.hooks.filter((handler) => !isTaskCommitHandler(handler)),
+    }))
+    .filter((entry) => entry.hooks.length > 0);
+}
+
 function localHookConfig() {
   const directory = join(root, ".codex");
   const path = join(directory, "hooks.json");
@@ -42,15 +60,16 @@ function localHookConfig() {
     throw new Error("Existing Stop hooks must be an array.");
   const command =
     shellQuote(process.execPath) +
-    " " +
-    shellQuote(join(root, "scripts/git/task-commit.mjs")) +
-    " --hook";
-  const present = stop.some(
-    (entry) =>
-      Array.isArray(entry?.hooks) &&
-      entry.hooks.some((handler) => handler?.command === command),
-  );
-  if (present) return { path, directory, content: null };
+    ' "$(git rev-parse --show-toplevel)/scripts/git/task-commit.mjs" --hook';
+  const managed = stop.flatMap((entry) => {
+    if (!Array.isArray(entry?.hooks))
+      throw new Error("Invalid Stop hook entry.");
+    return entry.hooks.filter(isTaskCommitHandler);
+  });
+  if (managed.length === 1 && managed[0].command === command) {
+    return { path, directory, content: null };
+  }
+  const retained = otherStopHooks(stop);
   const registration = {
     hooks: [
       {
@@ -65,7 +84,7 @@ function localHookConfig() {
     path,
     directory,
     content: `${JSON.stringify(
-      { ...current, hooks: { ...hooks, Stop: [...stop, registration] } },
+      { ...current, hooks: { ...hooks, Stop: [...retained, registration] } },
       null,
       2,
     )}\n`,
