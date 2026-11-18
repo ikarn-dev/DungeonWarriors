@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { DEVNET } from "../../../apps/web/lib/solana/addresses.mts";
 import {
   REQUIRED_PROGRAM_INSTRUCTIONS,
   validatedClientSource,
 } from "../../../apps/web/lib/solana/build-artifacts.mts";
+import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.mts";
 
 function artifacts() {
   const instructions = REQUIRED_PROGRAM_INSTRUCTIONS.map((name) => ({
@@ -27,6 +29,22 @@ function artifacts() {
     typeSource: `export type PurrpsGame = { address: "${DEVNET.program}"; instructions: [${instructions.map(({ name }) => `"${name}"`).join(",")}]; };`,
   };
 }
+
+test("the retained public ABI works without target files or an ignored generated client", () => {
+  const source = readFileSync(
+    new URL("../../../apps/web/lib/solana/purrps-game.mts", import.meta.url),
+    "utf8",
+  );
+  assert.ok(
+    validatedClientSource(PURRPS_GAME_IDL, source).includes("PURRPS_GAME_IDL"),
+  );
+  const accounts = PURRPS_GAME_IDL.accounts.map((account) =>
+    account.name.replace(/_/g, "").toLowerCase(),
+  );
+  assert.ok(accounts.includes("rungamestate"));
+  assert.ok(accounts.includes("runescrow"));
+  assert.ok(accounts.includes("housestate"));
+});
 
 test("exports actual artifact content with a checked runtime IDL and its generated type", () => {
   const { idl, typeSource } = artifacts();

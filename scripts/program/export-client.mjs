@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
@@ -20,9 +21,29 @@ export function exportClient() {
     JSON.parse(readFileSync(jsonPath, "utf8")),
     readFileSync(typePath, "utf8"),
   );
-  const output = join(root, "apps/web/lib/generated/purrps_game.ts");
+  // The public ABI is runtime source required by clean web/Vercel checkouts.
+  // Wallets, binaries and the rest of target/ remain local build artifacts.
+  const output = join(root, "apps/web/lib/solana/purrps-game.mts");
+  const formatted = spawnSync(
+    process.execPath,
+    [
+      join(root, "node_modules/@biomejs/biome/bin/biome"),
+      "format",
+      "--stdin-file-path",
+      output,
+    ],
+    {
+      input: source,
+      encoding: "utf8",
+      timeout: 10_000,
+      maxBuffer: 2 * 1024 * 1024,
+      cwd: root,
+    },
+  );
+  if (formatted.error || formatted.status !== 0)
+    throw new Error("CLIENT_FORMAT_FAILED");
   mkdirSync(dirname(output), { recursive: true });
-  writeFileSync(output, source);
+  writeFileSync(output, formatted.stdout);
 }
 
 if (import.meta.main) {
