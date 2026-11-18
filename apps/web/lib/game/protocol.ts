@@ -1,9 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
-import { publicKeySchema } from "../solana/addresses.mts";
+import { publicKeySchema } from "../solana/addresses.ts";
 import { RULES_V1, U64_MAX } from "./rules";
 
-export { publicKeySchema } from "../solana/addresses.mts";
+export { publicKeySchema } from "../solana/addresses.ts";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_INTENTS_PER_SUBMISSION = 8;

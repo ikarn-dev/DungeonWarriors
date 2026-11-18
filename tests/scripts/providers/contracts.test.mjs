@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { providerConfigSchema } from "../../../apps/web/lib/providers/config.mts";
+import { providerConfigSchema } from "../../../apps/web/lib/providers/config.ts";
 import {
   decodeOracleQuote,
   validateOracleQuote,
@@ -17,7 +17,7 @@ import {
   DEVNET,
   oracleAddress,
   vrfCallbackAuthority,
-} from "../../../apps/web/lib/solana/addresses.mts";
+} from "../../../apps/web/lib/solana/addresses.ts";
 import {
   environment,
   publicKey,

@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { TOKEN_PROGRAM_ID, unpackMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
-import { DEVNET, publicKeySchema } from "../solana/addresses.mts";
+import { DEVNET, publicKeySchema } from "../solana/addresses.ts";
 
 const safeUnsigned = z
   .number()

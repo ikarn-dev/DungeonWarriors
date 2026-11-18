@@ -3,7 +3,7 @@ import {
   accountBytes,
   accountSchema,
 } from "../../apps/web/lib/providers/rpc-schema.mts";
-import { DEVNET, oracleAddress } from "../../apps/web/lib/solana/addresses.mts";
+import { DEVNET, oracleAddress } from "../../apps/web/lib/solana/addresses.ts";
 
 // A BTC notification proves the configured WSS pair delivers actual oracle data.
 // Freshness is checked separately against the ER Clock in the HTTP account read.

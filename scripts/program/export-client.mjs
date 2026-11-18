@@ -23,7 +23,7 @@ export function exportClient() {
   );
   // The public ABI is runtime source required by clean web/Vercel checkouts.
   // Wallets, binaries and the rest of target/ remain local build artifacts.
-  const output = join(root, "apps/web/lib/solana/purrps-game.mts");
+  const output = join(root, "apps/web/lib/solana/purrps-game.ts");
   const formatted = spawnSync(
     process.execPath,
     [

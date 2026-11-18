@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DEVNET } from "../../../apps/web/lib/solana/addresses.mts";
+import { DEVNET } from "../../../apps/web/lib/solana/addresses.ts";
 import {
   REQUIRED_PROGRAM_INSTRUCTIONS,
   validatedClientSource,
 } from "../../../apps/web/lib/solana/build-artifacts.mts";
-import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.mts";
+import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
 
 function artifacts() {
   const instructions = REQUIRED_PROGRAM_INSTRUCTIONS.map((name) => ({
@@ -32,7 +32,7 @@ function artifacts() {
 
 test("the retained public ABI works without target files or an ignored generated client", () => {
   const source = readFileSync(
-    new URL("../../../apps/web/lib/solana/purrps-game.mts", import.meta.url),
+    new URL("../../../apps/web/lib/solana/purrps-game.ts", import.meta.url),
     "utf8",
   );
   assert.ok(

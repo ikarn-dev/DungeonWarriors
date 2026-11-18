@@ -6,8 +6,8 @@ import {
   type IdlAccounts,
 } from "@anchor-lang/core";
 import { type AccountInfo, PublicKey } from "@solana/web3.js";
-import { DEVNET, publicKeySchema } from "../solana/addresses.mts";
-import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.mts";
+import { DEVNET, publicKeySchema } from "../solana/addresses.ts";
+import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
 import { type CatId, catStats } from "./catalog";
 import { parsePredictionSnapshot } from "./predictor";
 import { runAccountObservationSchema } from "./protocol";

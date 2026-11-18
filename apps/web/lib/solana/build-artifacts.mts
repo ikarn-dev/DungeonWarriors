@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { DEVNET } from "./addresses.mts";
+import { DEVNET } from "./addresses.ts";
 
 export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "initialize_config",

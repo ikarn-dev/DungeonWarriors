@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicKeySchema } from "../solana/addresses.mts";
+import { publicKeySchema } from "../solana/addresses.ts";
 
 function endpointSchema(protocol: string, hosts: readonly string[]) {
   return z

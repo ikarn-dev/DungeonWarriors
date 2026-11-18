@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   DEVNET,
   oracleAddress,
-} from "../../../apps/web/lib/solana/addresses.mts";
+} from "../../../apps/web/lib/solana/addresses.ts";
 import { runReadiness } from "../../../scripts/providers/check-readiness.mjs";
 import {
   environment,

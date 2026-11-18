@@ -1,5 +1,5 @@
 import process from "node:process";
-import { providerConfigSchema } from "../../apps/web/lib/providers/config.mts";
+import { providerConfigSchema } from "../../apps/web/lib/providers/config.ts";
 import {
   decodeOracleQuote,
   validateOracleQuote,
@@ -20,7 +20,7 @@ import {
   MARKETS,
   oracleAddress,
   vrfCallbackAuthority,
-} from "../../apps/web/lib/solana/addresses.mts";
+} from "../../apps/web/lib/solana/addresses.ts";
 import { checkErStream } from "./check-er-stream.mjs";
 
 const maxResponseBytes = 256 * 1024;

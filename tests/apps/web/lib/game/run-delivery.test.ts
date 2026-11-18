@@ -15,7 +15,7 @@ import {
   ENTITY_VECTOR_OFFSET,
   guardRunLayout,
 } from "../../../../../apps/web/lib/game/run-layout";
-import { DEVNET } from "../../../../../apps/web/lib/solana/addresses.mts";
+import { DEVNET } from "../../../../../apps/web/lib/solana/addresses.ts";
 
 const identity = {
   owner: new PublicKey(new Uint8Array(32).fill(1)).toBase58(),
