@@ -1,4 +1,6 @@
 pub mod create_player;
+pub mod credit;
+pub mod house;
 pub mod increment;
 pub mod initialize;
 pub mod initialize_config;
@@ -6,6 +8,8 @@ pub mod inspect_oracle;
 pub mod publish;
 
 pub use create_player::*;
+pub use credit::*;
+pub use house::*;
 pub use increment::*;
 pub use initialize::*;
 pub use initialize_config::*;

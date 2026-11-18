@@ -30,4 +30,16 @@ pub enum ErrorCode {
     InvalidManifest,
     #[msg("Integer range exceeded")]
     ArithmeticOverflow,
+    #[msg("A positive token amount is required")]
+    InvalidAmount,
+    #[msg("Token owner or player identity is invalid")]
+    InvalidOwner,
+    #[msg("The custody vault is invalid or has an external delegate/close authority")]
+    InvalidVault,
+    #[msg("Insufficient settled available credit")]
+    InsufficientCredit,
+    #[msg("The vault does not cover all obligations and the required buffer")]
+    InsolventHouse,
+    #[msg("Run identity or frozen snapshot is invalid")]
+    InvalidRun,
 }

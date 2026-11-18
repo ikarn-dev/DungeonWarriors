@@ -16,7 +16,7 @@ use anchor_lang::prelude::*;
 
 pub use constants::*;
 use contracts::Market;
-use instruction_args::{InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs};
+use instruction_args::{AmountArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs};
 pub use instructions::*;
 use oracle::InspectedOracle;
 pub use state::Counter;
@@ -26,6 +26,30 @@ declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 #[program]
 pub mod purrps_game {
     use super::*;
+
+    pub fn initialize_house(ctx: Context<InitializeHouse>) -> Result<()> {
+        crate::instructions::house::handle_initialize_house(ctx)
+    }
+
+    pub fn fund_house(ctx: Context<ManageHouse>, args: AmountArgs) -> Result<()> {
+        crate::instructions::house::handle_fund_house(ctx, args)
+    }
+
+    pub fn withdraw_surplus(ctx: Context<ManageHouse>, args: AmountArgs) -> Result<()> {
+        crate::instructions::house::handle_withdraw_surplus(ctx, args)
+    }
+
+    pub fn set_house_buffer(ctx: Context<SetHouseBuffer>, args: AmountArgs) -> Result<()> {
+        crate::instructions::house::handle_set_house_buffer(ctx, args)
+    }
+
+    pub fn deposit(ctx: Context<TransferCredit>, args: AmountArgs) -> Result<()> {
+        crate::instructions::credit::handle_deposit(ctx, args)
+    }
+
+    pub fn withdraw(ctx: Context<TransferCredit>, args: AmountArgs) -> Result<()> {
+        crate::instructions::credit::handle_withdraw(ctx, args)
+    }
 
     pub fn initialize_config(
         ctx: Context<InitializeConfig>,
