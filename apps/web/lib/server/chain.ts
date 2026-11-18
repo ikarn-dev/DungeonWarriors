@@ -168,7 +168,6 @@ export async function readState(
             },
           });
         });
-        values.context.slot = published.context.slot;
       }
     }
   }

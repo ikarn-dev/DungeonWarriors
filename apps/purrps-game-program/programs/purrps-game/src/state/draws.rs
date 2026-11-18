@@ -46,7 +46,7 @@ pub struct CapsuleDraw {
     pub price_base_units: u64,
     pub vrf_program: Pubkey,
     pub vrf_queue: Pubkey,
-    pub vrf_request: Pubkey,
+    // SDK requests live in the queue; this account/hash is our stable operation identity.
     pub callback_authority: Pubkey,
     pub committed_seed_hash: [u8; 32],
     pub requested_at_seconds: i64,

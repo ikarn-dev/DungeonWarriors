@@ -7,7 +7,7 @@ import {
   missingSceneAssets,
   parseAssetManifest,
   verifyManifestBinding,
-} from "../../../../../apps/web/lib/game/assets.mts";
+} from "../../../../../apps/web/lib/game/assets.ts";
 import {
   coinFrame,
   coinPlacement,

@@ -91,15 +91,15 @@ pub struct RequestCapsuleArgs {
     pub expected_inventory_version: u64,
     pub expected_catalog_version: u32,
     pub kind: CapsuleKind,
+    pub max_payer_debit_lamports: u64,
 }
 
 // Accepted only under the authenticated VRF callback; these bytes are not a
 // permission for an ordinary user to fulfill a draw or pick their own outcome.
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
 pub struct FulfillCapsuleArgs {
-    pub nonce: u64,
-    pub request: Pubkey,
     pub randomness: [u8; 32],
+    pub committed_seed_hash: [u8; 32],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]

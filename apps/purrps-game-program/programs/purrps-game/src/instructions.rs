@@ -7,6 +7,7 @@ pub mod initialize_config;
 pub mod inspect_oracle;
 pub mod inspect_run;
 pub mod publish;
+pub mod starter;
 
 pub use create_player::*;
 pub use credit::*;
@@ -17,3 +18,4 @@ pub use initialize_config::*;
 pub use inspect_oracle::*;
 pub use inspect_run::*;
 pub use publish::*;
+pub use starter::*;

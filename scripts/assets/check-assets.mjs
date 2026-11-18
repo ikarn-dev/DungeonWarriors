@@ -8,7 +8,7 @@ import {
   FIRST_SCENE_ASSETS,
   missingSceneAssets,
   parseAssetManifest,
-} from "../../apps/web/lib/game/assets.mts";
+} from "../../apps/web/lib/game/assets.ts";
 
 const webRequire = createRequire(
   new URL("../../apps/web/package.json", import.meta.url),

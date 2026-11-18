@@ -16,6 +16,10 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "withdraw",
   "inspect_run",
   "inspect_run_escrow",
+  "claim_starter",
+  "fulfill_starter",
+  "select_cat",
+  "set_admission",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

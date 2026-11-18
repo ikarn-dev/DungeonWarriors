@@ -1,6 +1,7 @@
 pub mod catalog;
 pub mod constants;
 pub mod contracts;
+pub mod draw;
 pub mod economy;
 pub mod error;
 pub mod instruction_args;
@@ -16,7 +17,10 @@ use anchor_lang::prelude::*;
 
 pub use constants::*;
 use contracts::Market;
-use instruction_args::{AmountArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs};
+use instruction_args::{
+    AmountArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs, RequestCapsuleArgs,
+    SelectCatArgs, SetAdmissionArgs,
+};
 pub use instructions::*;
 use oracle::InspectedOracle;
 pub use state::Counter;
@@ -26,6 +30,23 @@ declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 #[program]
 pub mod purrps_game {
     use super::*;
+
+    pub fn claim_starter(ctx: Context<ClaimStarter>, args: RequestCapsuleArgs) -> Result<()> {
+        crate::instructions::starter::handle_claim_starter(ctx, args)
+    }
+    pub fn fulfill_starter(
+        ctx: Context<FulfillStarter>,
+        randomness: [u8; 32],
+        seed: [u8; 32],
+    ) -> Result<()> {
+        crate::instructions::starter::handle_fulfill_starter(ctx, randomness, seed)
+    }
+    pub fn select_cat(ctx: Context<SelectCat>, args: SelectCatArgs) -> Result<()> {
+        crate::instructions::starter::handle_select_cat(ctx, args)
+    }
+    pub fn set_admission(ctx: Context<SetAdmission>, args: SetAdmissionArgs) -> Result<()> {
+        crate::instructions::starter::handle_set_admission(ctx, args)
+    }
 
     pub fn initialize_house(ctx: Context<InitializeHouse>) -> Result<()> {
         crate::instructions::house::handle_initialize_house(ctx)

@@ -7,6 +7,7 @@
     "typeRoots": ["../apps/web/node_modules/@types"],
     "paths": {
       "@solana/web3.js": ["../apps/web/node_modules/@solana/web3.js"],
+      "@anchor-lang/core": ["../apps/web/node_modules/@anchor-lang/core"],
       "vitest": ["../apps/web/node_modules/vitest"],
       "@/*": ["../apps/web/*"]
     }

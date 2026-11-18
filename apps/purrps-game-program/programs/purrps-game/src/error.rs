@@ -42,4 +42,16 @@ pub enum ErrorCode {
     InsolventHouse,
     #[msg("Run identity or frozen snapshot is invalid")]
     InvalidRun,
+    #[msg("This operation is paused or its implementation is not admitted")]
+    AdmissionClosed,
+    #[msg("Inventory, draw identity or version is stale")]
+    InvalidInventory,
+    #[msg("The starter draw is already pending or fulfilled")]
+    StarterAlreadyClaimed,
+    #[msg("The callback does not match the frozen pending request")]
+    InvalidCallback,
+    #[msg("Invalid or exhausted session authorization")]
+    InvalidSession,
+    #[msg("Invalid or insufficient purpose-bound sponsor funding")]
+    InvalidSponsorBudget,
 }

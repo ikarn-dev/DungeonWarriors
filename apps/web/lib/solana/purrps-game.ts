@@ -16,6 +16,137 @@ export type PurrpsGame = {
   };
   instructions: [
     {
+      name: "claimStarter";
+      discriminator: [142, 187, 84, 81, 84, 148, 223, 217];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "owner";
+          signer: true;
+          relations: ["player", "collection"];
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "arg";
+                path: "args.expectedCatalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "draw";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [100, 114, 97, 119];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+              {
+                kind: "arg";
+                path: "args.expectedDrawNonce";
+              },
+            ];
+          };
+        },
+        {
+          name: "oracleQueue";
+          writable: true;
+        },
+        {
+          name: "programIdentity";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [105, 100, 101, 110, 116, 105, 116, 121];
+              },
+            ];
+          };
+        },
+        {
+          name: "vrfProgram";
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz";
+        },
+        {
+          name: "slotHashes";
+          address: "SysvarS1otHashes111111111111111111111111111";
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "requestCapsuleArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "createPlayer";
       discriminator: [19, 178, 189, 216, 159, 134, 0, 192];
       accounts: [
@@ -151,6 +282,100 @@ export type PurrpsGame = {
             defined: {
               name: "amountArgs";
             };
+          };
+        },
+      ];
+    },
+    {
+      name: "fulfillStarter";
+      discriminator: [114, 170, 35, 28, 32, 184, 26, 211];
+      accounts: [
+        {
+          name: "vrfProgramIdentity";
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ];
+          signer: true;
+        },
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "draw";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [100, 114, 97, 119];
+              },
+              {
+                kind: "account";
+                path: "draw.owner";
+                account: "capsuleDraw";
+              },
+              {
+                kind: "account";
+                path: "draw.nonce";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "draw.owner";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "draw.catalog.version";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "randomness";
+          type: {
+            array: ["u8", 32];
+          };
+        },
+        {
+          name: "seed";
+          type: {
+            array: ["u8", 32];
           };
         },
       ];
@@ -636,6 +861,76 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "selectCat";
+      discriminator: [207, 232, 198, 181, 56, 52, 167, 86];
+      accounts: [
+        {
+          name: "owner";
+          signer: true;
+          relations: ["collection"];
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "selectCatArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "setAdmission";
+      discriminator: [210, 241, 169, 64, 58, 171, 144, 234];
+      accounts: [
+        {
+          name: "config";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "admin";
+          signer: true;
+          relations: ["config"];
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "setAdmissionArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "setHouseBuffer";
       discriminator: [134, 174, 158, 200, 163, 103, 85, 79];
       accounts: [
@@ -824,6 +1119,10 @@ export type PurrpsGame = {
   ];
   accounts: [
     {
+      name: "capsuleDraw";
+      discriminator: [213, 12, 103, 20, 228, 32, 16, 181];
+    },
+    {
       name: "catalogVersion";
       discriminator: [163, 239, 122, 52, 153, 145, 228, 171];
     },
@@ -961,6 +1260,36 @@ export type PurrpsGame = {
       name: "invalidRun";
       msg: "Run identity or frozen snapshot is invalid";
     },
+    {
+      code: 6020;
+      name: "admissionClosed";
+      msg: "This operation is paused or its implementation is not admitted";
+    },
+    {
+      code: 6021;
+      name: "invalidInventory";
+      msg: "Inventory, draw identity or version is stale";
+    },
+    {
+      code: 6022;
+      name: "starterAlreadyClaimed";
+      msg: "The starter draw is already pending or fulfilled";
+    },
+    {
+      code: 6023;
+      name: "invalidCallback";
+      msg: "The callback does not match the frozen pending request";
+    },
+    {
+      code: 6024;
+      name: "invalidSession";
+      msg: "Invalid or exhausted session authorization";
+    },
+    {
+      code: 6025;
+      name: "invalidSponsorBudget";
+      msg: "Invalid or insufficient purpose-bound sponsor funding";
+    },
   ];
   types: [
     {
@@ -995,6 +1324,137 @@ export type PurrpsGame = {
           {
             name: "amountBaseUnits";
             type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "capsuleDraw";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "kind";
+            type: {
+              defined: {
+                name: "capsuleKind";
+              };
+            };
+          },
+          {
+            name: "status";
+            type: {
+              defined: {
+                name: "drawStatus";
+              };
+            };
+          },
+          {
+            name: "catalog";
+            type: {
+              defined: {
+                name: "versionBinding";
+              };
+            };
+          },
+          {
+            name: "inventoryVersion";
+            type: "u64";
+          },
+          {
+            name: "eligibleMask";
+            type: "u8";
+          },
+          {
+            name: "weights";
+            type: {
+              array: ["u16", 4];
+            };
+          },
+          {
+            name: "totalWeight";
+            type: "u16";
+          },
+          {
+            name: "priceBaseUnits";
+            type: "u64";
+          },
+          {
+            name: "vrfProgram";
+            type: "pubkey";
+          },
+          {
+            name: "vrfQueue";
+            type: "pubkey";
+          },
+          {
+            name: "callbackAuthority";
+            type: "pubkey";
+          },
+          {
+            name: "committedSeedHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "requestedAtSeconds";
+            type: "i64";
+          },
+          {
+            name: "paidDeadlineSeconds";
+            type: {
+              option: "i64";
+            };
+          },
+          {
+            name: "result";
+            type: {
+              option: {
+                defined: {
+                  name: "drawResult";
+                };
+              };
+            };
+          },
+          {
+            name: "completedAtSeconds";
+            type: {
+              option: "i64";
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "capsuleKind";
+      type: {
+        kind: "enum";
+        variants: [
+          {
+            name: "starterCat";
+          },
+          {
+            name: "paidCat";
+          },
+          {
+            name: "upgrade";
           },
         ];
       };
@@ -1376,6 +1836,51 @@ export type PurrpsGame = {
           {
             name: "completionAttempts";
             type: "u16";
+          },
+        ];
+      };
+    },
+    {
+      name: "drawResult";
+      type: {
+        kind: "enum";
+        variants: [
+          {
+            name: "cat";
+            fields: [
+              {
+                defined: {
+                  name: "catId";
+                };
+              },
+            ];
+          },
+          {
+            name: "upgrade";
+            fields: [
+              {
+                defined: {
+                  name: "rarity";
+                };
+              },
+            ];
+          },
+        ];
+      };
+    },
+    {
+      name: "drawStatus";
+      type: {
+        kind: "enum";
+        variants: [
+          {
+            name: "pending";
+          },
+          {
+            name: "fulfilled";
+          },
+          {
+            name: "refunded";
           },
         ];
       };
@@ -2479,6 +2984,38 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "requestCapsuleArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "expectedDrawNonce";
+            type: "u64";
+          },
+          {
+            name: "expectedInventoryVersion";
+            type: "u64";
+          },
+          {
+            name: "expectedCatalogVersion";
+            type: "u32";
+          },
+          {
+            name: "kind";
+            type: {
+              defined: {
+                name: "capsuleKind";
+              };
+            };
+          },
+          {
+            name: "maxPayerDebitLamports";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
       name: "runEscrow";
       type: {
         kind: "struct";
@@ -3043,6 +3580,46 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "selectCatArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "expectedInventoryVersion";
+            type: "u64";
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catId";
+              };
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "setAdmissionArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "starter";
+            type: "bool";
+          },
+          {
+            name: "purchases";
+            type: "bool";
+          },
+          {
+            name: "reservations";
+            type: "bool";
+          },
+        ];
+      };
+    },
+    {
       name: "starterClaim";
       type: {
         kind: "enum";
@@ -3224,6 +3801,137 @@ export const PURRPS_GAME_IDL = {
   },
   instructions: [
     {
+      name: "claim_starter",
+      discriminator: [142, 187, 84, 81, 84, 148, 223, 217],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "owner",
+          signer: true,
+          relations: ["player", "collection"],
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "arg",
+                path: "args.expected_catalog_version",
+              },
+            ],
+          },
+        },
+        {
+          name: "draw",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [100, 114, 97, 119],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+              {
+                kind: "arg",
+                path: "args.expected_draw_nonce",
+              },
+            ],
+          },
+        },
+        {
+          name: "oracle_queue",
+          writable: true,
+        },
+        {
+          name: "program_identity",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [105, 100, 101, 110, 116, 105, 116, 121],
+              },
+            ],
+          },
+        },
+        {
+          name: "vrf_program",
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz",
+        },
+        {
+          name: "slot_hashes",
+          address: "SysvarS1otHashes111111111111111111111111111",
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "RequestCapsuleArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "create_player",
       discriminator: [19, 178, 189, 216, 159, 134, 0, 192],
       accounts: [
@@ -3359,6 +4067,100 @@ export const PURRPS_GAME_IDL = {
             defined: {
               name: "AmountArgs",
             },
+          },
+        },
+      ],
+    },
+    {
+      name: "fulfill_starter",
+      discriminator: [114, 170, 35, 28, 32, 184, 26, 211],
+      accounts: [
+        {
+          name: "vrf_program_identity",
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ],
+          signer: true,
+        },
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "draw",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [100, 114, 97, 119],
+              },
+              {
+                kind: "account",
+                path: "draw.owner",
+                account: "CapsuleDraw",
+              },
+              {
+                kind: "account",
+                path: "draw.nonce",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "draw.owner",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "draw.catalog.version",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "randomness",
+          type: {
+            array: ["u8", 32],
+          },
+        },
+        {
+          name: "seed",
+          type: {
+            array: ["u8", 32],
           },
         },
       ],
@@ -3815,6 +4617,76 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "select_cat",
+      discriminator: [207, 232, 198, 181, 56, 52, 167, 86],
+      accounts: [
+        {
+          name: "owner",
+          signer: true,
+          relations: ["collection"],
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "SelectCatArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "set_admission",
+      discriminator: [210, 241, 169, 64, 58, 171, 144, 234],
+      accounts: [
+        {
+          name: "config",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "admin",
+          signer: true,
+          relations: ["config"],
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "SetAdmissionArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "set_house_buffer",
       discriminator: [134, 174, 158, 200, 163, 103, 85, 79],
       accounts: [
@@ -4003,6 +4875,10 @@ export const PURRPS_GAME_IDL = {
   ],
   accounts: [
     {
+      name: "CapsuleDraw",
+      discriminator: [213, 12, 103, 20, 228, 32, 16, 181],
+    },
+    {
       name: "CatalogVersion",
       discriminator: [163, 239, 122, 52, 153, 145, 228, 171],
     },
@@ -4072,6 +4948,137 @@ export const PURRPS_GAME_IDL = {
           {
             name: "amount_base_units",
             type: "u64",
+          },
+        ],
+      },
+    },
+    {
+      name: "CapsuleDraw",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "kind",
+            type: {
+              defined: {
+                name: "CapsuleKind",
+              },
+            },
+          },
+          {
+            name: "status",
+            type: {
+              defined: {
+                name: "DrawStatus",
+              },
+            },
+          },
+          {
+            name: "catalog",
+            type: {
+              defined: {
+                name: "VersionBinding",
+              },
+            },
+          },
+          {
+            name: "inventory_version",
+            type: "u64",
+          },
+          {
+            name: "eligible_mask",
+            type: "u8",
+          },
+          {
+            name: "weights",
+            type: {
+              array: ["u16", 4],
+            },
+          },
+          {
+            name: "total_weight",
+            type: "u16",
+          },
+          {
+            name: "price_base_units",
+            type: "u64",
+          },
+          {
+            name: "vrf_program",
+            type: "pubkey",
+          },
+          {
+            name: "vrf_queue",
+            type: "pubkey",
+          },
+          {
+            name: "callback_authority",
+            type: "pubkey",
+          },
+          {
+            name: "committed_seed_hash",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "requested_at_seconds",
+            type: "i64",
+          },
+          {
+            name: "paid_deadline_seconds",
+            type: {
+              option: "i64",
+            },
+          },
+          {
+            name: "result",
+            type: {
+              option: {
+                defined: {
+                  name: "DrawResult",
+                },
+              },
+            },
+          },
+          {
+            name: "completed_at_seconds",
+            type: {
+              option: "i64",
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "CapsuleKind",
+      type: {
+        kind: "enum",
+        variants: [
+          {
+            name: "StarterCat",
+          },
+          {
+            name: "PaidCat",
+          },
+          {
+            name: "Upgrade",
           },
         ],
       },
@@ -4453,6 +5460,51 @@ export const PURRPS_GAME_IDL = {
           {
             name: "completion_attempts",
             type: "u16",
+          },
+        ],
+      },
+    },
+    {
+      name: "DrawResult",
+      type: {
+        kind: "enum",
+        variants: [
+          {
+            name: "Cat",
+            fields: [
+              {
+                defined: {
+                  name: "CatId",
+                },
+              },
+            ],
+          },
+          {
+            name: "Upgrade",
+            fields: [
+              {
+                defined: {
+                  name: "Rarity",
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      name: "DrawStatus",
+      type: {
+        kind: "enum",
+        variants: [
+          {
+            name: "Pending",
+          },
+          {
+            name: "Fulfilled",
+          },
+          {
+            name: "Refunded",
           },
         ],
       },
@@ -5556,6 +6608,38 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "RequestCapsuleArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "expected_draw_nonce",
+            type: "u64",
+          },
+          {
+            name: "expected_inventory_version",
+            type: "u64",
+          },
+          {
+            name: "expected_catalog_version",
+            type: "u32",
+          },
+          {
+            name: "kind",
+            type: {
+              defined: {
+                name: "CapsuleKind",
+              },
+            },
+          },
+          {
+            name: "max_payer_debit_lamports",
+            type: "u64",
+          },
+        ],
+      },
+    },
+    {
       name: "RunEscrow",
       type: {
         kind: "struct",
@@ -6120,6 +7204,46 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "SelectCatArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "expected_inventory_version",
+            type: "u64",
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatId",
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "SetAdmissionArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "starter",
+            type: "bool",
+          },
+          {
+            name: "purchases",
+            type: "bool",
+          },
+          {
+            name: "reservations",
+            type: "bool",
+          },
+        ],
+      },
+    },
+    {
       name: "StarterClaim",
       type: {
         kind: "enum",
@@ -6372,6 +7496,36 @@ export const PURRPS_GAME_IDL = {
       code: 6019,
       name: "InvalidRun",
       msg: "Run identity or frozen snapshot is invalid",
+    },
+    {
+      code: 6020,
+      name: "AdmissionClosed",
+      msg: "This operation is paused or its implementation is not admitted",
+    },
+    {
+      code: 6021,
+      name: "InvalidInventory",
+      msg: "Inventory, draw identity or version is stale",
+    },
+    {
+      code: 6022,
+      name: "StarterAlreadyClaimed",
+      msg: "The starter draw is already pending or fulfilled",
+    },
+    {
+      code: 6023,
+      name: "InvalidCallback",
+      msg: "The callback does not match the frozen pending request",
+    },
+    {
+      code: 6024,
+      name: "InvalidSession",
+      msg: "Invalid or exhausted session authorization",
+    },
+    {
+      code: 6025,
+      name: "InvalidSponsorBudget",
+      msg: "Invalid or insufficient purpose-bound sponsor funding",
     },
   ],
   constants: [

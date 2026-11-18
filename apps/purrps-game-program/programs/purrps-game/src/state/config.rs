@@ -8,7 +8,7 @@ use crate::{
 
 // Base-only PDA [GAME_CONFIG_SEED]. Admin signatures govern publication and
 // admission. Initialization pins the Circle mint/token program; the deployment
-// and provider preflight verify Devnet. No instruction here enables admission.
+// and provider preflight verify Devnet. Paid draws and ER entry remain gated.
 #[account]
 #[derive(InitSpace)]
 pub struct GameConfig {
