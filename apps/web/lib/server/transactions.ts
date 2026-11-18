@@ -1,5 +1,5 @@
 import "server-only";
-import { BN, utils } from "@anchor-lang/core";
+import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
 import {
   Keypair,
   PublicKey,
@@ -62,6 +62,11 @@ export const submitInput = z
   .object({ intent: intentSchema, transaction: z.string().min(1).max(1800) })
   .strict();
 type Intent = z.infer<typeof intentSchema>;
+function accountRoles(items: IdlInstructionAccountItem[]): string[] {
+  return items.flatMap((item) =>
+    "accounts" in item ? accountRoles(item.accounts) : [item.name],
+  );
+}
 export function instructionFor(wallet: string, intent: Intent) {
   if (intent.operation === "owner")
     throw new ApiError("PREPARE_NOT_SUPPORTED", 400);
@@ -192,9 +197,17 @@ export function validateTransaction(
   const owner = new PublicKey(wallet);
   const signerCount = message.header.numRequiredSignatures;
   if (intent.operation === "owner") {
+    const roles = accountRoles(definition?.accounts ?? []);
+    const ownerIndex = roles.indexOf("owner");
+    const actualOwner = ix.accountKeyIndexes[ownerIndex];
     if (
       definition?.name !== intent.instruction ||
-      !message.staticAccountKeys[0]?.equals(owner) ||
+      roles.length !== ix.accountKeyIndexes.length ||
+      ownerIndex < 0 ||
+      actualOwner === undefined ||
+      !message.staticAccountKeys[actualOwner]?.equals(owner) ||
+      (intent.instruction !== "reserveRun" &&
+        !message.staticAccountKeys[0]?.equals(owner)) ||
       signerCount > 3
     )
       throw new ApiError("TRANSACTION_REJECTED", 400);

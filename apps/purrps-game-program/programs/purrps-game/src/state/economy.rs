@@ -51,6 +51,19 @@ pub enum SponsorPurpose {
     RunCompletion,
 }
 
+#[account]
+#[derive(InitSpace)]
+pub struct SponsorPolicy {
+    pub schema_version: u16,
+    pub bump: u8,
+    pub config: Pubkey,
+    pub authority: Pubkey,
+    pub max_operation_lamports: u64,
+    pub min_completion_lamports: u64,
+    pub max_attempts: u16,
+    pub paused: bool,
+}
+
 // [SPONSOR_SEED, operation]. Only SDK-required operational SOL records may be
 // delegated. Signatures bind this operation/purpose, not caller-chosen transfers.
 #[account]

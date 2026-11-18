@@ -20,6 +20,11 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "fulfill_starter",
   "select_cat",
   "set_admission",
+  "authorize_session",
+  "revoke_session",
+  "configure_sponsorship",
+  "fund_sponsorship",
+  "reserve_run",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

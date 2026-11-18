@@ -18,7 +18,8 @@ use anchor_lang::prelude::*;
 pub use constants::*;
 use contracts::Market;
 use instruction_args::{
-    AmountArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs, RequestCapsuleArgs,
+    AmountArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs, FundSponsorshipArgs,
+    InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs, RequestCapsuleArgs, ReserveRunArgs,
     SelectCatArgs, SetAdmissionArgs,
 };
 pub use instructions::*;
@@ -30,6 +31,31 @@ declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 #[program]
 pub mod purrps_game {
     use super::*;
+
+    pub fn authorize_session(
+        ctx: Context<AuthorizeSession>,
+        args: AuthorizeSessionArgs,
+    ) -> Result<()> {
+        crate::instructions::session::handle_authorize_session(ctx, args)
+    }
+    pub fn revoke_session(ctx: Context<RevokeSession>) -> Result<()> {
+        crate::instructions::session::handle_revoke_session(ctx)
+    }
+    pub fn configure_sponsorship(
+        ctx: Context<ConfigureSponsorship>,
+        args: ConfigureSponsorshipArgs,
+    ) -> Result<()> {
+        crate::instructions::sponsorship::handle_configure_sponsorship(ctx, args)
+    }
+    pub fn fund_sponsorship(
+        ctx: Context<FundSponsorship>,
+        args: FundSponsorshipArgs,
+    ) -> Result<()> {
+        crate::instructions::sponsorship::handle_fund_sponsorship(ctx, args)
+    }
+    pub fn reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
+        crate::instructions::reserve::handle_reserve_run(ctx, args)
+    }
 
     pub fn claim_starter(ctx: Context<ClaimStarter>, args: RequestCapsuleArgs) -> Result<()> {
         crate::instructions::starter::handle_claim_starter(ctx, args)

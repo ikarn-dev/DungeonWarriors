@@ -127,3 +127,12 @@ pub struct FundSponsorshipArgs {
     pub max_attempts: u16,
     pub expires_at_seconds: i64,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+pub struct ConfigureSponsorshipArgs {
+    pub authority: Pubkey,
+    pub max_operation_lamports: u64,
+    pub min_completion_lamports: u64,
+    pub max_attempts: u16,
+    pub paused: bool,
+}

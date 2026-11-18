@@ -1,3 +1,4 @@
+import { BN, type IdlInstructionAccountItem } from "@anchor-lang/core";
 import {
   PublicKey,
   SystemProgram,
@@ -19,10 +20,70 @@ vi.mock(
   }),
 );
 
+import { coder, idl } from "../../../../../apps/web/lib/server/chain";
 import {
   instructionFor,
   validateTransaction,
 } from "../../../../../apps/web/lib/server/transactions";
+
+function scalarTransaction(
+  instruction: "reserveRun" | "revokeSession",
+  owner: ReturnType<typeof wallet>,
+  payer: ReturnType<typeof wallet>,
+) {
+  const definition = idl.instructions.find((item) => item.name === instruction);
+  if (definition === undefined) throw new Error("missing instruction");
+  function flatten(
+    items: IdlInstructionAccountItem[],
+  ): { name: string; signer?: boolean; writable?: boolean }[] {
+    return items.flatMap((item) =>
+      "accounts" in item ? flatten(item.accounts) : [item],
+    );
+  }
+  const keys = flatten(definition.accounts).map((item) => ({
+    pubkey:
+      item.name === "owner"
+        ? owner.publicKey
+        : item.name === "payer" || item.name === "authority"
+          ? payer.publicKey
+          : wallet().publicKey,
+    isSigner: item.signer ?? false,
+    isWritable: item.writable ?? false,
+  }));
+  const args =
+    instruction === "reserveRun"
+      ? {
+          args: {
+            expectedRunNonce: new BN(0),
+            sessionNonce: new BN(0),
+            expectedInventoryVersion: new BN(0),
+            expectedRulesVersion: 1,
+            expectedCatalogVersion: 1,
+            cat: { collector: {} },
+            market: { sol: {} },
+            stakeBaseUnits: new BN(1000000),
+          },
+        }
+      : {};
+  const message = new TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: PublicKey.default.toBase58(),
+    instructions: [
+      new TransactionInstruction({
+        programId: new PublicKey(idl.address),
+        keys,
+        data: coder.instruction.encode(instruction, args),
+      }),
+    ],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(message);
+  for (let i = 0; i < message.header.numRequiredSignatures; i++) {
+    const key = message.staticAccountKeys[i];
+    const signer = key?.equals(owner.publicKey) ? owner : payer;
+    tx.signatures[i] = signer.sign(message.serialize());
+  }
+  return Buffer.from(tx.serialize()).toString("base64");
+}
 
 function transaction(
   owner: ReturnType<typeof wallet>,
@@ -48,6 +109,41 @@ function transaction(
   };
 }
 describe("complete transaction validation", () => {
+  it("accepts a play-key reservation only for its authenticated owner and keeps owner-only payer scope", () => {
+    const owner = wallet();
+    const play = wallet();
+    const intent = {
+      operation: "owner",
+      instruction: "reserveRun",
+      sponsored: false,
+    } as const;
+    const encoded = scalarTransaction("reserveRun", owner, play);
+    expect(() =>
+      validateTransaction(owner.address, intent, encoded),
+    ).not.toThrow();
+    expect(() =>
+      validateTransaction(wallet().address, intent, encoded),
+    ).toThrow("TRANSACTION_REJECTED");
+    const revoke = {
+      operation: "owner",
+      instruction: "revokeSession",
+      sponsored: false,
+    } as const;
+    expect(() =>
+      validateTransaction(
+        owner.address,
+        revoke,
+        scalarTransaction("revokeSession", owner, play),
+      ),
+    ).toThrow("TRANSACTION_REJECTED");
+    expect(() =>
+      validateTransaction(
+        owner.address,
+        revoke,
+        scalarTransaction("revokeSession", owner, owner),
+      ),
+    ).not.toThrow();
+  });
   it("accepts valid owner and sponsored player creation with the wallet signature already present", () => {
     const owner = wallet();
     for (const sponsored of [false, true]) {

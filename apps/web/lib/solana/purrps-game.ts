@@ -16,6 +16,82 @@ export type PurrpsGame = {
   };
   instructions: [
     {
+      name: "authorizeSession";
+      discriminator: [187, 218, 251, 161, 99, 40, 34, 34];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "owner";
+          writable: true;
+          signer: true;
+          relations: ["player"];
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "sessionToken";
+        },
+        {
+          name: "authorization";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 101, 115, 115, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+              {
+                kind: "arg";
+                path: "args.expectedSessionNonce";
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "authorizeSessionArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "claimStarter";
       discriminator: [142, 187, 84, 81, 84, 148, 223, 217];
       accounts: [
@@ -141,6 +217,70 @@ export type PurrpsGame = {
           type: {
             defined: {
               name: "requestCapsuleArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "configureSponsorship";
+      discriminator: [79, 11, 99, 120, 73, 223, 182, 148];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "admin";
+          writable: true;
+          signer: true;
+          relations: ["config"];
+        },
+        {
+          name: "policy";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114,
+                  45,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "configureSponsorshipArgs";
             };
           };
         },
@@ -436,6 +576,85 @@ export type PurrpsGame = {
           type: {
             defined: {
               name: "amountArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "fundSponsorship";
+      discriminator: [49, 133, 197, 147, 150, 126, 251, 33];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["policy"];
+        },
+        {
+          name: "policy";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114,
+                  45,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "funder";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "budget";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "arg";
+                path: "args.operation";
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "fundSponsorshipArgs";
             };
           };
         },
@@ -861,6 +1080,291 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "reserveRun";
+      discriminator: [160, 174, 11, 70, 247, 0, 45, 153];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house", "policy"];
+        },
+        {
+          name: "allocation";
+          accounts: [
+            {
+              name: "owner";
+            },
+            {
+              name: "payer";
+              writable: true;
+              signer: true;
+            },
+            {
+              name: "escrow";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+                  },
+                  {
+                    kind: "account";
+                    path: "owner";
+                  },
+                  {
+                    kind: "arg";
+                    path: "args.expectedRunNonce";
+                  },
+                ];
+              };
+            },
+            {
+              name: "run";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 103, 97, 109, 101];
+                  },
+                  {
+                    kind: "account";
+                    path: "owner";
+                  },
+                  {
+                    kind: "arg";
+                    path: "args.expectedRunNonce";
+                  },
+                ];
+              };
+            },
+            {
+              name: "systemProgram";
+              address: "11111111111111111111111111111111";
+            },
+          ];
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+        {
+          name: "authorization";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 101, 115, 115, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+              {
+                kind: "account";
+                path: "authorization.nonce";
+                account: "sessionAuthorization";
+              },
+            ];
+          };
+        },
+        {
+          name: "sessionToken";
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+        {
+          name: "rules";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 108, 101, 115];
+              },
+              {
+                kind: "account";
+                path: "rules.binding.version";
+                account: "gameRulesVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "catalog.binding.version";
+                account: "catalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "definingCatalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "definingCatalog.binding.version";
+                account: "catalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+        {
+          name: "policy";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114,
+                  45,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "budget";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "allocation.run";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "reserveRunArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "revokeSession";
+      discriminator: [86, 92, 198, 120, 144, 2, 7, 194];
+      accounts: [
+        {
+          name: "owner";
+          signer: true;
+          relations: ["authorization"];
+        },
+        {
+          name: "authorization";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 101, 115, 115, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+              {
+                kind: "account";
+                path: "authorization.nonce";
+                account: "sessionAuthorization";
+              },
+            ];
+          };
+        },
+      ];
+      args: [];
+    },
+    {
       name: "selectCat";
       discriminator: [207, 232, 198, 181, 56, 52, 167, 86];
       accounts: [
@@ -1158,6 +1662,18 @@ export type PurrpsGame = {
       name: "runGameState";
       discriminator: [171, 175, 110, 104, 16, 203, 55, 131];
     },
+    {
+      name: "sessionAuthorization";
+      discriminator: [182, 214, 46, 87, 235, 147, 1, 159];
+    },
+    {
+      name: "sponsorBudget";
+      discriminator: [129, 170, 172, 164, 4, 142, 24, 90];
+    },
+    {
+      name: "sponsorPolicy";
+      discriminator: [243, 45, 180, 191, 4, 144, 101, 21];
+    },
   ];
   errors: [
     {
@@ -1323,6 +1839,34 @@ export type PurrpsGame = {
         fields: [
           {
             name: "amountBaseUnits";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "authorizeSessionArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "expectedSessionNonce";
+            type: "u64";
+          },
+          {
+            name: "inputKey";
+            type: "pubkey";
+          },
+          {
+            name: "sessionToken";
+            type: "pubkey";
+          },
+          {
+            name: "expiresAtSeconds";
+            type: "i64";
+          },
+          {
+            name: "allowanceBaseUnits";
             type: "u64";
           },
         ];
@@ -1789,6 +2333,34 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "configureSponsorshipArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "authority";
+            type: "pubkey";
+          },
+          {
+            name: "maxOperationLamports";
+            type: "u64";
+          },
+          {
+            name: "minCompletionLamports";
+            type: "u64";
+          },
+          {
+            name: "maxAttempts";
+            type: "u16";
+          },
+          {
+            name: "paused";
+            type: "bool";
+          },
+        ];
+      };
+    },
+    {
       name: "counter";
       type: {
         kind: "struct";
@@ -1958,6 +2530,46 @@ export type PurrpsGame = {
           },
           {
             name: "activationExpired";
+          },
+        ];
+      };
+    },
+    {
+      name: "fundSponsorshipArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "operation";
+            type: "pubkey";
+          },
+          {
+            name: "beneficiary";
+            type: "pubkey";
+          },
+          {
+            name: "purpose";
+            type: {
+              defined: {
+                name: "sponsorPurpose";
+              };
+            };
+          },
+          {
+            name: "limitLamports";
+            type: "u64";
+          },
+          {
+            name: "reservedCompletionLamports";
+            type: "u64";
+          },
+          {
+            name: "maxAttempts";
+            type: "u16";
+          },
+          {
+            name: "expiresAtSeconds";
+            type: "i64";
           },
         ];
       };
@@ -3016,6 +3628,54 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "reserveRunArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "expectedRunNonce";
+            type: "u64";
+          },
+          {
+            name: "sessionNonce";
+            type: "u64";
+          },
+          {
+            name: "expectedInventoryVersion";
+            type: "u64";
+          },
+          {
+            name: "expectedRulesVersion";
+            type: "u32";
+          },
+          {
+            name: "expectedCatalogVersion";
+            type: "u32";
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catId";
+              };
+            };
+          },
+          {
+            name: "market";
+            type: {
+              defined: {
+                name: "market";
+              };
+            };
+          },
+          {
+            name: "stakeBaseUnits";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
       name: "runEscrow";
       type: {
         kind: "struct";
@@ -3600,6 +4260,82 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "sessionAuthorization";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "inputKey";
+            type: "pubkey";
+          },
+          {
+            name: "sessionToken";
+            type: "pubkey";
+          },
+          {
+            name: "program";
+            type: "pubkey";
+          },
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "expiresAtSeconds";
+            type: "i64";
+          },
+          {
+            name: "allowanceBaseUnits";
+            type: "u64";
+          },
+          {
+            name: "spentBaseUnits";
+            type: "u64";
+          },
+          {
+            name: "revoked";
+            type: "bool";
+          },
+        ];
+      };
+    },
+    {
+      name: "sessionToken";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "authority";
+            type: "pubkey";
+          },
+          {
+            name: "targetProgram";
+            type: "pubkey";
+          },
+          {
+            name: "sessionSigner";
+            type: "pubkey";
+          },
+          {
+            name: "validUntil";
+            type: "i64";
+          },
+        ];
+      };
+    },
+    {
       name: "setAdmissionArgs";
       type: {
         kind: "struct";
@@ -3615,6 +4351,130 @@ export type PurrpsGame = {
           {
             name: "reservations";
             type: "bool";
+          },
+        ];
+      };
+    },
+    {
+      name: "sponsorBudget";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "operation";
+            type: "pubkey";
+          },
+          {
+            name: "beneficiary";
+            type: "pubkey";
+          },
+          {
+            name: "authority";
+            type: "pubkey";
+          },
+          {
+            name: "feePayer";
+            type: "pubkey";
+          },
+          {
+            name: "purpose";
+            type: {
+              defined: {
+                name: "sponsorPurpose";
+              };
+            };
+          },
+          {
+            name: "limitLamports";
+            type: "u64";
+          },
+          {
+            name: "spentLamports";
+            type: "u64";
+          },
+          {
+            name: "reservedCompletionLamports";
+            type: "u64";
+          },
+          {
+            name: "maxAttempts";
+            type: "u16";
+          },
+          {
+            name: "attempts";
+            type: "u16";
+          },
+          {
+            name: "expiresAtSeconds";
+            type: "i64";
+          },
+        ];
+      };
+    },
+    {
+      name: "sponsorPolicy";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "config";
+            type: "pubkey";
+          },
+          {
+            name: "authority";
+            type: "pubkey";
+          },
+          {
+            name: "maxOperationLamports";
+            type: "u64";
+          },
+          {
+            name: "minCompletionLamports";
+            type: "u64";
+          },
+          {
+            name: "maxAttempts";
+            type: "u16";
+          },
+          {
+            name: "paused";
+            type: "bool";
+          },
+        ];
+      };
+    },
+    {
+      name: "sponsorPurpose";
+      type: {
+        kind: "enum";
+        variants: [
+          {
+            name: "starterDraw";
+          },
+          {
+            name: "paidDraw";
+          },
+          {
+            name: "runActivation";
+          },
+          {
+            name: "runCompletion";
           },
         ];
       };
@@ -3801,6 +4661,82 @@ export const PURRPS_GAME_IDL = {
   },
   instructions: [
     {
+      name: "authorize_session",
+      discriminator: [187, 218, 251, 161, 99, 40, 34, 34],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "owner",
+          writable: true,
+          signer: true,
+          relations: ["player"],
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "session_token",
+        },
+        {
+          name: "authorization",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 101, 115, 115, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+              {
+                kind: "arg",
+                path: "args.expected_session_nonce",
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "AuthorizeSessionArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "claim_starter",
       discriminator: [142, 187, 84, 81, 84, 148, 223, 217],
       accounts: [
@@ -3926,6 +4862,58 @@ export const PURRPS_GAME_IDL = {
           type: {
             defined: {
               name: "RequestCapsuleArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "configure_sponsorship",
+      discriminator: [79, 11, 99, 120, 73, 223, 182, 148],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "admin",
+          writable: true,
+          signer: true,
+          relations: ["config"],
+        },
+        {
+          name: "policy",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  115, 112, 111, 110, 115, 111, 114, 45, 112, 111, 108, 105, 99,
+                  121,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "ConfigureSponsorshipArgs",
             },
           },
         },
@@ -4221,6 +5209,73 @@ export const PURRPS_GAME_IDL = {
           type: {
             defined: {
               name: "AmountArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "fund_sponsorship",
+      discriminator: [49, 133, 197, 147, 150, 126, 251, 33],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["policy"],
+        },
+        {
+          name: "policy",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  115, 112, 111, 110, 115, 111, 114, 45, 112, 111, 108, 105, 99,
+                  121,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "funder",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "budget",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "arg",
+                path: "args.operation",
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "FundSponsorshipArgs",
             },
           },
         },
@@ -4617,6 +5672,279 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "reserve_run",
+      discriminator: [160, 174, 11, 70, 247, 0, 45, 153],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house", "policy"],
+        },
+        {
+          name: "allocation",
+          accounts: [
+            {
+              name: "owner",
+            },
+            {
+              name: "payer",
+              writable: true,
+              signer: true,
+            },
+            {
+              name: "escrow",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+                  },
+                  {
+                    kind: "account",
+                    path: "owner",
+                  },
+                  {
+                    kind: "arg",
+                    path: "args.expected_run_nonce",
+                  },
+                ],
+              },
+            },
+            {
+              name: "run",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 103, 97, 109, 101],
+                  },
+                  {
+                    kind: "account",
+                    path: "owner",
+                  },
+                  {
+                    kind: "arg",
+                    path: "args.expected_run_nonce",
+                  },
+                ],
+              },
+            },
+            {
+              name: "system_program",
+              address: "11111111111111111111111111111111",
+            },
+          ],
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+        {
+          name: "authorization",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 101, 115, 115, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+              {
+                kind: "account",
+                path: "authorization.nonce",
+                account: "SessionAuthorization",
+              },
+            ],
+          },
+        },
+        {
+          name: "session_token",
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+        {
+          name: "rules",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 108, 101, 115],
+              },
+              {
+                kind: "account",
+                path: "rules.binding.version",
+                account: "GameRulesVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "catalog.binding.version",
+                account: "CatalogVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "defining_catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "defining_catalog.binding.version",
+                account: "CatalogVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+        {
+          name: "policy",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  115, 112, 111, 110, 115, 111, 114, 45, 112, 111, 108, 105, 99,
+                  121,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "budget",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "allocation.run",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "ReserveRunArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "revoke_session",
+      discriminator: [86, 92, 198, 120, 144, 2, 7, 194],
+      accounts: [
+        {
+          name: "owner",
+          signer: true,
+          relations: ["authorization"],
+        },
+        {
+          name: "authorization",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 101, 115, 115, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+              {
+                kind: "account",
+                path: "authorization.nonce",
+                account: "SessionAuthorization",
+              },
+            ],
+          },
+        },
+      ],
+      args: [],
+    },
+    {
       name: "select_cat",
       discriminator: [207, 232, 198, 181, 56, 52, 167, 86],
       accounts: [
@@ -4914,6 +6242,18 @@ export const PURRPS_GAME_IDL = {
       name: "RunGameState",
       discriminator: [171, 175, 110, 104, 16, 203, 55, 131],
     },
+    {
+      name: "SessionAuthorization",
+      discriminator: [182, 214, 46, 87, 235, 147, 1, 159],
+    },
+    {
+      name: "SponsorBudget",
+      discriminator: [129, 170, 172, 164, 4, 142, 24, 90],
+    },
+    {
+      name: "SponsorPolicy",
+      discriminator: [243, 45, 180, 191, 4, 144, 101, 21],
+    },
   ],
   types: [
     {
@@ -4947,6 +6287,34 @@ export const PURRPS_GAME_IDL = {
         fields: [
           {
             name: "amount_base_units",
+            type: "u64",
+          },
+        ],
+      },
+    },
+    {
+      name: "AuthorizeSessionArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "expected_session_nonce",
+            type: "u64",
+          },
+          {
+            name: "input_key",
+            type: "pubkey",
+          },
+          {
+            name: "session_token",
+            type: "pubkey",
+          },
+          {
+            name: "expires_at_seconds",
+            type: "i64",
+          },
+          {
+            name: "allowance_base_units",
             type: "u64",
           },
         ],
@@ -5413,6 +6781,34 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "ConfigureSponsorshipArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "authority",
+            type: "pubkey",
+          },
+          {
+            name: "max_operation_lamports",
+            type: "u64",
+          },
+          {
+            name: "min_completion_lamports",
+            type: "u64",
+          },
+          {
+            name: "max_attempts",
+            type: "u16",
+          },
+          {
+            name: "paused",
+            type: "bool",
+          },
+        ],
+      },
+    },
+    {
       name: "Counter",
       type: {
         kind: "struct",
@@ -5582,6 +6978,46 @@ export const PURRPS_GAME_IDL = {
           },
           {
             name: "ActivationExpired",
+          },
+        ],
+      },
+    },
+    {
+      name: "FundSponsorshipArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "operation",
+            type: "pubkey",
+          },
+          {
+            name: "beneficiary",
+            type: "pubkey",
+          },
+          {
+            name: "purpose",
+            type: {
+              defined: {
+                name: "SponsorPurpose",
+              },
+            },
+          },
+          {
+            name: "limit_lamports",
+            type: "u64",
+          },
+          {
+            name: "reserved_completion_lamports",
+            type: "u64",
+          },
+          {
+            name: "max_attempts",
+            type: "u16",
+          },
+          {
+            name: "expires_at_seconds",
+            type: "i64",
           },
         ],
       },
@@ -6640,6 +8076,54 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "ReserveRunArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "expected_run_nonce",
+            type: "u64",
+          },
+          {
+            name: "session_nonce",
+            type: "u64",
+          },
+          {
+            name: "expected_inventory_version",
+            type: "u64",
+          },
+          {
+            name: "expected_rules_version",
+            type: "u32",
+          },
+          {
+            name: "expected_catalog_version",
+            type: "u32",
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatId",
+              },
+            },
+          },
+          {
+            name: "market",
+            type: {
+              defined: {
+                name: "Market",
+              },
+            },
+          },
+          {
+            name: "stake_base_units",
+            type: "u64",
+          },
+        ],
+      },
+    },
+    {
       name: "RunEscrow",
       type: {
         kind: "struct",
@@ -7224,6 +8708,82 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "SessionAuthorization",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "input_key",
+            type: "pubkey",
+          },
+          {
+            name: "session_token",
+            type: "pubkey",
+          },
+          {
+            name: "program",
+            type: "pubkey",
+          },
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "expires_at_seconds",
+            type: "i64",
+          },
+          {
+            name: "allowance_base_units",
+            type: "u64",
+          },
+          {
+            name: "spent_base_units",
+            type: "u64",
+          },
+          {
+            name: "revoked",
+            type: "bool",
+          },
+        ],
+      },
+    },
+    {
+      name: "SessionToken",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "authority",
+            type: "pubkey",
+          },
+          {
+            name: "target_program",
+            type: "pubkey",
+          },
+          {
+            name: "session_signer",
+            type: "pubkey",
+          },
+          {
+            name: "valid_until",
+            type: "i64",
+          },
+        ],
+      },
+    },
+    {
       name: "SetAdmissionArgs",
       type: {
         kind: "struct",
@@ -7239,6 +8799,130 @@ export const PURRPS_GAME_IDL = {
           {
             name: "reservations",
             type: "bool",
+          },
+        ],
+      },
+    },
+    {
+      name: "SponsorBudget",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "operation",
+            type: "pubkey",
+          },
+          {
+            name: "beneficiary",
+            type: "pubkey",
+          },
+          {
+            name: "authority",
+            type: "pubkey",
+          },
+          {
+            name: "fee_payer",
+            type: "pubkey",
+          },
+          {
+            name: "purpose",
+            type: {
+              defined: {
+                name: "SponsorPurpose",
+              },
+            },
+          },
+          {
+            name: "limit_lamports",
+            type: "u64",
+          },
+          {
+            name: "spent_lamports",
+            type: "u64",
+          },
+          {
+            name: "reserved_completion_lamports",
+            type: "u64",
+          },
+          {
+            name: "max_attempts",
+            type: "u16",
+          },
+          {
+            name: "attempts",
+            type: "u16",
+          },
+          {
+            name: "expires_at_seconds",
+            type: "i64",
+          },
+        ],
+      },
+    },
+    {
+      name: "SponsorPolicy",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "config",
+            type: "pubkey",
+          },
+          {
+            name: "authority",
+            type: "pubkey",
+          },
+          {
+            name: "max_operation_lamports",
+            type: "u64",
+          },
+          {
+            name: "min_completion_lamports",
+            type: "u64",
+          },
+          {
+            name: "max_attempts",
+            type: "u16",
+          },
+          {
+            name: "paused",
+            type: "bool",
+          },
+        ],
+      },
+    },
+    {
+      name: "SponsorPurpose",
+      type: {
+        kind: "enum",
+        variants: [
+          {
+            name: "StarterDraw",
+          },
+          {
+            name: "PaidDraw",
+          },
+          {
+            name: "RunActivation",
+          },
+          {
+            name: "RunCompletion",
           },
         ],
       },

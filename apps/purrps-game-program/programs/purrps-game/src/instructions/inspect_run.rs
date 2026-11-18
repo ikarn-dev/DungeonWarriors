@@ -1,18 +1,11 @@
+pub use crate::contracts::snapshot_hash;
 use crate::{
     constants::*,
-    contracts::RunSnapshot,
     error::ErrorCode,
     protocol::{RunPhase, PROTOCOL_VERSION},
     state::{economy::RunEscrow, run::RunGameState},
 };
 use anchor_lang::prelude::*;
-use solana_sha256_hasher::hashv;
-
-pub fn snapshot_hash(snapshot: &RunSnapshot) -> Result<[u8; 32]> {
-    let mut bytes = Vec::new();
-    snapshot.serialize(&mut bytes)?;
-    Ok(hashv(&[b"purrps:run:v1", crate::ID.as_ref(), &bytes]).to_bytes())
-}
 
 #[derive(Accounts)]
 pub struct InspectRun<'info> {

@@ -25,3 +25,4 @@ pub const DRAW_SEED: &[u8] = b"draw";
 pub const RESULT_SEED: &[u8] = b"result";
 pub const LEADERBOARD_SEED: &[u8] = b"leaderboard";
 pub const SPONSOR_SEED: &[u8] = b"sponsor";
+pub const SPONSOR_POLICY_SEED: &[u8] = b"sponsor-policy";

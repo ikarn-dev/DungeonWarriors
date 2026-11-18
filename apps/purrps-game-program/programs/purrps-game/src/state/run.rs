@@ -201,6 +201,111 @@ pub struct RunGameState {
     pub terminal: Option<RunTerminal>,
 }
 
+impl RunGameState {
+    // READY has no earned progress or generated world; activation supplies a validated observation.
+    pub fn ready(bump: u8, escrow: Pubkey, snapshot: RunSnapshot, snapshot_hash: [u8; 32]) -> Self {
+        let physics = snapshot.rules.physics;
+        let speed = physics.runner_speed_subpixels_per_tick;
+        Self {
+            schema_version: crate::SCHEMA_VERSION,
+            bump,
+            escrow,
+            snapshot,
+            snapshot_hash,
+            phase: RunPhase::Ready,
+            active_ticks: 0,
+            world_origin_pixels: 0,
+            runner: RunnerState {
+                x_subpixels: 0,
+                y_subpixels: i32::from(physics.viewport_height_pixels)
+                    * i32::from(physics.subpixels_per_pixel)
+                    / 2
+                    - physics.hitbox_height_subpixels,
+                vx_subpixels_per_tick: 0,
+                vy_subpixels_per_tick: 0,
+                automatic_speed_subpixels_per_tick: speed,
+                grounded: true,
+                axis: InputAxis::Neutral,
+                dash_ends_at_tick: 0,
+                dash_ready_at_tick: 0,
+                shield_contact_ends_at_tick: 0,
+            },
+            entities: vec![
+                WorldEntity {
+                    id: 0,
+                    kind: EntityKind::Terrain,
+                    x_subpixels: 0,
+                    y_subpixels: 0,
+                    width_subpixels: 0,
+                    height_subpixels: 0,
+                    designated_coin: None,
+                    designated_checkpoint: 0,
+                    consumed: false
+                };
+                MAX_WORLD_ENTITIES
+            ],
+            entity_count: 0,
+            next_entity_id: 0,
+            observations: vec![
+                OracleObservation {
+                    sequence: 0,
+                    price: 0,
+                    exponent: 0,
+                    published_at_seconds: 0,
+                    posted_slot: 0,
+                    content_hash: [0; 32]
+                };
+                MAX_RECENT_OBSERVATIONS
+            ],
+            observation_head: 0,
+            observation_count: 0,
+            start_observation: None,
+            intents: vec![None; MAX_QUEUED_INTENTS],
+            intent_head: 0,
+            intent_count: 0,
+            last_accepted_sequence: 0,
+            last_processed_sequence: 0,
+            last_accepted_order: 0,
+            control_window_seconds: 0,
+            control_updates_in_window: 0,
+            last_heartbeat_tick: 0,
+            inactive_exit_tick: None,
+            key_exit_tick: None,
+            input_key_revoked: false,
+            score: 0,
+            total_coins: 0,
+            designated_coin_mask: 0,
+            qualified_checkpoints: 0,
+            powers: [PowerState {
+                ready_at_tick: 0,
+                ends_at_tick: 0,
+                charges: 0,
+            }; 4],
+            crank: CrankState {
+                task: Pubkey::default(),
+                cancel_authority: snapshot.run,
+                generation: 0,
+                last_execution_ordinal: 0,
+                trusted_elapsed_ms: 0,
+                consumed_elapsed_ms: 0,
+                completion_attempts: 0,
+            },
+            world_generation: GenerationState {
+                next_segment: 0,
+                next_x_subpixels: 0,
+                surface_y_subpixels: 0,
+                checkpoint: 0,
+                checkpoint_x_subpixels: 0,
+                checkpoint_speed_subpixels_per_tick: speed,
+                spawned_coin_mask: 0,
+                spawned_hazard_mask: 0,
+            },
+            suspension: None,
+            terminal: None,
+        }
+    }
+}
+
 fn write_buffer<T: AnchorSerialize, W: Write>(
     values: &[T],
     writer: &mut W,

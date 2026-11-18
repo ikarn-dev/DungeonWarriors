@@ -76,3 +76,9 @@ pub struct RunSnapshot {
     pub activation_deadline_seconds: i64,
     pub delegation_epoch: u64,
 }
+
+pub fn snapshot_hash(snapshot: &RunSnapshot) -> Result<[u8; 32]> {
+    let mut bytes = Vec::new();
+    snapshot.serialize(&mut bytes)?;
+    Ok(solana_sha256_hasher::hashv(&[b"purrps:run:v1", crate::ID.as_ref(), &bytes]).to_bytes())
+}
