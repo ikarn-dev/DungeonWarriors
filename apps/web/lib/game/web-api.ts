@@ -3,6 +3,13 @@ export class WebApiError extends Error {
     super(code);
   }
 }
+export function webErrorMessage(code: string) {
+  if (code === "ORIGIN_REJECTED")
+    return "Sign-in could not start on this site address. Please contact the PURRPS team.";
+  if (code === "SERVICE_NOT_CONFIGURED")
+    return "PURRPS is temporarily unavailable. Please try again once service is restored.";
+  return `Request could not finish: ${code.replaceAll("_", " ").toLowerCase()}. You can refresh and retry.`;
+}
 export async function readWebJson(response: Response): Promise<unknown> {
   if (response.body === null) throw new WebApiError("EMPTY_RESPONSE");
   const reader = response.body.getReader();

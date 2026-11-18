@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { POST as challengeRoute } from "../../../../../apps/web/app/api/auth/challenge/route";
+import { POST as logoutRoute } from "../../../../../apps/web/app/api/auth/logout/route";
+import { GET as sessionRoute } from "../../../../../apps/web/app/api/auth/session/route";
+import { POST as verifyRoute } from "../../../../../apps/web/app/api/auth/verify/route";
 import {
   authenticate,
   createChallenge,
@@ -10,9 +14,116 @@ import {
   rateLimit,
   runtime,
 } from "../../../../../apps/web/lib/server/runtime";
-import { wallet } from "./fixtures";
+import { environment, wallet } from "./fixtures";
+
+beforeAll(() => {
+  const authNames = new Set([
+    "APP_ORIGIN",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+  ]);
+  for (const name of [
+    ...Object.keys(environment),
+    "SPONSOR_SECRET_KEY",
+    "SPONSOR_HOURLY_BUDGET_LAMPORTS",
+  ])
+    if (!authNames.has(name)) vi.stubEnv(name, undefined);
+});
+afterAll(() => vi.unstubAllEnvs());
 
 describe("configured Upstash authentication integration", () => {
+  it("completes the actual auth routes with only origin and Redis, and preserves exact-origin and secure-cookie checks", async () => {
+    const w = wallet();
+    const origin = runtime().config.APP_ORIGIN;
+    const request = (
+      path: string,
+      value: unknown,
+      sessionCookie?: string,
+      requestOrigin = origin,
+    ) =>
+      new Request(`${origin}${path}`, {
+        method: "POST",
+        headers: {
+          Origin: requestOrigin,
+          "Content-Type": "application/json",
+          ...(sessionCookie === undefined ? {} : { Cookie: sessionCookie }),
+        },
+        body: JSON.stringify(value),
+      });
+    let token: string | undefined;
+    try {
+      expect(
+        (
+          await challengeRoute(
+            request(
+              "/api/auth/challenge",
+              { wallet: w.address },
+              undefined,
+              "https://other.example",
+            ),
+          )
+        ).status,
+      ).toBe(403);
+      const challengeResponse = await challengeRoute(
+        request("/api/auth/challenge", { wallet: w.address }),
+      );
+      expect(challengeResponse.status).toBe(200);
+      const c = await challengeResponse.json();
+      const input = {
+        challengeId: c.challengeId,
+        signature: w
+          .sign(new TextEncoder().encode(c.message))
+          .toString("base64"),
+      };
+      const verified = await verifyRoute(request("/api/auth/verify", input));
+      expect(verified.status).toBe(200);
+      const header = verified.headers.get("set-cookie") ?? "";
+      const sessionCookie = header.split(";")[0] ?? "";
+      token = sessionCookie.split("=")[1];
+      expect(
+        /^__Host-purrps-session=[A-Za-z0-9_-]{43}$/.test(sessionCookie),
+      ).toBe(true);
+      expect(
+        [
+          "Path=/",
+          "HttpOnly",
+          "Secure",
+          "SameSite=Strict",
+          "Max-Age=43200",
+        ].every((flag) => header.includes(flag)),
+      ).toBe(true);
+      const session = await sessionRoute(
+        new Request(`${origin}/api/auth/session`, {
+          headers: { Cookie: sessionCookie },
+        }),
+      );
+      expect(session.status).toBe(200);
+      expect((await session.json()).wallet).toBe(w.address);
+      expect(
+        (await verifyRoute(request("/api/auth/verify", input))).status,
+      ).toBe(401);
+      expect(
+        (await logoutRoute(request("/api/auth/logout", {}, sessionCookie)))
+          .status,
+      ).toBe(200);
+      expect(
+        (
+          await sessionRoute(
+            new Request(`${origin}/api/auth/session`, {
+              headers: { Cookie: sessionCookie },
+            }),
+          )
+        ).status,
+      ).toBe(401);
+    } catch {
+      throw new Error("LIVE_AUTH_ROUTES_CHECK_FAILED");
+    } finally {
+      if (token !== undefined)
+        await logout(token).catch(() => {
+          throw new Error("LIVE_AUTH_ROUTES_CLEANUP_FAILED");
+        });
+    }
+  });
   it("consumes a challenge once under concurrent verification and enforces real idle/absolute expiry", async () => {
     let stage = "challenge";
     const w = wallet();

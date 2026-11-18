@@ -100,7 +100,13 @@ export async function route(work: () => Promise<Response>) {
         ? error
         : new ApiError("SERVICE_UNAVAILABLE", 503);
     return json(
-      { error: failure.code },
+      {
+        error: failure.code,
+        ...(failure.code === "SERVICE_NOT_CONFIGURED" &&
+        failure.fields !== undefined
+          ? { fields: failure.fields }
+          : {}),
+      },
       failure.status,
       failure.status === 429 ? { "Retry-After": "60" } : {},
     );

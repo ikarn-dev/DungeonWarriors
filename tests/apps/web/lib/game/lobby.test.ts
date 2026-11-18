@@ -9,7 +9,10 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { decodeLobbyState } from "../../../../../apps/web/lib/game/lobby-state";
 import { validatePreparedTransaction } from "../../../../../apps/web/lib/game/transaction-intents";
-import { readWebJson } from "../../../../../apps/web/lib/game/web-api";
+import {
+  readWebJson,
+  webErrorMessage,
+} from "../../../../../apps/web/lib/game/web-api";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
 import { PURRPS_GAME_IDL } from "../../../../../apps/web/lib/solana/purrps-game";
 import { config, wallet } from "../server/fixtures";
@@ -21,6 +24,7 @@ vi.mock(
       typeof import("../../../../../apps/web/lib/server/runtime")
     >()),
     runtime: () => ({ config }),
+    sponsorshipConfig: () => config,
   }),
 );
 
@@ -172,4 +176,10 @@ describe("wallet-side transaction checks", () => {
       ok: true,
     });
   });
+});
+
+it("gives non-retry guidance for deployment failures", () => {
+  expect(webErrorMessage("ORIGIN_REJECTED")).not.toContain("refresh");
+  expect(webErrorMessage("SERVICE_NOT_CONFIGURED")).not.toContain("refresh");
+  expect(webErrorMessage("TRANSACTION_FAILED")).toContain("transaction failed");
 });

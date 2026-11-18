@@ -17,6 +17,7 @@ vi.mock(
       typeof import("../../../../../apps/web/lib/server/runtime")
     >()),
     runtime: () => ({ config }),
+    sponsorshipConfig: () => config,
   }),
 );
 

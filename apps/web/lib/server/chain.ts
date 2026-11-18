@@ -4,7 +4,7 @@ import { type AccountInfo, Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { DEVNET } from "../solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
-import { ApiError, runtime } from "./runtime";
+import { ApiError, baseRpcConfig } from "./runtime";
 
 export const program = new PublicKey(DEVNET.program);
 export const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
@@ -25,7 +25,7 @@ export function pda(seed: string, ...parts: Uint8Array[]) {
   )[0];
 }
 export function connection() {
-  return new Connection(runtime().config.HELIUS_DEVNET_RPC_URL, {
+  return new Connection(baseRpcConfig().HELIUS_DEVNET_RPC_URL, {
     commitment: "finalized",
     disableRetryOnRateLimit: true,
     fetch: (url, init) =>

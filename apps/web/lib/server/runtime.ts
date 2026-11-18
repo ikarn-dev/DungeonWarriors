@@ -2,21 +2,40 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { providerConfigSchema } from "../providers/config.ts";
+import type { z } from "zod";
+import {
+  authConfigSchema,
+  rpcConfigSchema,
+  sponsorConfigSchema,
+} from "../providers/config.ts";
 
 export class ApiError extends Error {
   constructor(
     readonly code: string,
     readonly status: number,
+    readonly fields?: readonly string[],
   ) {
     super(code);
   }
 }
-export function serverConfig() {
-  const result = providerConfigSchema.safeParse(process.env);
-  if (!result.success) throw new ApiError("SERVICE_NOT_CONFIGURED", 503);
+function requiredConfig<T>(schema: z.ZodType<T>) {
+  const result = schema.safeParse(process.env);
+  if (!result.success)
+    throw new ApiError("SERVICE_NOT_CONFIGURED", 503, [
+      ...new Set(
+        result.error.issues
+          .map((issue) => issue.path[0])
+          .filter(
+            (field): field is string =>
+              typeof field === "string" && /^[A-Z][A-Z0-9_]*$/.test(field),
+          ),
+      ),
+    ]);
   return result.data;
 }
+export const serverConfig = () => requiredConfig(authConfigSchema);
+export const baseRpcConfig = () => requiredConfig(rpcConfigSchema);
+export const sponsorshipConfig = () => requiredConfig(sponsorConfigSchema);
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 let singleton: ReturnType<typeof makeRuntime> | undefined;

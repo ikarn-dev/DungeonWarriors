@@ -20,7 +20,7 @@ import {
   program,
   u64Input,
 } from "./chain";
-import { ApiError, runtime } from "./runtime";
+import { ApiError, runtime, sponsorshipConfig } from "./runtime";
 
 export const intentSchema = z.discriminatedUnion("operation", [
   z
@@ -72,7 +72,7 @@ export function instructionFor(wallet: string, intent: Intent) {
     throw new ApiError("PREPARE_NOT_SUPPORTED", 400);
   const owner = new PublicKey(wallet);
   const payer = intent.sponsored
-    ? new PublicKey(runtime().config.SPONSOR_PUBLIC_KEY)
+    ? new PublicKey(sponsorshipConfig().SPONSOR_PUBLIC_KEY)
     : owner;
   const values: Record<string, PublicKey> = {
     config: pda("game-config"),
@@ -84,7 +84,8 @@ export function instructionFor(wallet: string, intent: Intent) {
   };
   let args: object = {};
   if (intent.operation === "claimStarter") {
-    const budget = runtime().config.SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n;
+    const budget =
+      sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n;
     if (budget <= 0n) throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
     const version = Buffer.alloc(4);
     version.writeUInt32LE(intent.catalogVersion);
@@ -253,7 +254,7 @@ function sponsorKey() {
   } catch {
     throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
   }
-  if (key.publicKey.toBase58() !== runtime().config.SPONSOR_PUBLIC_KEY)
+  if (key.publicKey.toBase58() !== sponsorshipConfig().SPONSOR_PUBLIC_KEY)
     throw new ApiError("SPONSOR_KEY_MISMATCH", 503);
   return key;
 }
@@ -267,6 +268,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
   const fee = await rpc.getFeeForMessage(tx.message, "confirmed");
   if (fee.value === null) throw new ApiError("BLOCKHASH_EXPIRED", 409);
   if (intent.sponsored) {
+    const policy = sponsorshipConfig();
     const key = sponsorKey();
     const loader = PublicKey.findProgramAddressSync(
       [program.toBytes()],
@@ -316,13 +318,13 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     const cost =
       (intent.operation === "createPlayer"
         ? rent.reduce((total, n) => total + BigInt(n), 0n)
-        : r.config.SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n) +
+        : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n) +
       BigInt(fee.value);
     if (BigInt(Math.max(0, balance - after)) + BigInt(fee.value) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     if (
-      cost > r.config.SPONSOR_OPERATION_LIMIT_LAMPORTS ||
-      BigInt(balance) - cost < r.config.SPONSOR_MIN_BALANCE_LAMPORTS
+      cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS ||
+      BigInt(balance) - cost < policy.SPONSOR_MIN_BALANCE_LAMPORTS
     )
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     const { SPONSOR_HOURLY_BUDGET_LAMPORTS: hourly } = process.env;
@@ -340,7 +342,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
         `${r.prefix}:sponsor:attempt:${operation}`,
         `${r.prefix}:sponsor:cost:${Math.floor(Date.now() / 3600000)}`,
       ],
-      [r.config.SPONSOR_MAX_ATTEMPTS, cost.toString(), hourly],
+      [policy.SPONSOR_MAX_ATTEMPTS, cost.toString(), hourly],
     );
     if (admitted !== 1) throw new ApiError("SPONSOR_LIMITED", 429);
     tx.sign([key]);

@@ -112,6 +112,45 @@ const structure = z.object({
   SPONSOR_MAX_ATTEMPTS: seconds.pipe(z.number().min(1)),
 });
 
+export const authConfigSchema = structure.pick({
+  APP_ORIGIN: true,
+  UPSTASH_REDIS_REST_URL: true,
+  UPSTASH_REDIS_REST_TOKEN: true,
+});
+export const rpcConfigSchema = structure.pick({ HELIUS_DEVNET_RPC_URL: true });
+const sponsorFields = structure.pick({
+  SPONSOR_PUBLIC_KEY: true,
+  SPONSOR_MIN_BALANCE_LAMPORTS: true,
+  SPONSOR_OPERATION_LIMIT_LAMPORTS: true,
+  SPONSOR_COMPLETION_RESERVE_LAMPORTS: true,
+  SPONSOR_MAX_ATTEMPTS: true,
+});
+function validateSponsorBudget(
+  value: z.output<typeof sponsorFields>,
+  context: z.RefinementCtx,
+) {
+  if (
+    value.SPONSOR_COMPLETION_RESERVE_LAMPORTS >
+    value.SPONSOR_OPERATION_LIMIT_LAMPORTS
+  )
+    context.addIssue({
+      code: "custom",
+      path: ["SPONSOR_COMPLETION_RESERVE_LAMPORTS"],
+      message: "Invalid provider configuration",
+    });
+  if (
+    value.SPONSOR_MIN_BALANCE_LAMPORTS < value.SPONSOR_OPERATION_LIMIT_LAMPORTS
+  )
+    context.addIssue({
+      code: "custom",
+      path: ["SPONSOR_MIN_BALANCE_LAMPORTS"],
+      message: "Invalid provider configuration",
+    });
+}
+export const sponsorConfigSchema = sponsorFields.superRefine(
+  validateSponsorBudget,
+);
+
 export const providerConfigSchema = structure.pipe(
   z.transform((value: z.output<typeof structure>, context) => {
     const issue = (field: keyof typeof value): void => {
@@ -128,16 +167,7 @@ export const providerConfigSchema = structure.pipe(
       issue("MAGICBLOCK_ER_WS_URL");
     if (value.ORACLE_MIN_EXPONENT > value.ORACLE_MAX_EXPONENT)
       issue("ORACLE_MAX_EXPONENT");
-    if (
-      value.SPONSOR_COMPLETION_RESERVE_LAMPORTS >
-      value.SPONSOR_OPERATION_LIMIT_LAMPORTS
-    )
-      issue("SPONSOR_COMPLETION_RESERVE_LAMPORTS");
-    if (
-      value.SPONSOR_MIN_BALANCE_LAMPORTS <
-      value.SPONSOR_OPERATION_LIMIT_LAMPORTS
-    )
-      issue("SPONSOR_MIN_BALANCE_LAMPORTS");
+    validateSponsorBudget(value, context);
     return value;
   }),
 );

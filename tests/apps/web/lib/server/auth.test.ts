@@ -32,8 +32,20 @@ vi.mock(
       >();
     return {
       ...original,
-      runtime: () => ({ redis: store, config, prefix: "test" }),
-      serverConfig: () => config,
+      runtime: () => ({
+        redis: store,
+        config: {
+          APP_ORIGIN: config.APP_ORIGIN,
+          UPSTASH_REDIS_REST_URL: config.UPSTASH_REDIS_REST_URL,
+          UPSTASH_REDIS_REST_TOKEN: config.UPSTASH_REDIS_REST_TOKEN,
+        },
+        prefix: "test",
+      }),
+      serverConfig: () => ({
+        APP_ORIGIN: config.APP_ORIGIN,
+        UPSTASH_REDIS_REST_URL: config.UPSTASH_REDIS_REST_URL,
+        UPSTASH_REDIS_REST_TOKEN: config.UPSTASH_REDIS_REST_TOKEN,
+      }),
       rateLimit: vi.fn(async () => {}),
     };
   },
@@ -70,6 +82,29 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 describe("wallet authentication", () => {
+  it("accepts only the configured exact origin, independent of spoofed host or referrer headers", () => {
+    expect(() =>
+      assertOrigin(request("/api/auth/challenge", {})),
+    ).not.toThrow();
+    for (const headers of [
+      { Origin: config.APP_ORIGIN, "Sec-Fetch-Site": "cross-site" },
+      {
+        Referer: config.APP_ORIGIN,
+        "X-Forwarded-Host": new URL(config.APP_ORIGIN).host,
+      },
+      {
+        Origin: "https://attacker.example",
+        Host: new URL(config.APP_ORIGIN).host,
+        "X-Forwarded-Host": new URL(config.APP_ORIGIN).host,
+      },
+      { Origin: `${config.APP_ORIGIN}.attacker.example` },
+    ])
+      expect(() =>
+        assertOrigin(
+          new Request(config.APP_ORIGIN, { method: "POST", headers }),
+        ),
+      ).toThrow("ORIGIN_REJECTED");
+  });
   it("uses real Ed25519 verification and binds the challenge to wallet, domain, chain and expiry", async () => {
     const w = wallet();
     const c = await createChallenge(w.address);

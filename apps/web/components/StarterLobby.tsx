@@ -15,6 +15,7 @@ import {
   readWebJson,
   WebApiError,
   webApi,
+  webErrorMessage,
 } from "../lib/game/web-api";
 import CatCollection from "./CatCollection";
 
@@ -340,8 +341,7 @@ export default function StarterPanel() {
       </output>
       {error !== null && (
         <p role="alert" className="break-words text-sm">
-          Request could not finish: {error.replaceAll("_", " ").toLowerCase()}.
-          You can refresh and retry.
+          {webErrorMessage(error)}
         </p>
       )}
       {authenticated && (
