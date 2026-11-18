@@ -10,13 +10,14 @@
     "test:web": "node apps/web/node_modules/vitest/vitest.mjs run --config tests/vitest.config.mts",
     "test:program": "rustup run 1.89.0 cargo test --locked --manifest-path apps/purrps-game-program/Cargo.toml -p purrps-game --test rule_contracts --test account_contracts --test protocol_contracts --test publication_contracts --test simulation --test world_generation",
     "test:program:integration": "rustup run 1.89.0 cargo test --locked --manifest-path apps/purrps-game-program/Cargo.toml -p purrps-game --test program_admin --test test_initialize --test custody --test run_delivery",
-    "test:tooling": "node --test tests/scripts/git/*.test.mjs tests/scripts/program/*.test.mjs",
+    "test:tooling": "node --test tests/scripts/git/*.test.mjs tests/scripts/program/*.test.mjs tests/scripts/assets/*.test.mjs",
     "program:export-client": "node scripts/program/export-client.mjs",
     "test:providers": "node --test tests/scripts/providers/*.test.mjs",
     "check:providers": "node --env-file=apps/web/.env scripts/providers/check-readiness.mjs",
     "lint": "biome check",
     "format": "biome check --write",
-    "test:parity": "PURRPS_WORLD_TRACE=1 rustup run 1.89.0 cargo test --offline --locked --manifest-path apps/purrps-game-program/Cargo.toml -p purrps-game --test world_generation generated_required_route_is_reachable_for_every_cat_and_level_without_powers && PURRPS_WORLD_TRACE=1 node apps/web/node_modules/vitest/vitest.mjs run --config tests/vitest.config.mts world.test.ts"
+    "test:parity": "PURRPS_WORLD_TRACE=1 rustup run 1.89.0 cargo test --offline --locked --manifest-path apps/purrps-game-program/Cargo.toml -p purrps-game --test world_generation generated_required_route_is_reachable_for_every_cat_and_level_without_powers && PURRPS_WORLD_TRACE=1 node apps/web/node_modules/vitest/vitest.mjs run --config tests/vitest.config.mts world.test.ts",
+    "check:assets": "node scripts/assets/check-assets.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.2",

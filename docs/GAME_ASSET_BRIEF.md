@@ -4,7 +4,7 @@
 
 **User decision — 2026-11-17:** The user supplies the game artwork manually. Coins must look like dimensional gold coins rotating on the ramp in a flat 2D side-view game. This brief specifies the delivery; it does not generate artwork or add gameplay features.
 
-We are at **P1-06 asset planning**. The developer will explicitly flag the asset handoff before **P2-05 Phaser scene integration**. Pure simulation, prediction and contract work can continue while artwork is prepared. Final media/version validation is part of P5-03; do not leave the first playable scene waiting until P5 to request its core art.
+**P1-06 foundation contracts are built; production artwork is pending.** The developer will explicitly flag the asset handoff before **P2-05 Phaser scene integration**. Pure simulation, prediction and contract work can continue while artwork is prepared. Final media/version validation is part of P5-03; do not leave the first playable scene waiting until P5 to request its core art.
 
 Start with one cat's run cycle, the gold coin spin and one grass/stone ramp material set. Check their scale and readability together before producing every cat animation. Then deliver the remaining first-scene assets. No real game entry should depend on missing media or a locally invented cat.
 
@@ -134,3 +134,15 @@ The final runtime destination is `apps/web/public/game-assets/v1/`, with a manif
 - All supplied names, powers, rarity grades and upgrade visuals match the existing four-cat catalog. There are no unnecessary per-level variants.
 - Entry checks load the required versioned media; missing files fail clearly before a new affected action. Artwork and animation never attest to grants, cash-out acceptance or settlement.
 - User-run browser/device checks verify nearest-neighbor scaling, animation speed, reduced motion, loading, audio controls and frame/memory behavior. This brief alone does not verify those results.
+
+## Runtime manifest and CLI validation
+
+The first-scene contract is implemented in `apps/web/lib/game/assets.mts`; it lists 30 stable sheet/material identifiers, including four cat sheets, separate ramp/bridge/water materials, the coin/shadow, pickups, shared effect sheets, three backgrounds and a HUD sheet. Audio, fonts and later shop/collection artwork remain separate delivery work for P5-03.
+
+The runtime file is `apps/web/public/game-assets/v1/manifest.json`. It contains `schemaVersion: 1`, `version: 1` and an `assets` array sorted by `id`. Each entry records `id`, root-relative `path`, lowercase `sha256`, encoded `bytes`, image `width`/`height`, `frameWidth`/`frameHeight`, `frames`, pixel `anchor: {x, y}`, `repeat` (`none`, `x`, `xy`), `reducedMotionFrame`, and `clips`. Clips are sorted by name and contain `name`, zero-based `start`, `count`, `fps`, and `loop`. Runtime sheets use an untrimmed, equal-cell grid; packed authoring atlases must be converted before publication. The developer prepares this manifest from the supplied art and notes.
+
+Cat sheets expose `idle`, `run`, `jump`, `fall`, `dash`, `hit`, `defeat`. Shared action clips are `dash`, `hit`, `landing`, `pickup`; shared power clips are `double-jump`, `extra-dash`, `magnet`, `shield-active`, `shield-contact`. The HUD sheet exposes `boost`, `cash-out`, `dash`, `double-jump`, `extra-dash`, `jump`, `magnet`, `mute`, `pause`, `rotate-device`, `shield`, `sound`, `status`. These are named sheet regions, so static icons may use a one-frame clip.
+
+Run `pnpm check:assets` to validate version 1, or `pnpm check:assets 2` for a later version. It checks file containment, sizes, hashes, PNG dimensions/color channels and full decoding using Next's installed image decoder. Missing files, invalid metadata and missing first-scene IDs cannot report ready. The catalog binding hashes canonical UTF-8 JSON from `assetManifestBytes`, with strict field order and sorted IDs/clip names; it does not hash arbitrary pretty-printed JSON. Published versions must be retained intact.
+
+`apps/web/lib/game/presentation.ts` defines the 960 × 540 viewport, nearest-neighbor rendering, physical-pixel alignment where the display fits, pointer mapping, portrait gameplay gating with emergency cash-out retained, 44 CSS-pixel touch targets and references to the existing UI colors/fonts. It also defines the upright 16 FPS coin loop and slope-aligned shadow. These tested contracts do not constitute a rendered Phaser scene or device visual review.
