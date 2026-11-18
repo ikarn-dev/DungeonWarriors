@@ -1,0 +1,38 @@
+{
+  "network": "solana-devnet",
+  "programId": "F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx",
+  "programData": "2S4vvn67xrx4NxdcN3ZjBSicaNVJKHtpZGLJPrwkupJ4",
+  "upgradeAuthority": "5hVdF24QyxcpdubW2LgivXvYKnzbhaBAHTAD9A98tWxJ",
+  "sourceCommit": "16f2e375eceb328aee5bc8ae3f847d67cd811845",
+  "upgradeSignature": "5WBhiMjykZAXwsf2Gk5hLL5HCvFdqtQ6FV8JK3XUuUSWjkVnUgTJA9xdGpScTK2h8Jucaeom8FsD2Sn91C2bjeff",
+  "finalizedSlot": 523546918,
+  "bytecode": {
+    "bytes": 547936,
+    "sha256": "1293ca610fd86d466a85d9038a63e003399866a78c32d2d4dc6988c80168d21b",
+    "finalizedReadbackMatches": true
+  },
+  "verification": {
+    "programTestsPassed": 53,
+    "simulation": "unsigned_read_only",
+    "simulationSlot": 523548099,
+    "simulationComputeUnits": 65970,
+    "checks": [
+      "initialize_config",
+      "initialize_house",
+      "canonical_usdc_vault",
+      "zero_credit_totals",
+      "closed_admission",
+      "no_persisted_simulation_accounts"
+    ],
+    "uploadBufferClosed": true,
+    "operationalReadbackSlot": 523549173
+  },
+  "operationalState": {
+    "configInitialized": false,
+    "houseInitialized": false,
+    "catalogPublished": false,
+    "usdcTransferred": "0",
+    "gameplayExecutionBuilt": false
+  },
+  "verifiedAt": "2026-11-18T07:04:59.936145+00:00"
+}
