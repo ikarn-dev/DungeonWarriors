@@ -34,19 +34,85 @@ export function overlaps(a: Rect, b: Rect): boolean {
   );
 }
 
+export function surfaceAt(entity: WorldEntity, x: number): number | null {
+  if (entity.kind !== "terrain" && entity.kind !== "ramp") return null;
+  const rise = entity.kind === "ramp" ? entity.riseSubpixels : 0;
+  const offset = Math.max(
+    0,
+    Math.min(entity.widthSubpixels, x - entity.xSubpixels),
+  );
+  return (
+    entity.ySubpixels + Math.trunc((rise * offset) / entity.widthSubpixels)
+  );
+}
+function bottom(entity: WorldEntity): number {
+  return (
+    entity.ySubpixels +
+    entity.heightSubpixels +
+    (entity.kind === "ramp" ? Math.max(0, entity.riseSubpixels) : 0)
+  );
+}
+function surfaceUnder(entity: WorldEntity, rect: Rect): number | null {
+  const left = Math.max(rect.x, entity.xSubpixels);
+  const right = Math.min(
+    rect.x + rect.w,
+    entity.xSubpixels + entity.widthSubpixels,
+  );
+  if (left >= right) return null;
+  const a = surfaceAt(entity, left);
+  const b = surfaceAt(entity, right);
+  return a === null || b === null ? null : Math.min(a, b);
+}
+export function insideTerrain(rect: Rect, entity: WorldEntity): boolean {
+  const top = surfaceUnder(entity, rect);
+  return top !== null && rect.y < bottom(entity) && rect.y + rect.h > top;
+}
+
 export function moveRunner(
   runner: RunnerState,
   world: readonly WorldEntity[],
 ): MotionPath {
   const start = body(runner);
+  const supported =
+    runner.grounded &&
+    world.some((e) => surfaceUnder(e, start) === start.y + start.h);
   let dx = runner.vxSubpixelsPerTick;
   for (const tile of world) {
-    if (tile.kind !== "terrain") continue;
+    if (surfaceAt(tile, start.x) === null) continue;
     const r = entityRect(tile);
-    if (start.y < r.y + r.h && start.y + start.h > r.y) {
-      if (dx > 0 && start.x + start.w <= r.x)
+    const canStep = (edge: number, velocity: number): boolean => {
+      const top = surfaceAt(tile, edge);
+      return (
+        top !== null &&
+        supported &&
+        runner.vySubpixelsPerTick >= 0 &&
+        tile.kind === "ramp" &&
+        start.y + start.h - top <=
+          Math.trunc(
+            (Math.abs(velocity) * RULES_V1.physics.maxRequiredRiseSubpixels) /
+              RULES_V1.generation.segmentWidthSubpixels,
+          ) +
+            1
+      );
+    };
+    if (start.y < bottom(tile)) {
+      const leftTop = surfaceAt(tile, r.x);
+      const rightTop = surfaceAt(tile, r.x + r.w);
+      if (
+        leftTop !== null &&
+        dx > 0 &&
+        start.x + start.w <= r.x &&
+        start.y + start.h > leftTop &&
+        !canStep(r.x, dx)
+      )
         dx = Math.min(dx, r.x - start.x - start.w);
-      if (dx < 0 && start.x >= r.x + r.w)
+      if (
+        rightTop !== null &&
+        dx < 0 &&
+        start.x >= r.x + r.w &&
+        start.y + start.h > rightTop &&
+        !canStep(r.x + r.w, dx)
+      )
         dx = Math.max(dx, r.x + r.w - start.x);
     }
   }
@@ -54,22 +120,36 @@ export function moveRunner(
   if (dx !== runner.vxSubpixelsPerTick) runner.vxSubpixelsPerTick = 0;
   const afterX = body(runner);
   let dy = runner.vySubpixelsPerTick;
+  let floor: number | null = null;
   runner.grounded = false;
   for (const tile of world) {
-    if (tile.kind !== "terrain") continue;
-    const r = entityRect(tile);
-    if (afterX.x < r.x + r.w && afterX.x + afterX.w > r.x) {
-      if (
-        dy >= 0 &&
-        afterX.y + afterX.h <= r.y &&
-        afterX.y + afterX.h + dy >= r.y
-      ) {
-        dy = r.y - afterX.y - afterX.h;
-        runner.grounded = true;
-      }
-      if (dy < 0 && afterX.y >= r.y + r.h)
-        dy = Math.max(dy, r.y + r.h - afterX.y);
-    }
+    const top = surfaceUnder(tile, afterX);
+    if (top === null) continue;
+    const oldTop =
+      surfaceUnder(tile, start) ??
+      surfaceAt(
+        tile,
+        dx >= 0 ? tile.xSubpixels : tile.xSubpixels + tile.widthSubpixels,
+      );
+    const tracking =
+      supported &&
+      runner.vySubpixelsPerTick >= 0 &&
+      tile.kind === "ramp" &&
+      Math.abs(top - start.y - start.h) <=
+        RULES_V1.physics.maxVelocitySubpixelsPerTick;
+    if (
+      (oldTop !== null &&
+        start.y + start.h <= oldTop &&
+        afterX.y + afterX.h + dy >= top) ||
+      tracking
+    )
+      floor = floor === null ? top : Math.min(floor, top);
+    if (dy < 0 && afterX.y >= bottom(tile))
+      dy = Math.max(dy, bottom(tile) - afterX.y);
+  }
+  if (floor !== null) {
+    dy = floor - afterX.y - afterX.h;
+    runner.grounded = true;
   }
   runner.ySubpixels = afterX.y + dy;
   if (dy !== runner.vySubpixelsPerTick || runner.grounded)

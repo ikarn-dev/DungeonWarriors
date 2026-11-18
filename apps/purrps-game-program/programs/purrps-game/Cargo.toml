@@ -34,6 +34,10 @@ path = "../../../../tests/apps/purrps-game-program/program-admin.rs"
 name = "simulation"
 path = "../../../../tests/apps/purrps-game-program/simulation.rs"
 
+[[test]]
+name = "world_generation"
+path = "../../../../tests/apps/purrps-game-program/world-generation.rs"
+
 [lib]
 crate-type = ["cdylib", "lib"]
 name = "purrps_game"

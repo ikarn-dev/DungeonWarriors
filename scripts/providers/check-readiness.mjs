@@ -21,6 +21,7 @@ import {
   oracleAddress,
   vrfCallbackAuthority,
 } from "../../apps/web/lib/solana/addresses.mts";
+import { checkErStream } from "./check-er-stream.mjs";
 
 const maxResponseBytes = 256 * 1024;
 
@@ -156,6 +157,9 @@ const safeCodes = new Set([
   "MALFORMED_ACCOUNT",
   "RPC_REJECTED",
   "RESPONSE_TOO_LARGE",
+  "WEBSOCKET_TIMEOUT",
+  "WEBSOCKET_UNAVAILABLE",
+  "WEBSOCKET_RESPONSE_INVALID",
 ]);
 
 export async function runReadiness(environment) {
@@ -166,7 +170,7 @@ export async function runReadiness(environment) {
       fields: [
         ...new Set(parsed.error.issues.map((issue) => String(issue.path[0]))),
       ].sort(),
-      integrationGate: "unverified",
+      integrationGate: "not_built",
     };
   const config = parsed.data;
   const checks = [
@@ -188,6 +192,7 @@ export async function runReadiness(environment) {
       },
     ],
     ["er_identity_and_oracles", () => checkEr(config)],
+    ["er_websocket_delivery", () => checkErStream(config)],
     [
       "upstash_ping",
       async () => {
@@ -219,24 +224,25 @@ export async function runReadiness(environment) {
       : "provider_reads_failed",
     checks: results,
     vrfCallbackAuthority: vrfCallbackAuthority(DEVNET.program),
-    integrationGate: "unverified",
-    remainingEvidence: [
-      "delegation",
-      "crank_auth_clock_duplicates",
-      "vrf_authenticated_callback",
-      "commit_undelegation_magic_action",
-      "websocket_subscription",
-      "redis_write_and_nonce_atomicity",
-      "compute_fees_capacity",
+    integrationGate: "not_built",
+    remainingBuildTasks: [
+      "er_runner_delegation_crank_liveness",
+      "vrf_callback",
+      "commit_completion",
+      "web_sessions_nonce_atomicity",
     ],
+    unmeasured: ["ER_compute_fees_capacity"],
   };
 }
 
 if (import.meta.main) {
   try {
     const report = await runReadiness(process.env);
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-    process.exitCode = report.status === "provider_reads_passed" ? 0 : 1;
+    const code = report.status === "provider_reads_passed" ? 0 : 1;
+    // A failed peer may never finish its close handshake; all checks are settled.
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`, () =>
+      process.exit(code),
+    );
   } catch {
     process.stderr.write("Provider readiness could not complete.\n");
     process.exitCode = 1;

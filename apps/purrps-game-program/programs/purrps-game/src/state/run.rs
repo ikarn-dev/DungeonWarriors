@@ -48,6 +48,19 @@ pub enum EntityKind {
     Coin,
     Star,
     Booster(Power),
+    Ramp(i32),
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GenerationState {
+    pub next_segment: u64,
+    pub next_x_subpixels: i32,
+    pub surface_y_subpixels: i32,
+    pub checkpoint: u64,
+    pub checkpoint_x_subpixels: i32,
+    pub checkpoint_speed_subpixels_per_tick: i32,
+    pub spawned_coin_mask: u8,
+    pub spawned_hazard_mask: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,6 +196,7 @@ pub struct RunGameState {
     pub qualified_checkpoints: u64,
     pub powers: [PowerState; 4],
     pub crank: CrankState,
+    pub world_generation: GenerationState,
     pub suspension: Option<Suspension>,
     pub terminal: Option<RunTerminal>,
 }

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::Pubkey;
 use purrps_game::{
-    catalog::{cat_stats, CatId, Power, CATALOG_V1},
+    catalog::{cat_stats, CatId, CATALOG_V1},
     contracts::{CatSnapshot, Market, OracleBinding, RunSnapshot, VersionBinding},
     protocol::{
         AcceptedIntent, FaultReason, InputAxis, InputPermission, IntentEnvelope, PlayerIntent,
@@ -100,7 +100,7 @@ pub fn max_layout() -> RunGameState {
         entities: (0..MAX_WORLD_ENTITIES)
             .map(|id| WorldEntity {
                 id: id as u64,
-                kind: EntityKind::Booster(Power::Shield),
+                kind: EntityKind::Ramp(i32::MAX),
                 x_subpixels: 0,
                 y_subpixels: 0,
                 width_subpixels: 1,
@@ -145,6 +145,16 @@ pub fn max_layout() -> RunGameState {
             trusted_elapsed_ms: 1,
             consumed_elapsed_ms: 1,
             completion_attempts: 1,
+        },
+        world_generation: purrps_game::state::run::GenerationState {
+            next_segment: 1,
+            next_x_subpixels: 1,
+            surface_y_subpixels: 1,
+            checkpoint: 1,
+            checkpoint_x_subpixels: 1,
+            checkpoint_speed_subpixels_per_tick: 1,
+            spawned_coin_mask: 1,
+            spawned_hazard_mask: 1,
         },
         suspension: Some(Suspension {
             reason: FaultReason::UnsafeWorld,

@@ -1,5 +1,6 @@
 pub mod collision;
 pub mod powers;
+pub mod world;
 
 use crate::{
     catalog::CatStats,
@@ -16,6 +17,7 @@ pub enum SimulationError {
     InvalidWorld,
     InvalidBatch,
     NumericOverflow,
+    InvalidObservation,
 }
 
 // A pure projection of RunGameState, not another authority or persisted account.
@@ -66,6 +68,12 @@ pub fn validate_world(world: &[WorldEntity]) -> Result<(), SimulationError> {
                 index >= RULES_V1.designated_coins || e.kind != EntityKind::Coin
             })
             || (e.consumed && matches!(e.kind, EntityKind::Terrain | EntityKind::Hazard))
+            || matches!(e.kind, EntityKind::Ramp(rise) if e.consumed
+                || i64::from(rise).abs() * i64::from(RULES_V1.generation.segment_width_subpixels)
+                    > i64::from(RULES_V1.physics.max_required_rise_subpixels) * i64::from(e.width_subpixels)
+                || e.width_subpixels < RULES_V1.physics.min_landing_width_subpixels
+                || !valid_rect(e.x_subpixels, e.y_subpixels + rise.min(0),
+                    e.width_subpixels, e.height_subpixels + rise.abs()))
         {
             return Err(SimulationError::InvalidWorld);
         }
@@ -160,7 +168,10 @@ fn pickups(
 ) -> Result<(), SimulationError> {
     for e in world.iter_mut() {
         if e.consumed
-            || matches!(e.kind, EntityKind::Terrain | EntityKind::Hazard)
+            || matches!(
+                e.kind,
+                EntityKind::Terrain | EntityKind::Ramp(_) | EntityKind::Hazard
+            )
             || !collision::collects(path, e, powers::pickup_radius(&frame.powers, stats, tick))
         {
             continue;
@@ -184,8 +195,7 @@ fn pickups(
     Ok(())
 }
 
-// Rectangular terrain is swept X then Y. Generation, ramp representation,
-// rebasing, authenticated scheduler/queues and liveness are separate P2 work.
+// Terrain is swept X then Y; supported feet follow continuous ramp surfaces.
 // Bounded copies make failures atomic for both the program core and predictor.
 pub fn step(
     frame: &SimulationFrame,
@@ -205,10 +215,10 @@ pub fn step(
     if frame.phase != RunPhase::Active {
         return Ok(result);
     }
-    if entities.iter().any(|e| {
-        e.kind == EntityKind::Terrain
-            && collision::overlaps(collision::body(&frame.runner), collision::entity_rect(e))
-    }) {
+    if entities
+        .iter()
+        .any(|e| collision::inside_terrain(collision::body(&frame.runner), e))
+    {
         return Err(SimulationError::InvalidWorld);
     }
     let tick = frame

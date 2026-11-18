@@ -62,6 +62,7 @@ fn full_run_buffers_round_trip_with_the_reserved_account_space() {
     assert_eq!(decoded.observations, state.observations);
     assert_eq!(decoded.intents, state.intents);
     assert_eq!(decoded.terminal, state.terminal);
+    assert_eq!(decoded.world_generation, state.world_generation);
 }
 
 fn encoded_size<T: AnchorSerialize>(value: &T) -> usize {

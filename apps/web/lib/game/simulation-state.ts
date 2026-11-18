@@ -65,6 +65,9 @@ export const worldEntitySchema = z.discriminatedUnion("kind", [
   entity.extend({ kind: z.literal("coin") }).strict(),
   entity.extend({ kind: z.literal("star") }).strict(),
   entity.extend({ kind: z.literal("booster"), power }).strict(),
+  entity
+    .extend({ kind: z.literal("ramp"), riseSubpixels: coordinate })
+    .strict(),
 ]);
 export type WorldEntity = z.infer<typeof worldEntitySchema>;
 
@@ -105,7 +108,8 @@ export class SimulationError extends Error {
       | "INVALID_FRAME"
       | "INVALID_WORLD"
       | "INVALID_BATCH"
-      | "NUMERIC_OVERFLOW",
+      | "NUMERIC_OVERFLOW"
+      | "INVALID_OBSERVATION",
   ) {
     super(code);
     this.name = "SimulationError";

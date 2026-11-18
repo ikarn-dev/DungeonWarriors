@@ -4,11 +4,10 @@ import { RULES_V1, speedBps } from "./rules";
 import {
   body,
   collects,
-  entityRect,
   hits,
+  insideTerrain,
   type MotionPath,
   moveRunner,
-  overlaps,
 } from "./simulation-collision";
 import { absorbHit, command, pickupRadius, refresh } from "./simulation-powers";
 import {
@@ -51,13 +50,24 @@ export function validateWorld(world: readonly WorldEntity[]): void {
         e.heightSubpixels,
       ) ||
       (e.designatedCoin !== null && e.kind !== "coin") ||
-      (e.consumed && (e.kind === "terrain" || e.kind === "hazard"))
+      (e.consumed &&
+        (e.kind === "terrain" || e.kind === "ramp" || e.kind === "hazard")) ||
+      (e.kind === "ramp" &&
+        (Math.abs(e.riseSubpixels) * RULES_V1.generation.segmentWidthSubpixels >
+          RULES_V1.physics.maxRequiredRiseSubpixels * e.widthSubpixels ||
+          e.widthSubpixels < RULES_V1.physics.minLandingWidthSubpixels ||
+          !validRect(
+            e.xSubpixels,
+            e.ySubpixels + Math.min(e.riseSubpixels, 0),
+            e.widthSubpixels,
+            e.heightSubpixels + Math.abs(e.riseSubpixels),
+          )))
     )
       throw new SimulationError("INVALID_WORLD");
     previous = e.id;
   }
 }
-function validateFrame(frame: SimulationFrame, stats: CatStats): void {
+export function validateFrame(frame: SimulationFrame, stats: CatStats): void {
   const p = RULES_V1.physics;
   if (
     !simulationFrameSchema.safeParse(frame).success ||
@@ -131,6 +141,7 @@ function pickups(
     if (
       e.consumed ||
       e.kind === "terrain" ||
+      e.kind === "ramp" ||
       e.kind === "hazard" ||
       !collects(path, e, pickupRadius(frame, stats, tick))
     )
@@ -163,8 +174,7 @@ function pickups(
   }
 }
 
-// Pure counterpart to Rust simulation::step. Rectangular terrain only here;
-// scheduler/liveness, ramp generation and rebasing remain separate P2 work.
+// Pure counterpart to Rust simulation::step, including supported ramp contact.
 export function step(
   frame: SimulationFrame,
   entities: readonly WorldEntity[],
@@ -180,12 +190,7 @@ export function step(
     entities: entities.map((e) => ({ ...e })),
   };
   if (frame.phase !== "active") return result;
-  if (
-    entities.some(
-      (e) =>
-        e.kind === "terrain" && overlaps(body(frame.runner), entityRect(e)),
-    )
-  )
+  if (entities.some((e) => insideTerrain(body(frame.runner), e)))
     throw new SimulationError("INVALID_WORLD");
   const tick = addCounter(frame.activeTicks, 1n);
   for (const action of actions) {

@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { relative, resolve } from "node:path";
 import process from "node:process";
+import { commitSubject } from "./commit-message.mjs";
 import {
   assertIdle,
   assertPublishable,
@@ -46,20 +47,7 @@ function commitMessage() {
   const args = process.argv
     .slice(2)
     .filter((arg) => !["--", "--hook", "--dry-run"].includes(arg));
-  if (args.length > 1)
-    throw new Error("Provide one Conventional Commit subject.");
-  const message = args[0] ?? "chore: save completed coding task";
-  if (
-    message.length > 100 ||
-    !/^(feat|fix|refactor|perf|test|build|ci|docs|style|chore|revert)(\([a-z0-9/-]+\))?!?: [^\r\n]+$/.test(
-      message,
-    )
-  ) {
-    throw new Error(
-      "Use a Conventional Commit subject, for example: feat(game): add checkpoints",
-    );
-  }
-  return message;
+  return commitSubject(args);
 }
 
 function assertStable(paths, before, head, branch) {

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DEVNET } from "../../../apps/web/lib/solana/addresses.mts";
+import {
+  DEVNET,
+  oracleAddress,
+} from "../../../apps/web/lib/solana/addresses.mts";
 import { runReadiness } from "../../../scripts/providers/check-readiness.mjs";
 import {
   environment,
@@ -70,6 +73,47 @@ function providerResponse(method, host, overrides = {}) {
 
 function stubProviders(context, change = () => undefined, overrides = {}) {
   const requests = [];
+  class Socket extends EventTarget {
+    constructor() {
+      super();
+      queueMicrotask(() => this.dispatchEvent(new Event("open")));
+    }
+    send(data) {
+      const request = JSON.parse(data);
+      const emit = (payload) =>
+        queueMicrotask(() =>
+          this.dispatchEvent(
+            new MessageEvent("message", { data: JSON.stringify(payload) }),
+          ),
+        );
+      if (request.method === "accountSubscribe") {
+        assert.equal(request.params[0], oracleAddress(1));
+        emit({ jsonrpc: "2.0", id: 1, result: 7 });
+        emit(
+          overrides.streamMessage ?? {
+            jsonrpc: "2.0",
+            method: "accountNotification",
+            params: {
+              subscription: 7,
+              result: {
+                context: { slot: 123_456_790 },
+                value: account(DEVNET.oracleProgram, oracle),
+              },
+            },
+          },
+        );
+      } else {
+        assert.equal(request.method, "accountUnsubscribe");
+        assert.deepEqual(request.params, [7]);
+        emit({ jsonrpc: "2.0", id: 2, result: true });
+      }
+    }
+    close() {}
+  }
+  context.mock.method(globalThis, "WebSocket", function WebSocketFixture(url) {
+    assert.equal(url, environment.MAGICBLOCK_ER_WS_URL);
+    return new Socket();
+  });
   context.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push({ url, options });
     assert.equal(options.redirect, "error");
@@ -97,12 +141,14 @@ test("readiness performs seven read-only requests and never passes the integrati
   const requests = stubProviders(context);
   const report = await runReadiness(environment);
   assert.equal(report.status, "provider_reads_passed");
-  assert.equal(report.integrationGate, "unverified");
-  assert.equal(report.checks.length, 4);
+  assert.equal(report.integrationGate, "not_built");
+  assert.equal(report.checks.length, 5);
   assert.equal(requests.length, 7);
-  assert.ok(report.remainingEvidence.includes("crank_auth_clock_duplicates"));
   assert.ok(
-    report.remainingEvidence.includes("redis_write_and_nonce_atomicity"),
+    report.remainingBuildTasks.includes("er_runner_delegation_crank_liveness"),
+  );
+  assert.ok(
+    report.remainingBuildTasks.includes("web_sessions_nonce_atomicity"),
   );
   const json = JSON.stringify(report);
   assert.ok(!json.includes(environment.UPSTASH_REDIS_REST_TOKEN));
@@ -166,6 +212,7 @@ test("wrong chains, spoofed identities and underfunding fail without leaking err
       "SPONSOR_UNDERFUNDED",
       "MINT_MISMATCH",
       "VALIDATOR_MISMATCH",
+      undefined,
       "PROVIDER_UNAVAILABLE_OR_INVALID",
     ],
   );
@@ -192,7 +239,50 @@ test("oversized responses are rejected before JSON parsing", async (context) => 
   stubProviders(context, () => new Response(" ".repeat(256 * 1024 + 1)));
   const report = await runReadiness(environment);
   assert.equal(report.status, "provider_reads_failed");
-  assert.ok(report.checks.every((item) => item.code === "RESPONSE_TOO_LARGE"));
+  assert.ok(
+    report.checks
+      .filter((item) => item.name !== "er_websocket_delivery")
+      .every((item) => item.code === "RESPONSE_TOO_LARGE"),
+  );
+});
+
+test("websocket delivery rejects spoofed accounts and subscription identities", async (context) => {
+  stubProviders(context, undefined, {
+    streamMessage: {
+      jsonrpc: "2.0",
+      method: "accountNotification",
+      params: {
+        subscription: 7,
+        result: {
+          context: { slot: 123_456_790 },
+          value: account(DEVNET.program, oracle),
+        },
+      },
+    },
+  });
+  const report = await runReadiness(environment);
+  assert.equal(
+    report.checks.find((item) => item.name === "er_websocket_delivery")?.code,
+    "ORACLE_ACCOUNT_MISMATCH",
+  );
+});
+
+test("websocket malformed responses fail without leaking provider content", async (context) => {
+  stubProviders(context, undefined, {
+    streamMessage: {
+      jsonrpc: "2.0",
+      id: 99,
+      error: { message: environment.UPSTASH_REDIS_REST_TOKEN },
+    },
+  });
+  const report = await runReadiness(environment);
+  assert.equal(
+    report.checks.find((item) => item.name === "er_websocket_delivery")?.code,
+    "WEBSOCKET_RESPONSE_INVALID",
+  );
+  assert.ok(
+    !JSON.stringify(report).includes(environment.UPSTASH_REDIS_REST_TOKEN),
+  );
 });
 
 test("wrong oracle owners fail even when the payload is otherwise valid", async (context) => {
