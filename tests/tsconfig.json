@@ -6,6 +6,7 @@
     "types": ["node"],
     "typeRoots": ["../apps/web/node_modules/@types"],
     "paths": {
+      "@solana/web3.js": ["../apps/web/node_modules/@solana/web3.js"],
       "vitest": ["../apps/web/node_modules/vitest"],
       "@/*": ["../apps/web/*"]
     }

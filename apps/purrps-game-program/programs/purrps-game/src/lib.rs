@@ -74,6 +74,14 @@ pub mod purrps_game {
         crate::instructions::inspect_oracle::handle_inspect_oracle(ctx, market)
     }
 
+    pub fn inspect_run(ctx: Context<InspectRun>) -> Result<RunStatusView> {
+        crate::instructions::inspect_run::handle_inspect_run(ctx)
+    }
+
+    pub fn inspect_run_escrow(ctx: Context<InspectRunEscrow>) -> Result<()> {
+        crate::instructions::inspect_run::handle_inspect_run_escrow(ctx)
+    }
+
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)
     }

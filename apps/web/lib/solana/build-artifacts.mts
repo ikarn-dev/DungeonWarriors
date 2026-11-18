@@ -8,6 +8,14 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "publish_catalog",
   "create_player",
   "inspect_oracle",
+  "initialize_house",
+  "fund_house",
+  "withdraw_surplus",
+  "set_house_buffer",
+  "deposit",
+  "withdraw",
+  "inspect_run",
+  "inspect_run_escrow",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

@@ -56,7 +56,7 @@ export class PredictionError extends Error {
   }
 }
 
-function parseSnapshot(input: unknown): Snapshot {
+export function parsePredictionSnapshot(input: unknown): Snapshot {
   const parsed = snapshotSchema.safeParse(input);
   if (!parsed.success) throw new PredictionError("INVALID_SNAPSHOT");
   const s = parsed.data;
@@ -99,7 +99,7 @@ export class Predictor {
     input: unknown,
     private readonly stats: CatStats,
   ) {
-    this.snapshot = parseSnapshot(input);
+    this.snapshot = parsePredictionSnapshot(input);
     this.predictedTick = this.snapshot.frame.activeTicks;
   }
 
@@ -125,7 +125,7 @@ export class Predictor {
   }
 
   reconcile(input: unknown): boolean {
-    const next = parseSnapshot(input);
+    const next = parsePredictionSnapshot(input);
     if (next.run !== this.snapshot.run)
       throw new PredictionError("RUN_MISMATCH");
     if (
