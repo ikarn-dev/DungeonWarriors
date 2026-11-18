@@ -17,7 +17,8 @@
     "lint": "biome check",
     "format": "biome check --write",
     "test:parity": "PURRPS_WORLD_TRACE=1 rustup run 1.89.0 cargo test --offline --locked --manifest-path apps/purrps-game-program/Cargo.toml -p purrps-game --test world_generation generated_required_route_is_reachable_for_every_cat_and_level_without_powers && PURRPS_WORLD_TRACE=1 node apps/web/node_modules/vitest/vitest.mjs run --config tests/vitest.config.mts world.test.ts",
-    "check:assets": "node scripts/assets/check-assets.mjs"
+    "check:assets": "node scripts/assets/check-assets.mjs",
+    "test:web:build": "node --test tests/scripts/web/*.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.2",
