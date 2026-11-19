@@ -32,6 +32,10 @@ declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 pub mod purrps_game {
     use super::*;
 
+    pub fn abort_undelegated_reservation(ctx: Context<AbortUndelegatedReservation>) -> Result<()> {
+        crate::instructions::abort_reservation::handle_abort_undelegated_reservation(ctx)
+    }
+
     pub fn authorize_session(
         ctx: Context<AuthorizeSession>,
         args: AuthorizeSessionArgs,

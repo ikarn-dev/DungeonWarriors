@@ -16,6 +16,120 @@ export type PurrpsGame = {
   };
   instructions: [
     {
+      name: "abortUndelegatedReservation";
+      discriminator: [95, 10, 82, 51, 22, 164, 237, 153];
+      accounts: [
+        {
+          name: "escrow";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "receipt";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 101, 115, 117, 108, 116];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [];
+    },
+    {
       name: "authorizeSession";
       discriminator: [187, 218, 251, 161, 99, 40, 34, 34];
       accounts: [
@@ -1655,6 +1769,10 @@ export type PurrpsGame = {
       discriminator: [224, 184, 224, 50, 98, 72, 48, 236];
     },
     {
+      name: "resultReceipt";
+      discriminator: [181, 239, 156, 8, 213, 129, 130, 222];
+    },
+    {
       name: "runEscrow";
       discriminator: [167, 222, 19, 95, 231, 132, 137, 139];
     },
@@ -1805,6 +1923,11 @@ export type PurrpsGame = {
       code: 6025;
       name: "invalidSponsorBudget";
       msg: "Invalid or insufficient purpose-bound sponsor funding";
+    },
+    {
+      code: 6026;
+      name: "reservationNotRefundable";
+      msg: "Only expired, unplayed reservations that were never delegated can be refunded here";
     },
   ];
   types: [
@@ -3676,6 +3799,102 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "resultReceipt";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "run";
+            type: "pubkey";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "market";
+            type: {
+              defined: {
+                name: "market";
+              };
+            };
+          },
+          {
+            name: "snapshotHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "rules";
+            type: {
+              defined: {
+                name: "versionBinding";
+              };
+            };
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catSnapshot";
+              };
+            };
+          },
+          {
+            name: "oracle";
+            type: {
+              defined: {
+                name: "oracleBinding";
+              };
+            };
+          },
+          {
+            name: "startObservation";
+            type: {
+              option: {
+                defined: {
+                  name: "oracleObservation";
+                };
+              };
+            };
+          },
+          {
+            name: "stakeBaseUnits";
+            type: "u64";
+          },
+          {
+            name: "terminal";
+            type: {
+              defined: {
+                name: "runTerminal";
+              };
+            };
+          },
+          {
+            name: "settledAtSlot";
+            type: "u64";
+          },
+          {
+            name: "settledAtSeconds";
+            type: "i64";
+          },
+        ];
+      };
+    },
+    {
       name: "runEscrow";
       type: {
         kind: "struct";
@@ -4660,6 +4879,120 @@ export const PURRPS_GAME_IDL = {
     description: "PURRPS vault, wager and settlement program",
   },
   instructions: [
+    {
+      name: "abort_undelegated_reservation",
+      discriminator: [95, 10, 82, 51, 22, 164, 237, 153],
+      accounts: [
+        {
+          name: "escrow",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "receipt",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 101, 115, 117, 108, 116],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [],
+    },
     {
       name: "authorize_session",
       discriminator: [187, 218, 251, 161, 99, 40, 34, 34],
@@ -6233,6 +6566,10 @@ export const PURRPS_GAME_IDL = {
     {
       name: "PlayerAccount",
       discriminator: [224, 184, 224, 50, 98, 72, 48, 236],
+    },
+    {
+      name: "ResultReceipt",
+      discriminator: [181, 239, 156, 8, 213, 129, 130, 222],
     },
     {
       name: "RunEscrow",
@@ -8124,6 +8461,102 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "ResultReceipt",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "run",
+            type: "pubkey",
+          },
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "market",
+            type: {
+              defined: {
+                name: "Market",
+              },
+            },
+          },
+          {
+            name: "snapshot_hash",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "rules",
+            type: {
+              defined: {
+                name: "VersionBinding",
+              },
+            },
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatSnapshot",
+              },
+            },
+          },
+          {
+            name: "oracle",
+            type: {
+              defined: {
+                name: "OracleBinding",
+              },
+            },
+          },
+          {
+            name: "start_observation",
+            type: {
+              option: {
+                defined: {
+                  name: "OracleObservation",
+                },
+              },
+            },
+          },
+          {
+            name: "stake_base_units",
+            type: "u64",
+          },
+          {
+            name: "terminal",
+            type: {
+              defined: {
+                name: "RunTerminal",
+              },
+            },
+          },
+          {
+            name: "settled_at_slot",
+            type: "u64",
+          },
+          {
+            name: "settled_at_seconds",
+            type: "i64",
+          },
+        ],
+      },
+    },
+    {
       name: "RunEscrow",
       type: {
         kind: "struct",
@@ -9210,6 +9643,11 @@ export const PURRPS_GAME_IDL = {
       code: 6025,
       name: "InvalidSponsorBudget",
       msg: "Invalid or insufficient purpose-bound sponsor funding",
+    },
+    {
+      code: 6026,
+      name: "ReservationNotRefundable",
+      msg: "Only expired, unplayed reservations that were never delegated can be refunded here",
     },
   ],
   constants: [

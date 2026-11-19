@@ -25,6 +25,7 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "configure_sponsorship",
   "fund_sponsorship",
   "reserve_run",
+  "abort_undelegated_reservation",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

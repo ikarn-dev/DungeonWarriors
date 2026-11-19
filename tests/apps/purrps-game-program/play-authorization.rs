@@ -17,6 +17,8 @@ use solana_signer::Signer;
 mod boundaries;
 #[path = "support/play-setup.rs"]
 mod play;
+#[path = "play-recovery.rs"]
+mod recovery;
 #[path = "support/game-setup.rs"]
 mod setup;
 #[path = "support/harness.rs"]

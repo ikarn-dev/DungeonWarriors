@@ -54,4 +54,6 @@ pub enum ErrorCode {
     InvalidSession,
     #[msg("Invalid or insufficient purpose-bound sponsor funding")]
     InvalidSponsorBudget,
+    #[msg("Only expired, unplayed reservations that were never delegated can be refunded here")]
+    ReservationNotRefundable,
 }

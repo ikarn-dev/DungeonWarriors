@@ -138,6 +138,7 @@ pub fn put<T: AccountSerialize>(h: &mut Harness, key: Pubkey, value: &T) {
         .unwrap_or_else(|| h.svm.get_account(&h.admin.pubkey()).unwrap());
     let mut data = Vec::new();
     value.try_serialize(&mut data).unwrap();
+    data.resize(data.len().max(account.data.len()), 0);
     account.data = data;
     account.owner = purrps_game::ID;
     account.lamports = h.svm.minimum_balance_for_rent_exemption(account.data.len());
