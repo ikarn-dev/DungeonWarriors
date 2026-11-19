@@ -27,6 +27,8 @@ mod recovery;
 mod returned_settlement;
 #[path = "completion.rs"]
 mod run_completion;
+#[path = "run-crank.rs"]
+mod run_crank;
 #[path = "run-lifecycle.rs"]
 mod run_lifecycle;
 #[path = "run-oracle.rs"]

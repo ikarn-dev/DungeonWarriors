@@ -74,6 +74,7 @@ anchor-lang = { version = "=1.1.2", features = ["init-if-needed"] }
 anchor-spl = "=1.1.2"
 ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank", "instruction", "solana-system-interface"] }
 session-keys = { version = "=3.1.1", features = ["no-entrypoint"] }
+hydra-api = { version = "=0.2.1", features = ["cpi-native", "ephemeral"] }
 solana-instructions-sysvar = "=3.0.1"
 solana-sha256-hasher = { version = "=3.1.0", features = ["sha2"] }
 

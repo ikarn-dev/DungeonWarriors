@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use ephemeral_rollups_sdk::{
     anchor::DelegationProgram,
     consts::{DELEGATION_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID},
@@ -10,7 +10,10 @@ use ephemeral_rollups_sdk::{
     },
 };
 
-use super::{abort_reservation::activation_expired, run_inputs::validate_input_snapshot};
+use super::{
+    abort_reservation::activation_expired, run_crank::CRANK_RENT_HEADROOM,
+    run_inputs::validate_input_snapshot,
+};
 use crate::{
     constants::*,
     error::ErrorCode,
@@ -92,6 +95,20 @@ pub fn handle_delegate_run(ctx: Context<DelegateRun>, args: RunIdentityArgs) -> 
                 && unplayed_reservation(&run),
             ErrorCode::InvalidRun
         );
+    }
+    let rent = Rent::get()?.minimum_balance(a.run.data_len());
+    let headroom = a.run.lamports().saturating_sub(rent);
+    if headroom < CRANK_RENT_HEADROOM {
+        system_program::transfer(
+            CpiContext::new(
+                a.system_program.key(),
+                system_program::Transfer {
+                    from: a.payer.to_account_info(),
+                    to: a.run.to_account_info(),
+                },
+            ),
+            CRANK_RENT_HEADROOM - headroom,
+        )?;
     }
     delegate_account(
         DelegateAccounts {

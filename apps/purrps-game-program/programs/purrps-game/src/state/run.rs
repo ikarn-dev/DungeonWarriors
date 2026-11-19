@@ -121,7 +121,7 @@ pub struct CrankState {
     pub cancel_authority: Pubkey,
     pub generation: u64,
     pub last_execution_ordinal: u64,
-    pub trusted_elapsed_ms: u64,
+    pub clock_origin_seconds: u64,
     pub consumed_elapsed_ms: u64,
     pub completion_attempts: u16,
 }
@@ -297,7 +297,7 @@ impl RunGameState {
                 cancel_authority: snapshot.run,
                 generation: 0,
                 last_execution_ordinal: 0,
-                trusted_elapsed_ms: 0,
+                clock_origin_seconds: 0,
                 consumed_elapsed_ms: 0,
                 completion_attempts: 0,
             },

@@ -68,4 +68,6 @@ pub enum ErrorCode {
     InvalidRunWorld,
     #[msg("Completion did not come from the pinned validator and run balance")]
     InvalidCompletionAction,
+    #[msg("Only the registered Hydra trigger may advance this run")]
+    InvalidCrank,
 }

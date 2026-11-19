@@ -2526,6 +2526,7 @@ dependencies = [
  "anchor-spl",
  "bincode",
  "ephemeral-rollups-sdk",
+ "hydra-api",
  "litesvm",
  "magicblock-magic-program-api",
  "session-keys",

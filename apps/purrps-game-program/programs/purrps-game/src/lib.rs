@@ -19,7 +19,7 @@ use anchor_lang::prelude::*;
 pub use constants::*;
 use contracts::Market;
 use instruction_args::{
-    AmountArgs, ApplyUpgradeArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs,
+    AdvanceRunArgs, AmountArgs, ApplyUpgradeArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs,
     FundSponsorshipArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs,
     RequestCapsuleArgs, ReserveRunArgs, RunIdentityArgs, SelectCatArgs, SetAdmissionArgs,
     SubmitIntentsArgs,
@@ -99,6 +99,14 @@ pub mod purrps_game {
         account_seeds: Vec<Vec<u8>>,
     ) -> Result<()> {
         crate::instructions::delegation::handle_process_undelegation(ctx, account_seeds)
+    }
+
+    pub fn activate_run(ctx: Context<ActivateRun>, args: RunIdentityArgs) -> Result<()> {
+        crate::instructions::run_crank::handle_activate_run(ctx, args)
+    }
+
+    pub fn advance_run(ctx: Context<AdvanceRun>, args: AdvanceRunArgs) -> Result<()> {
+        crate::instructions::run_crank::handle_advance_run(ctx, args)
     }
 
     pub fn submit_intents(ctx: Context<RunInput>, args: SubmitIntentsArgs) -> Result<()> {

@@ -53,7 +53,16 @@ pub fn handle_recover_run_oracle(ctx: Context<RecoverRunOracle>) -> Result<()> {
         Ok(oracle)
     });
     match (run.phase, quote) {
-        (RunPhase::Suspended, Ok(oracle)) => resume_oracle(run, &oracle),
+        (RunPhase::Suspended, Ok(oracle))
+            if run.suspension.is_some_and(|s| {
+                matches!(
+                    s.reason,
+                    FaultReason::OracleInvalid | FaultReason::OracleStale
+                )
+            }) =>
+        {
+            resume_oracle(run, &oracle, clock.unix_timestamp)
+        }
         (RunPhase::Active, Err(error)) => {
             let fault = if matches!(error, anchor_lang::error::Error::AnchorError(ref e) if e.error_name == "StaleOracle")
             {

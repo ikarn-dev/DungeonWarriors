@@ -130,6 +130,146 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "activateRun";
+      discriminator: [33, 122, 195, 151, 171, 147, 195, 39];
+      accounts: [
+        {
+          name: "escrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "playKey";
+          signer: true;
+        },
+        {
+          name: "priceUpdate";
+        },
+        {
+          name: "crank";
+          writable: true;
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
+        {
+          name: "rentVault";
+          writable: true;
+          address: "MagicVau1t999999999999999999999999999999999";
+        },
+        {
+          name: "hydraProgram";
+          address: "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf";
+        },
+        {
+          name: "magicProgram";
+          address: "Magic11111111111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "runIdentityArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "advanceRun";
+      discriminator: [118, 153, 247, 180, 226, 16, 152, 67];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "priceUpdate";
+        },
+        {
+          name: "crank";
+          writable: true;
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
+        {
+          name: "instructions";
+          address: "Sysvar1nstructions1111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "advanceRunArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "applyUpgrade";
       discriminator: [144, 186, 27, 211, 104, 117, 35, 249];
       accounts: [
@@ -2079,6 +2219,22 @@ export type PurrpsGame = {
           name: "magicProgram";
           address: "Magic11111111111111111111111111111111111111";
         },
+        {
+          name: "crank";
+          writable: true;
+          optional: true;
+        },
+        {
+          name: "rentVault";
+          writable: true;
+          optional: true;
+          address: "MagicVau1t999999999999999999999999999999999";
+        },
+        {
+          name: "hydraProgram";
+          optional: true;
+          address: "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf";
+        },
       ];
       args: [
         {
@@ -3240,6 +3396,11 @@ export type PurrpsGame = {
       name: "invalidCompletionAction";
       msg: "Completion did not come from the pinned validator and run balance";
     },
+    {
+      code: 6033;
+      name: "invalidCrank";
+      msg: "Only the registered Hydra trigger may advance this run";
+    },
   ];
   types: [
     {
@@ -3261,6 +3422,22 @@ export type PurrpsGame = {
           },
           {
             name: "acceptedOrder";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "advanceRunArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "delegationEpoch";
+            type: "u64";
+          },
+          {
+            name: "taskGeneration";
             type: "u64";
           },
         ];
@@ -3868,7 +4045,7 @@ export type PurrpsGame = {
             type: "u64";
           },
           {
-            name: "trustedElapsedMs";
+            name: "clockOriginSeconds";
             type: "u64";
           },
           {
@@ -6442,6 +6619,146 @@ export const PURRPS_GAME_IDL = {
       args: [],
     },
     {
+      name: "activate_run",
+      discriminator: [33, 122, 195, 151, 171, 147, 195, 39],
+      accounts: [
+        {
+          name: "escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "play_key",
+          signer: true,
+        },
+        {
+          name: "price_update",
+        },
+        {
+          name: "crank",
+          writable: true,
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
+        {
+          name: "rent_vault",
+          writable: true,
+          address: "MagicVau1t999999999999999999999999999999999",
+        },
+        {
+          name: "hydra_program",
+          address: "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf",
+        },
+        {
+          name: "magic_program",
+          address: "Magic11111111111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "RunIdentityArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "advance_run",
+      discriminator: [118, 153, 247, 180, 226, 16, 152, 67],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "price_update",
+        },
+        {
+          name: "crank",
+          writable: true,
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
+        {
+          name: "instructions",
+          address: "Sysvar1nstructions1111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "AdvanceRunArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "apply_upgrade",
       discriminator: [144, 186, 27, 211, 104, 117, 35, 249],
       accounts: [
@@ -8338,6 +8655,22 @@ export const PURRPS_GAME_IDL = {
           name: "magic_program",
           address: "Magic11111111111111111111111111111111111111",
         },
+        {
+          name: "crank",
+          writable: true,
+          optional: true,
+        },
+        {
+          name: "rent_vault",
+          writable: true,
+          optional: true,
+          address: "MagicVau1t999999999999999999999999999999999",
+        },
+        {
+          name: "hydra_program",
+          optional: true,
+          address: "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf",
+        },
       ],
       args: [
         {
@@ -9347,6 +9680,22 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "AdvanceRunArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "delegation_epoch",
+            type: "u64",
+          },
+          {
+            name: "task_generation",
+            type: "u64",
+          },
+        ],
+      },
+    },
+    {
       name: "AmountArgs",
       type: {
         kind: "struct",
@@ -9948,7 +10297,7 @@ export const PURRPS_GAME_IDL = {
             type: "u64",
           },
           {
-            name: "trusted_elapsed_ms",
+            name: "clock_origin_seconds",
             type: "u64",
           },
           {
@@ -12544,6 +12893,11 @@ export const PURRPS_GAME_IDL = {
       code: 6032,
       name: "InvalidCompletionAction",
       msg: "Completion did not come from the pinned validator and run balance",
+    },
+    {
+      code: 6033,
+      name: "InvalidCrank",
+      msg: "Only the registered Hydra trigger may advance this run",
     },
   ],
   constants: [

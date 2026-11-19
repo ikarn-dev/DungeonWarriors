@@ -31,6 +31,8 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "fund_sponsorship",
   "reserve_run",
   "delegate_run",
+  "activate_run",
+  "advance_run",
   "expire_delegated_activation",
   "process_undelegation",
   "abort_undelegated_reservation",

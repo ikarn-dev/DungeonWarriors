@@ -212,6 +212,7 @@ fn deployed_provider_round_trips_only_the_run_and_refunds_the_same_stake() {
     let run = pda(purrps_game::RUN_GAME_SEED, owner, 0);
     let escrow = pda(purrps_game::RUN_ESCROW_SEED, owner, 0);
     let original = account_bytes(&p, run);
+    let original_rent = p.h.svm.get_balance(&run).unwrap();
     let base = [p.player, p.house, p.vault, p.budget(0)];
     let before = base.map(|key| account_bytes(&p, key));
     let dlp = DelegationProgram::id();
@@ -222,6 +223,10 @@ fn deployed_provider_round_trips_only_the_run_and_refunds_the_same_stake() {
     let delegated = p.h.svm.get_account(&run).unwrap();
     assert_eq!(delegated.owner, dlp);
     assert_eq!(delegated.data, original);
+    assert_eq!(
+        delegated.lamports - original_rent,
+        purrps_game::instructions::CRANK_RENT_HEADROOM
+    );
     assert_eq!(p.h.svm.get_account(&escrow).unwrap().owner, purrps_game::ID);
     assert!(p.h.read::<RunEscrow>(escrow).delegation_initiated);
     let account =

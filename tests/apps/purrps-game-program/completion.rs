@@ -109,6 +109,9 @@ fn completion_guard_checks_terminal_and_failed_provider_cpi_restores_state() {
                 payer,
                 magic_context: MAGIC_CONTEXT_ID,
                 magic_program: MagicProgram::id(),
+                crank: None,
+                rent_vault: None,
+                hydra_program: None,
             },
         )
     };
@@ -344,6 +347,9 @@ fn compiled_completion_schedules_one_fixed_action_or_a_bare_return() {
                 payer,
                 magic_context: MAGIC_CONTEXT_ID,
                 magic_program: MagicProgram::id(),
+                crank: None,
+                rent_vault: None,
+                hydra_program: None,
             },
         );
         let before: RunGameState = p.h.read(run);

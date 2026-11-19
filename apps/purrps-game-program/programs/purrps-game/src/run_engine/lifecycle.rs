@@ -64,7 +64,7 @@ fn sample(previous: OracleObservation, current: OracleObservation) -> PriceSampl
     }
 }
 
-// Called after the activation instruction has authenticated and registered the task.
+// Activation and task registration commit atomically in the ER handler.
 pub fn activate_world(run: &mut RunGameState, oracle: &InspectedOracle, now: i64) -> Result<()> {
     require!(
         run.phase == RunPhase::Ready
@@ -342,16 +342,17 @@ pub fn expire_suspension(run: &mut RunGameState, now: i64) -> Result<bool> {
     Ok(true)
 }
 
-pub fn resume_oracle(run: &mut RunGameState, oracle: &InspectedOracle) -> Result<()> {
+pub fn resume_oracle(run: &mut RunGameState, oracle: &InspectedOracle, now: i64) -> Result<()> {
     require!(
         run.phase == RunPhase::Suspended
             && run.terminal.is_none()
             && run.suspension.is_some_and(|s| matches!(
                 s.reason,
-                FaultReason::OracleInvalid | FaultReason::OracleStale
+                FaultReason::OracleInvalid | FaultReason::OracleStale | FaultReason::SchedulerGap
             )),
         ErrorCode::InvalidRun
     );
+    let origin = u64::try_from(now).map_err(|_| error!(ErrorCode::InvalidCrank))?;
     let last = run.latest_observation()?.ok_or(ErrorCode::InvalidRun)?;
     let next = oracle.next_observation(Some(last))?;
     if next != last {
@@ -359,5 +360,7 @@ pub fn resume_oracle(run: &mut RunGameState, oracle: &InspectedOracle) -> Result
     }
     run.phase = RunPhase::Active;
     run.suspension = None;
+    run.crank.clock_origin_seconds = origin;
+    run.crank.consumed_elapsed_ms = 0;
     Ok(())
 }

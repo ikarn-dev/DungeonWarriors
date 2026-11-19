@@ -142,7 +142,7 @@ pub fn max_layout() -> RunGameState {
             cancel_authority: key,
             generation: 1,
             last_execution_ordinal: 1,
-            trusted_elapsed_ms: 1,
+            clock_origin_seconds: 1,
             consumed_elapsed_ms: 1,
             completion_attempts: 1,
         },

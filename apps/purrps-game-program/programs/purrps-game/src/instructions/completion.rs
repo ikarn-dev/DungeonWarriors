@@ -1,7 +1,8 @@
 use anchor_lang::{prelude::*, system_program, InstructionData};
 use ephemeral_rollups_sdk::{
     anchor::{action, MagicProgram},
-    consts::{DELEGATION_PROGRAM_ID, MAGIC_CONTEXT_ID},
+    consts::{DELEGATION_PROGRAM_ID, EPHEMERAL_VAULT_ID, MAGIC_CONTEXT_ID},
+    crank::hydra::ephemeral,
     dlp_api::discriminator::DlpDiscriminator,
     ephem::{CallHandler, FoldableIntentBuilder, MagicIntentBundleBuilder},
     pda::ephemeral_balance_pda_from_payer,
@@ -9,7 +10,12 @@ use ephemeral_rollups_sdk::{
 };
 use solana_instructions_sysvar::{load_current_index_checked, load_instruction_at_checked};
 
-use super::{abort_reservation::*, run_inputs::validate_input_snapshot, settle_returned::*};
+use super::{
+    abort_reservation::*,
+    run_crank::{task_address, HydraProgram},
+    run_inputs::validate_input_snapshot,
+    settle_returned::*,
+};
 use crate::{
     constants::*,
     error::ErrorCode,
@@ -50,6 +56,13 @@ pub struct RequestCompletion<'info> {
     #[account(mut,address=MAGIC_CONTEXT_ID,owner=magic_program.key())]
     pub magic_context: UncheckedAccount<'info>,
     pub magic_program: Program<'info, MagicProgram>,
+    /// CHECK: Required for an activated run and pinned to its recorded task.
+    #[account(mut)]
+    pub crank: Option<UncheckedAccount<'info>>,
+    /// CHECK: Fixed native rent vault. Used only when cancelling an active task.
+    #[account(mut, address=EPHEMERAL_VAULT_ID)]
+    pub rent_vault: Option<UncheckedAccount<'info>>,
+    pub hydra_program: Option<Program<'info, HydraProgram>>,
 }
 
 fn completion_metas(
@@ -147,12 +160,42 @@ pub fn handle_request_completion(
         .and_then(|lamports| lamports.checked_add(rent.minimum_balance(0)))
         .ok_or(ErrorCode::ArithmeticOverflow)?;
     let funded = a.action_balance.lamports() >= action_rent;
+    cancel_crank(a, &run, &seeds)?;
     run.crank.completion_attempts += 1;
     run.phase = RunPhase::CompletionRequested;
     // The provider changes ownership during this call. Persist the immutable
     // result and request metadata before CPI and let Solana roll back on error.
     run.try_serialize(&mut &mut a.run.try_borrow_mut_data()?[..])?;
     schedule_completion(a, &seeds, funded)
+}
+
+#[inline(never)]
+fn cancel_crank(a: &RequestCompletion<'_>, run: &RunGameState, seeds: &[&[u8]]) -> Result<()> {
+    if run.crank.task == Pubkey::default() {
+        return Ok(());
+    }
+    let crank = a.crank.as_ref().ok_or(ErrorCode::InvalidCrank)?;
+    require!(
+        crank.key() == run.crank.task && crank.key() == task_address(a.run.key()),
+        ErrorCode::InvalidCrank
+    );
+    if crank.data_is_empty() && *crank.owner == system_program::ID {
+        // A prior completion request already closed it.
+        return Ok(());
+    }
+    let vault = a.rent_vault.as_ref().ok_or(ErrorCode::InvalidCrank)?;
+    let _hydra = a.hydra_program.as_ref().ok_or(ErrorCode::InvalidCrank)?;
+    require_keys_eq!(*crank.owner, HydraProgram::id(), ErrorCode::InvalidCrank);
+    let run = a.run.to_account_info();
+    ephemeral::cancel(
+        &run,
+        &crank.to_account_info(),
+        &run,
+        &vault.to_account_info(),
+        &a.magic_program.to_account_info(),
+        &[seeds],
+    )?;
+    Ok(())
 }
 
 #[inline(never)]
