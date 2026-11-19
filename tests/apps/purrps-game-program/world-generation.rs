@@ -264,3 +264,59 @@ fn endless_world_preserves_absolute_distance_after_speed_and_payout_caps() {
     );
     assert!(state.world_origin_pixels > 50000);
 }
+
+#[test]
+fn all_cat_levels_match_powered_worlds_beyond_the_payout_cap() {
+    use purrps_game::economy::gross_payout;
+    use solana_sha256_hasher::hashv;
+    let mut rows = String::new();
+    let generate_trace = std::env::var("PURRPS_WORLD_TRACE").as_deref() == Ok("1");
+    for (cat_index, cat) in [
+        CatId::Collector,
+        CatId::Acrobat,
+        CatId::Guardian,
+        CatId::Sprinter,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        for level in 1..=5 {
+            let stats = cat_stats(cat, level).unwrap();
+            let ability = stats.power as usize;
+            let cooldown = u64::from(stats.power_cooldown_ticks);
+            let mut state = initial(cat, level, 0);
+            let mut digest = [0; 32];
+            for tick in 1..=12_600u64 {
+                state = step_world(&state, &stats, &[PlayerIntent::Boost], sample(0)).unwrap();
+                assert_eq!(state.frame.phase, RunPhase::Active);
+                assert_eq!(state.frame.active_ticks, tick);
+                assert_eq!(state.frame.qualified_checkpoints, tick / 600);
+                assert_eq!(
+                    state.frame.powers[ability].ready_at_tick,
+                    1 + ((tick - 1) / cooldown + 1) * cooldown
+                );
+                if generate_trace {
+                    digest = hashv(&[&digest, world_hash(&state).as_bytes()]).to_bytes();
+                }
+            }
+            assert_eq!(purrps_game::rules::run_level(state.frame.active_ticks), 22);
+            assert_eq!(
+                gross_payout(1_000_000, state.frame.qualified_checkpoints),
+                Ok(10_000_000)
+            );
+            rows.push_str(&format!(
+                "{cat_index},{level},{}\n",
+                digest
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>()
+            ));
+        }
+    }
+    if generate_trace {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../tests/.artifacts/powered-world-parity.csv");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, rows).unwrap();
+    }
+}

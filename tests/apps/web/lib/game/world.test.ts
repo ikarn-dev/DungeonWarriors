@@ -1,7 +1,13 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { type CatId, catStats } from "../../../../../apps/web/lib/game/catalog";
-import { RULES_V1, U64_MAX } from "../../../../../apps/web/lib/game/rules";
+import { grossPayout } from "../../../../../apps/web/lib/game/economy";
+import {
+  RULES_V1,
+  runLevel,
+  U64_MAX,
+} from "../../../../../apps/web/lib/game/rules";
 import { step } from "../../../../../apps/web/lib/game/simulation";
 import { stepWorld } from "../../../../../apps/web/lib/game/world";
 import { entity, frame } from "./simulation-fixtures";
@@ -147,4 +153,64 @@ it("keeps absolute distance and checkpoint coins correct after both caps", () =>
   expect(state.frame.totalCoins).toBe(105n);
   expect(state.frame.qualifiedCheckpoints).toBe(21n);
   expect(state.worldOriginPixels).toBeGreaterThan(50000n);
+});
+
+const poweredTrace =
+  traceEnabled === "1"
+    ? readFileSync(
+        new URL(
+          "../../../../.artifacts/powered-world-parity.csv",
+          import.meta.url,
+        ),
+        "utf8",
+      )
+        .trim()
+        .split("\n")
+    : null;
+if (poweredTrace !== null && poweredTrace.length !== 20)
+  throw new Error("Incomplete Rust powered world trace");
+
+it.each(
+  cats.flatMap((cat, catIndex) =>
+    Array.from({ length: 5 }, (_, index) => ({
+      cat,
+      catIndex,
+      level: index + 1,
+    })),
+  ),
+)("matches powered endless parity for $cat level $level", ({
+  cat,
+  catIndex,
+  level,
+}) => {
+  const stats = catStats(cat, level);
+  let state = initialWorld(cat, level);
+  let digest = Buffer.alloc(32);
+  const cooldown = BigInt(stats.powerCooldownTicks);
+  for (let tick = 1n; tick <= 12600n; tick++) {
+    state = stepWorld(state, stats, [{ kind: "boost" }], sample());
+    const current = state.frame;
+    if (
+      current.phase !== "active" ||
+      current.activeTicks !== tick ||
+      current.qualifiedCheckpoints !== tick / 600n ||
+      current.powers[stats.power].readyAtTick !==
+        1n + ((tick - 1n) / cooldown + 1n) * cooldown
+    )
+      throw new Error(`Unexpected powered state at tick ${tick}`);
+    if (poweredTrace !== null)
+      digest = createHash("sha256")
+        .update(digest)
+        .update(worldHash(state))
+        .digest();
+  }
+  expect(runLevel(state.frame.activeTicks)).toBe(22n);
+  expect(grossPayout(1000000n, state.frame.qualifiedCheckpoints)).toBe(
+    10000000n,
+  );
+  if (poweredTrace !== null) {
+    expect(`${catIndex},${level},${digest.toString("hex")}`).toBe(
+      poweredTrace[catIndex * 5 + level - 1],
+    );
+  }
 });
