@@ -375,6 +375,7 @@ describe("recovery from finalized base state", () => {
     ).resolves.toEqual({ status: "recoveryPending" });
     await expect(check(fixture("terminal"))).resolves.toEqual({
       status: "settlementReady",
+      pending: { grossPayoutBaseUnits: "0", refundBaseUnits: "1" },
     });
     await expect(
       finalizedRunState(identity.owner, "1", [

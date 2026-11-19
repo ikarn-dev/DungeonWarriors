@@ -5,11 +5,17 @@ import {
   type IdlAccounts,
 } from "@anchor-lang/core";
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
-import { type AccountInfo, Connection, PublicKey } from "@solana/web3.js";
+import {
+  type AccountInfo,
+  Connection,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { z } from "zod";
 import {
   decodeEscrowAccount,
   decodeRunAccount,
+  enumTag,
   runAddresses,
 } from "../game/run-accounts";
 import { DEVNET } from "../solana/addresses.ts";
@@ -65,16 +71,108 @@ export function account<T>(
 }
 export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wallet") }).strict(),
+  z.object({ kind: z.literal("balances") }).strict(),
   z.object({ kind: z.literal("draw"), nonce: u64Input }).strict(),
   z.object({ kind: z.literal("run"), nonce: u64Input }).strict(),
   z
     .object({
       kind: z.literal("history"),
-      fromNonce: u64Input,
-      limit: z.number().int().min(1).max(8),
+      fromNonce: u64Input.optional(),
+      limit: z.number().int().min(1).max(8).default(8),
     })
     .strict(),
 ]);
+
+type Accounts = IdlAccounts<PurrpsGame>;
+const invalidAccount = () => new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+
+function readPlayer(owner: PublicKey, info: AccountInfo<Buffer> | null) {
+  const player = account<Accounts["playerAccount"]>("playerAccount", info);
+  if (player === null) return null;
+  const [, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("player"), owner.toBytes()],
+    program,
+  );
+  if (
+    player.schemaVersion !== 1 ||
+    !player.owner.equals(owner) ||
+    player.bump !== bump ||
+    !player.wins
+      .add(player.losses)
+      .add(player.technicalRefunds)
+      .eq(player.settledRuns) ||
+    player.settledRuns.gt(player.nextRunNonce)
+  )
+    throw invalidAccount();
+  return player;
+}
+
+function walletView(player: Accounts["playerAccount"] | null) {
+  if (player === null) return null;
+  return {
+    availableBaseUnits: player.availableBaseUnits.toString(),
+    lockedStakeBaseUnits: player.lockedStakeBaseUnits.toString(),
+    purchaseEscrowBaseUnits: player.purchaseEscrowBaseUnits.toString(),
+    nextRunNonce: player.nextRunNonce.toString(),
+    settledRuns: player.settledRuns.toString(),
+    wins: player.wins.toString(),
+    losses: player.losses.toString(),
+    technicalRefunds: player.technicalRefunds.toString(),
+  };
+}
+
+function readResult(
+  identity: { owner: string; nonce: bigint },
+  addresses: ReturnType<typeof runAddresses>,
+  info: AccountInfo<Buffer> | null,
+) {
+  const receipt = account<Accounts["resultReceipt"]>("resultReceipt", info);
+  if (receipt === null) return null;
+  if (
+    receipt.schemaVersion !== 1 ||
+    receipt.bump !== addresses.receipt[1] ||
+    receipt.owner.toBase58() !== identity.owner ||
+    receipt.nonce.toString() !== identity.nonce.toString() ||
+    !receipt.run.equals(addresses.run[0])
+  )
+    throw invalidAccount();
+  return receipt;
+}
+
+function resultView(receipt: Accounts["resultReceipt"], address: PublicKey) {
+  const { terminal } = receipt;
+  const reason = enumTag(terminal.reason);
+  const outcome =
+    reason === "cashOut" || reason === "autoCashOut"
+      ? "win"
+      : reason === "technicalAbort"
+        ? "technicalRefund"
+        : "loss";
+  return {
+    status:
+      outcome === "technicalRefund"
+        ? ("refunded" as const)
+        : ("settled" as const),
+    outcome,
+    reason,
+    receipt: address.toBase58(),
+    run: receipt.run.toBase58(),
+    nonce: receipt.nonce.toString(),
+    market: enumTag(receipt.market).toUpperCase(),
+    cat: enumTag(receipt.cat.definition.id),
+    catLevel: receipt.cat.level,
+    score: terminal.score.toString(),
+    coins: terminal.coins.toString(),
+    qualifiedCheckpoints: terminal.qualifiedCheckpoints.toString(),
+    activeTicks: terminal.activeTicks.toString(),
+    stakeBaseUnits: receipt.stakeBaseUnits.toString(),
+    grossPayoutBaseUnits: terminal.grossPayoutBaseUnits.toString(),
+    refundBaseUnits: terminal.refundBaseUnits.toString(),
+    settledAtSlot: receipt.settledAtSlot.toString(),
+    settledAtSeconds: receipt.settledAtSeconds.toString(),
+  };
+}
+
 export async function finalizedRunState(
   wallet: string,
   nonce: string,
@@ -83,9 +181,8 @@ export async function finalizedRunState(
   const identity = { owner: wallet, nonce: BigInt(nonce) };
   const addresses = runAddresses(identity);
   const [escrowInfo, runInfo, receiptInfo, clock] = accounts;
-  const invalid = () => new ApiError("INVALID_CHAIN_ACCOUNT", 502);
   if (escrowInfo == null) {
-    if (runInfo != null || receiptInfo != null) throw invalid();
+    if (runInfo != null || receiptInfo != null) throw invalidAccount();
     return { status: "absent" as const };
   }
   const escrow = await decodeEscrowAccount(
@@ -93,52 +190,57 @@ export async function finalizedRunState(
     addresses.escrow[0],
     escrowInfo,
   ).catch(() => {
-    throw invalid();
+    throw invalidAccount();
   });
-  const receipt = account<IdlAccounts<PurrpsGame>["resultReceipt"]>(
-    "resultReceipt",
-    receiptInfo ?? null,
-  );
+  const receipt = readResult(identity, addresses, receiptInfo ?? null);
   if (escrow.receipt !== null) {
     if (
       receipt === null ||
-      receipt.schemaVersion !== 1 ||
-      receipt.bump !== addresses.receipt[1] ||
-      receipt.owner.toBase58() !== wallet ||
-      receipt.nonce.toString() !== nonce ||
-      !receipt.run.equals(addresses.run[0]) ||
       Buffer.from(receipt.snapshotHash).toString("hex") !== escrow.snapshotHash
     )
-      throw invalid();
+      throw invalidAccount();
+    const result = resultView(receipt, addresses.receipt[0]);
+    const status =
+      result.outcome === "technicalRefund"
+        ? "refundedTechnical"
+        : result.outcome === "win"
+          ? "settledWin"
+          : "settledLoss";
+    if (escrow.status !== status) throw invalidAccount();
     return {
-      status:
-        escrow.status === "refundedTechnical"
-          ? ("refunded" as const)
-          : ("settled" as const),
+      status: result.status,
       receipt: escrow.receipt,
-      grossPayoutBaseUnits: receipt.terminal.grossPayoutBaseUnits.toString(),
-      refundBaseUnits: receipt.terminal.refundBaseUnits.toString(),
+      grossPayoutBaseUnits: result.grossPayoutBaseUnits,
+      refundBaseUnits: result.refundBaseUnits,
+      result,
     };
   }
-  if (receipt !== null) throw invalid();
+  if (receipt !== null) throw invalidAccount();
   if (runInfo == null || runInfo.owner.equals(DELEGATION_PROGRAM_ID)) {
-    if (!escrow.delegationInitiated) throw invalid();
+    if (!escrow.delegationInitiated) throw invalidAccount();
     return { status: "recoveryPending" as const };
   }
   const run = await decodeRunAccount(identity, addresses.run[0], runInfo).catch(
     () => {
-      throw invalid();
+      throw invalidAccount();
     },
   );
-  if (run.snapshotHash !== escrow.snapshotHash) throw invalid();
+  if (run.snapshotHash !== escrow.snapshotHash) throw invalidAccount();
   if (escrow.delegationInitiated) {
     const terminal =
       run.observation.phase === "terminalRecorded" ||
       run.observation.phase === "completionRequested";
+    if (!terminal) return { status: "recoveryPending" as const };
+    const { grossPayoutBaseUnits: gross, refundBaseUnits: refund } =
+      run.terminal ?? {};
+    if (typeof gross !== "bigint" || typeof refund !== "bigint")
+      throw invalidAccount();
     return {
-      status: terminal
-        ? ("settlementReady" as const)
-        : ("recoveryPending" as const),
+      status: "settlementReady" as const,
+      pending: {
+        grossPayoutBaseUnits: gross.toString(),
+        refundBaseUnits: refund.toString(),
+      },
     };
   }
   if (
@@ -148,7 +250,7 @@ export async function finalizedRunState(
     clock.executable ||
     clock.data.length !== 40
   )
-    throw invalid();
+    throw invalidAccount();
   return {
     status:
       clock.data.readBigInt64LE(32) >= BigInt(escrow.activationDeadlineSeconds)
@@ -157,11 +259,127 @@ export async function finalizedRunState(
   };
 }
 
+function uninitialized(info: AccountInfo<Buffer> | null) {
+  return (
+    info === null ||
+    (info.owner.equals(SystemProgram.programId) &&
+      !info.executable &&
+      info.data.length === 0)
+  );
+}
+
+function wireAccount(address: PublicKey, info: AccountInfo<Buffer> | null) {
+  if (
+    info !== null &&
+    (!info.owner.equals(program) || info.data.length > 10240 || info.executable)
+  )
+    throw invalidAccount();
+  return {
+    address: address.toBase58(),
+    account:
+      info === null
+        ? null
+        : {
+            owner: info.owner.toBase58(),
+            data: info.data.toString("base64"),
+            executable: false,
+          },
+  };
+}
+
+function stateContext(slot: number) {
+  return {
+    network: "solana-devnet" as const,
+    commitment: "finalized" as const,
+    slot,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function readFinalizedPlayer(rpc: Connection, owner: PublicKey) {
+  const { value, context } = await rpc.getAccountInfoAndContext(
+    pda("player", owner.toBytes()),
+    "finalized",
+  );
+  return {
+    context,
+    player: readPlayer(owner, uninitialized(value) ? null : value),
+  };
+}
+
+async function readHistory(
+  rpc: Connection,
+  owner: PublicKey,
+  input: Extract<z.infer<typeof stateInput>, { kind: "history" }>,
+) {
+  const { player, context } = await readFinalizedPlayer(rpc, owner);
+  const latest = BigInt(player?.nextRunNonce.toString() ?? "0");
+  const requested =
+    input.fromNonce === undefined ? latest : BigInt(input.fromNonce);
+  const start = requested < latest ? requested : latest;
+  const count = start < BigInt(input.limit) ? Number(start) : input.limit;
+  const rows = Array.from({ length: count }, (_, i) => {
+    const identity = { owner: owner.toBase58(), nonce: start - 1n - BigInt(i) };
+    return { identity, addresses: runAddresses(identity) };
+  });
+  const page =
+    count === 0
+      ? { context, value: [] }
+      : await rpc.getMultipleAccountsInfoAndContext(
+          rows.map(({ addresses }) => addresses.receipt[0]),
+          {
+            commitment: "finalized",
+            minContextSlot: context.slot,
+          },
+        );
+  if (page.value.length !== count || page.context.slot < context.slot)
+    throw invalidAccount();
+  const accounts = rows.map(({ addresses }, i) => {
+    const info = page.value[i] ?? null;
+    return wireAccount(addresses.receipt[0], uninitialized(info) ? null : info);
+  });
+  const entries = rows.map(({ identity, addresses }, i) => {
+    const info = page.value[i] ?? null;
+    const receipt = readResult(
+      identity,
+      addresses,
+      uninitialized(info) ? null : info,
+    );
+    if (receipt === null)
+      return {
+        status: "pending" as const,
+        nonce: identity.nonce.toString(),
+        run: addresses.run[0].toBase58(),
+      };
+    if (BigInt(receipt.settledAtSlot.toString()) > BigInt(page.context.slot))
+      throw invalidAccount();
+    return resultView(receipt, addresses.receipt[0]);
+  });
+  const next = start - BigInt(count);
+  return {
+    ...stateContext(page.context.slot),
+    accounts,
+    history: {
+      entries,
+      fromNonce: start.toString(),
+      nextFromNonce: next === 0n ? null : next.toString(),
+    },
+  };
+}
+
 export async function readState(
   wallet: string,
   input: z.infer<typeof stateInput>,
 ) {
   const owner = new PublicKey(wallet);
+  const rpc = connection();
+  if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
+    throw new ApiError("WRONG_NETWORK", 503);
+  if (input.kind === "history") return readHistory(rpc, owner, input);
+  if (input.kind === "balances") {
+    const { player, context } = await readFinalizedPlayer(rpc, owner);
+    return { ...stateContext(context.slot), balances: walletView(player) };
+  }
   let addresses: PublicKey[];
   switch (input.kind) {
     case "wallet":
@@ -183,22 +401,11 @@ export async function readState(
         new PublicKey(DEVNET.clock),
       ];
       break;
-    case "history": {
-      const start = BigInt(input.fromNonce);
-      addresses = Array.from(
-        { length: Math.min(input.limit, Number(start > 8n ? 8n : start)) },
-        (_, i) =>
-          pda("result", owner.toBytes(), nonceBytes(start - 1n - BigInt(i))),
-      );
-      break;
-    }
   }
-  const rpc = connection();
-  if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
-    throw new ApiError("WRONG_NETWORK", 503);
   const values = await rpc.getMultipleAccountsInfoAndContext(addresses, {
     commitment: "finalized",
   });
+  if (values.value.length !== addresses.length) throw invalidAccount();
   const run =
     input.kind === "run"
       ? await finalizedRunState(wallet, input.nonce, values.value)
@@ -213,24 +420,9 @@ export async function readState(
       entry?.owner.equals(DELEGATION_PROGRAM_ID)
         ? null
         : entry;
-    if (
-      value !== null &&
-      (!value.owner.equals(program) ||
-        value.data.length > 10240 ||
-        value.executable)
-    )
-      throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-    return {
-      address: addresses[i]?.toBase58(),
-      account:
-        value === null
-          ? null
-          : {
-              owner: value.owner.toBase58(),
-              data: value.data.toString("base64"),
-              executable: false,
-            },
-    };
+    const address = addresses[i];
+    if (address === undefined) throw invalidAccount();
+    return wireAccount(address, value);
   });
   if (input.kind === "wallet") {
     const cfg = account<{
@@ -260,29 +452,15 @@ export async function readState(
           minContextSlot: values.context.slot,
         });
         published.value.forEach((value, i) => {
-          if (
-            value === null ||
-            !value.owner.equals(program) ||
-            value.data.length > 10240
-          )
-            throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-          accounts.push({
-            address: keys[i]?.toBase58(),
-            account: {
-              owner: value.owner.toBase58(),
-              data: value.data.toString("base64"),
-              executable: false,
-            },
-          });
+          const key = keys[i];
+          if (value === null || key === undefined) throw invalidAccount();
+          accounts.push(wireAccount(key, value));
         });
       }
     }
   }
   return {
-    network: "solana-devnet",
-    commitment: "finalized",
-    slot: values.context.slot,
-    fetchedAt: new Date().toISOString(),
+    ...stateContext(values.context.slot),
     accounts,
     ...(run === null ? {} : { run }),
   };

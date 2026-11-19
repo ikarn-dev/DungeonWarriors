@@ -27,6 +27,24 @@ const target = process.argv[2];
 const expectedSponsor = process.env.SPONSOR_PUBLIC_KEY;
 let cookie;
 
+async function verifyAccounts() {
+  const [{ value: balances }, { value: history }] = await Promise.all([
+    call("/api/chain/state", { kind: "balances" }, 200),
+    call("/api/chain/state", { kind: "history" }, 200),
+  ]);
+  if (
+    balances.commitment !== "finalized" ||
+    balances.balances !== null ||
+    history.commitment !== "finalized" ||
+    history.history?.fromNonce !== "0" ||
+    history.history?.nextFromNonce !== null ||
+    !Array.isArray(history.history?.entries) ||
+    history.history.entries.length !== 0
+  )
+    throw new Error("Incorrect hosted empty wallet records.");
+  return { balances: "uninitialized", history: "empty" };
+}
+
 async function verifyGame(owner, program) {
   const intent = {
     operation: "game",
@@ -231,6 +249,9 @@ async function verify() {
     const game = process.argv.includes("--game")
       ? await verifyGame(owner, program)
       : undefined;
+    const accounts = process.argv.includes("--accounts")
+      ? await verifyAccounts()
+      : undefined;
     return {
       status: sponsor === expectedSponsor ? "passed" : "sponsor_mismatch",
       origin: target,
@@ -241,6 +262,7 @@ async function verify() {
       expectedSponsor,
       transaction: "prepared_only",
       ...(game === undefined ? {} : { game }),
+      ...(accounts === undefined ? {} : { accounts }),
     };
   } finally {
     if (cookie) {
