@@ -2066,6 +2066,79 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "reclaimExpiredRunBudget";
+      discriminator: [59, 200, 148, 231, 100, 231, 145, 157];
+      accounts: [
+        {
+          name: "budget";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "budget.operation";
+                account: "sponsorBudget";
+              },
+            ];
+          };
+        },
+        {
+          name: "sponsor";
+          writable: true;
+        },
+        {
+          name: "run";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "budget.beneficiary";
+                account: "sponsorBudget";
+              },
+              {
+                kind: "arg";
+                path: "nonce";
+              },
+            ];
+          };
+        },
+        {
+          name: "runEscrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "budget.beneficiary";
+                account: "sponsorBudget";
+              },
+              {
+                kind: "arg";
+                path: "nonce";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "nonce";
+          type: "u64";
+        },
+      ];
+    },
+    {
       name: "refundCapsule";
       discriminator: [17, 72, 179, 34, 38, 133, 69, 107];
       accounts: [
@@ -8500,6 +8573,79 @@ export const PURRPS_GAME_IDL = {
         },
       ],
       args: [],
+    },
+    {
+      name: "reclaim_expired_run_budget",
+      discriminator: [59, 200, 148, 231, 100, 231, 145, 157],
+      accounts: [
+        {
+          name: "budget",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "budget.operation",
+                account: "SponsorBudget",
+              },
+            ],
+          },
+        },
+        {
+          name: "sponsor",
+          writable: true,
+        },
+        {
+          name: "run",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "budget.beneficiary",
+                account: "SponsorBudget",
+              },
+              {
+                kind: "arg",
+                path: "nonce",
+              },
+            ],
+          },
+        },
+        {
+          name: "run_escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "budget.beneficiary",
+                account: "SponsorBudget",
+              },
+              {
+                kind: "arg",
+                path: "nonce",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "_nonce",
+          type: "u64",
+        },
+      ],
     },
     {
       name: "refund_capsule",

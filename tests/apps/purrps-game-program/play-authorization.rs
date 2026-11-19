@@ -37,6 +37,8 @@ mod run_lifecycle;
 mod run_oracle;
 #[path = "support/game-setup.rs"]
 mod setup;
+#[path = "sponsor-recovery.rs"]
+mod sponsor_recovery;
 #[path = "support/harness.rs"]
 mod support;
 use play::{ix, pda, Play, NOW};

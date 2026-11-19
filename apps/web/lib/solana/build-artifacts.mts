@@ -29,6 +29,7 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "revoke_session",
   "configure_sponsorship",
   "fund_sponsorship",
+  "reclaim_expired_run_budget",
   "reserve_run",
   "delegate_run",
   "activate_run",

@@ -114,3 +114,32 @@ pub fn handle_fund_sponsorship(
     )?;
     Ok(())
 }
+
+#[derive(Accounts)]
+#[instruction(nonce: u64)]
+pub struct ReclaimExpiredRunBudget<'info> {
+    #[account(mut, close=sponsor, seeds=[SPONSOR_SEED, budget.operation.as_ref()], bump=budget.bump)]
+    pub budget: Box<Account<'info, SponsorBudget>>,
+    #[account(mut, address=budget.authority @ ErrorCode::InvalidSponsorBudget)]
+    pub sponsor: SystemAccount<'info>,
+    #[account(address=budget.operation @ ErrorCode::InvalidSponsorBudget,
+        seeds=[RUN_GAME_SEED, budget.beneficiary.as_ref(), &nonce.to_le_bytes()], bump)]
+    pub run: SystemAccount<'info>,
+    #[account(seeds=[RUN_ESCROW_SEED, budget.beneficiary.as_ref(), &nonce.to_le_bytes()], bump)]
+    pub run_escrow: SystemAccount<'info>,
+}
+
+pub fn handle_reclaim_expired_run_budget(ctx: Context<ReclaimExpiredRunBudget>) -> Result<()> {
+    let a = ctx.accounts;
+    require!(
+        a.budget.schema_version == SCHEMA_VERSION
+            && a.budget.purpose == SponsorPurpose::RunCompletion
+            && a.budget.spent_lamports == 0
+            && a.budget.attempts == 0
+            && a.run.to_account_info().data_is_empty()
+            && a.run_escrow.to_account_info().data_is_empty()
+            && Clock::get()?.unix_timestamp >= a.budget.expires_at_seconds,
+        ErrorCode::InvalidSponsorBudget
+    );
+    Ok(())
+}

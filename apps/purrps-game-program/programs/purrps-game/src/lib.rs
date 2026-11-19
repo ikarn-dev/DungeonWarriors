@@ -82,6 +82,12 @@ pub mod purrps_game {
     ) -> Result<()> {
         crate::instructions::sponsorship::handle_fund_sponsorship(ctx, args)
     }
+    pub fn reclaim_expired_run_budget(
+        ctx: Context<ReclaimExpiredRunBudget>,
+        _nonce: u64,
+    ) -> Result<()> {
+        crate::instructions::sponsorship::handle_reclaim_expired_run_budget(ctx)
+    }
     pub fn reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
         crate::instructions::reserve::handle_reserve_run(ctx, args)
     }
