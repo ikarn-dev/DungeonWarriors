@@ -8,14 +8,87 @@ import { createRequire } from "node:module";
 import { validatePreparedTransaction } from "../../../apps/web/lib/game/transaction-intents.ts";
 import { readWebJson } from "../../../apps/web/lib/game/web-api.ts";
 import { DEVNET } from "../../../apps/web/lib/solana/addresses.ts";
+import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
 
 const require = createRequire(
   new URL("../../../apps/web/package.json", import.meta.url),
 );
-const { PublicKey, VersionedTransaction } = require("@solana/web3.js");
+const {
+  PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
+} = require("@solana/web3.js");
+const { BorshCoder, convertIdlToCamelCase } = require("@anchor-lang/core");
+const {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+} = require("@solana/spl-token");
 const target = process.argv[2];
 const expectedSponsor = process.env.SPONSOR_PUBLIC_KEY;
 let cookie;
+
+async function verifyGame(owner, program) {
+  const intent = {
+    operation: "game",
+    sponsored: false,
+    action: { kind: "withdraw", amount: "1" },
+  };
+  const unknownSignature = "1".repeat(64);
+  const [{ value: prepared }, { value: state }, ...statuses] =
+    await Promise.all([
+      call("/api/tx/prepare", intent, 200),
+      call("/api/chain/state", { kind: "run", nonce: "0" }, 200),
+      ...["base", "er"].map((network) =>
+        call("/api/tx/status", { signature: unknownSignature, network }, 200),
+      ),
+    ]);
+  const transaction = VersionedTransaction.deserialize(
+    Buffer.from(prepared.transaction, "base64"),
+  );
+  const message = TransactionMessage.decompile(transaction.message);
+  const [associated, withdraw] = message.instructions;
+  const destination = getAssociatedTokenAddressSync(
+    new PublicKey(DEVNET.usdcMint),
+    owner,
+  );
+  const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+  const decoded = withdraw && coder.instruction.decode(withdraw.data);
+  if (
+    prepared.network !== "base" ||
+    message.instructions.length !== 2 ||
+    !message.payerKey.equals(owner) ||
+    transaction.message.header.numRequiredSignatures !== 1 ||
+    transaction.signatures.some((s) => s.some((byte) => byte !== 0)) ||
+    !associated?.programId.equals(ASSOCIATED_TOKEN_PROGRAM_ID) ||
+    !associated.keys[1]?.pubkey.equals(destination) ||
+    !withdraw?.programId.equals(program) ||
+    decoded?.name !== "withdraw" ||
+    decoded.data.args.amountBaseUnits.toString() !== "1" ||
+    !withdraw.keys.some((meta) => meta.pubkey.equals(destination))
+  )
+    throw new Error("Incorrect hosted withdrawal preparation.");
+  if (
+    state.run?.status !== "absent" ||
+    state.commitment !== "finalized" ||
+    state.accounts?.length !== 3 ||
+    state.accounts.some((entry) => entry.account !== null)
+  )
+    throw new Error("Incorrect hosted recovery state.");
+  for (const [index, network] of ["base", "er"].entries()) {
+    const response = statuses[index]?.value;
+    if (
+      response?.network !== network ||
+      response.status !== null ||
+      response.resolution !== "unknown"
+    )
+      throw new Error("Incorrect hosted unknown transaction status.");
+  }
+  return {
+    withdrawal: "prepared_only",
+    run: "absent",
+    status: "unknown_on_both_networks",
+  };
+}
 
 async function call(path, body, expected, origin = target) {
   const post = body !== undefined;
@@ -155,6 +228,9 @@ async function verify() {
     if (tx.signatures.some((signature) => signature.some((byte) => byte !== 0)))
       throw new Error("Preparation returned a signed transaction.");
     const sponsor = tx.message.staticAccountKeys[0].toBase58();
+    const game = process.argv.includes("--game")
+      ? await verifyGame(owner, program)
+      : undefined;
     return {
       status: sponsor === expectedSponsor ? "passed" : "sponsor_mismatch",
       origin: target,
@@ -164,6 +240,7 @@ async function verify() {
       sponsor,
       expectedSponsor,
       transaction: "prepared_only",
+      ...(game === undefined ? {} : { game }),
     };
   } finally {
     if (cookie) {
