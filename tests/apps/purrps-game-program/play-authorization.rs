@@ -15,6 +15,8 @@ use solana_keypair::Keypair;
 use solana_signer::Signer;
 #[path = "play-boundaries.rs"]
 mod boundaries;
+#[path = "credit-contention.rs"]
+mod credit_contention;
 #[path = "delegation.rs"]
 mod delegation;
 #[path = "paid-capsules.rs"]

@@ -48,7 +48,7 @@ fn payment(p: &Play) -> accounts::ResolveCapsule {
     }
 }
 
-fn purchase(p: &Play, kind: CapsuleKind, nonce: u64, cap: u64) -> Instruction {
+pub(super) fn purchase(p: &Play, kind: CapsuleKind, nonce: u64, cap: u64) -> Instruction {
     let cfg: GameConfig = p.h.read(p.h.config);
     let owner = p.owner.pubkey();
     ix(
@@ -79,13 +79,27 @@ fn purchase(p: &Play, kind: CapsuleKind, nonce: u64, cap: u64) -> Instruction {
     )
 }
 
-fn open_fixture(p: &mut Play) -> GameConfig {
+pub(super) fn open_fixture(p: &mut Play) -> GameConfig {
     completed_starter(p);
     let config = p.h.config;
     let mut cfg: GameConfig = p.h.read(config);
     cfg.allow_purchases = true;
     setup::put(&mut p.h, config, &cfg);
     cfg
+}
+
+pub(super) fn install_vrf_fixture(
+    p: &mut Play,
+    cfg: &GameConfig,
+    program: &[u8],
+    queue_data: &[u8],
+) {
+    p.h.svm.add_program(cfg.vrf_program, program).unwrap();
+    let mut queue = p.h.svm.get_account(&p.owner.pubkey()).unwrap();
+    queue.owner = cfg.vrf_program;
+    queue.data = queue_data.to_vec();
+    queue.lamports = p.h.svm.minimum_balance_for_rent_exemption(queue.data.len());
+    p.h.svm.set_account(cfg.vrf_queue, queue).unwrap();
 }
 
 fn pending_fixture(p: &mut Play, kind: CapsuleKind) -> (Pubkey, u64) {
@@ -232,12 +246,7 @@ fn provider_snapshot_accepts_paid_requests_and_locks_the_exact_credit() {
     for kind in [CapsuleKind::PaidCat, CapsuleKind::Upgrade] {
         let mut p = Play::new();
         let cfg = open_fixture(&mut p);
-        p.h.svm.add_program(cfg.vrf_program, &provider).unwrap();
-        let mut queue = p.h.svm.get_account(&p.owner.pubkey()).unwrap();
-        queue.owner = cfg.vrf_program;
-        queue.data = queue_data.clone();
-        queue.lamports = p.h.svm.minimum_balance_for_rent_exemption(queue.data.len());
-        p.h.svm.set_account(cfg.vrf_queue, queue).unwrap();
+        install_vrf_fixture(&mut p, &cfg, &provider, &queue_data);
         let draw = payment(&p).draw;
         let bad_cap = purchase(&p, kind, 0, 1);
         rejected(p.h.send(bad_cap, &p.owner), "InvalidSponsorBudget");

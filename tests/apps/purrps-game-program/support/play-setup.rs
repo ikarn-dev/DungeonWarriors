@@ -183,7 +183,7 @@ impl Play {
         p.configure(p.policy_args()).unwrap();
         p
     }
-    fn tokens(h: &mut Harness, owner: Pubkey, amount: u64) -> Pubkey {
+    pub(super) fn tokens(h: &mut Harness, owner: Pubkey, amount: u64) -> Pubkey {
         let address = Pubkey::new_unique();
         let mut a = h.svm.get_account(&purrps_game::USDC_MINT).unwrap();
         a.data = vec![0; 165];
