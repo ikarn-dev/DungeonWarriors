@@ -227,8 +227,11 @@ export async function runReadiness(environment) {
     integrationGate: "not_built",
     remainingBuildTasks: [
       "er_runner_delegation_crank_liveness",
-      "vrf_callback",
       "commit_completion",
+    ],
+    liveChecksOutsideProbe: [
+      "starter_vrf_fulfillment",
+      "hosted_sponsored_transaction",
       "web_sessions_nonce_atomicity",
     ],
     unmeasured: ["ER_compute_fees_capacity"],

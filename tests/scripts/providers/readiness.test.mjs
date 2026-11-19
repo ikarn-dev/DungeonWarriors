@@ -144,11 +144,13 @@ test("readiness performs seven read-only requests and never passes the integrati
   assert.equal(report.integrationGate, "not_built");
   assert.equal(report.checks.length, 5);
   assert.equal(requests.length, 7);
+  assert.deepEqual(report.remainingBuildTasks, [
+    "er_runner_delegation_crank_liveness",
+    "commit_completion",
+  ]);
+  assert.ok(report.liveChecksOutsideProbe.includes("starter_vrf_fulfillment"));
   assert.ok(
-    report.remainingBuildTasks.includes("er_runner_delegation_crank_liveness"),
-  );
-  assert.ok(
-    report.remainingBuildTasks.includes("web_sessions_nonce_atomicity"),
+    report.liveChecksOutsideProbe.includes("web_sessions_nonce_atomicity"),
   );
   const json = JSON.stringify(report);
   assert.ok(!json.includes(environment.UPSTASH_REDIS_REST_TOKEN));
