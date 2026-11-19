@@ -30,6 +30,7 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "fund_sponsorship",
   "reserve_run",
   "abort_undelegated_reservation",
+  "settle_returned_run",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

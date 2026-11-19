@@ -41,28 +41,111 @@ pub struct AbortUndelegatedReservation<'info> {
     pub system_program: Program<'info, System>,
 }
 
+impl AbortUndelegatedReservation<'_> {
+    pub(super) fn validate_open_reservation(&self) -> Result<()> {
+        let snapshot = &self.escrow.snapshot;
+        let hash = snapshot_hash(snapshot)?;
+        require!(
+            snapshot.protocol_version == PROTOCOL_VERSION
+                && snapshot.run == self.run.key()
+                && self.run.escrow == self.escrow.key()
+                && self.run.snapshot == *snapshot
+                && self.escrow.snapshot_hash == hash
+                && self.run.snapshot_hash == hash
+                && self.escrow.status == EscrowStatus::Reserved
+                && self.escrow.receipt.is_none()
+                && max_gross_reservation(snapshot.stake_base_units).ok()
+                    == Some(snapshot.max_gross_base_units),
+            ErrorCode::InvalidRun
+        );
+        Ok(())
+    }
+
+    pub(super) fn finish(
+        &mut self,
+        terminal: RunTerminal,
+        status: EscrowStatus,
+        receipt_bump: u8,
+        clock: Clock,
+    ) -> Result<()> {
+        let snapshot = &self.escrow.snapshot;
+        let credit = terminal
+            .gross_payout_base_units
+            .checked_add(terminal.refund_base_units)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        require!(
+            credit <= snapshot.max_gross_base_units,
+            ErrorCode::InvalidRun
+        );
+        assert_vault(self.house.key(), &self.house, &self.vault)?;
+        self.player.available_base_units = self
+            .player
+            .available_base_units
+            .checked_add(credit)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        self.player.locked_stake_base_units = self
+            .player
+            .locked_stake_base_units
+            .checked_sub(snapshot.stake_base_units)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        self.player.settled_runs = self
+            .player
+            .settled_runs
+            .checked_add(1)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        let counter = match status {
+            EscrowStatus::SettledWin => &mut self.player.wins,
+            EscrowStatus::SettledLoss => &mut self.player.losses,
+            EscrowStatus::RefundedTechnical => &mut self.player.technical_refunds,
+            EscrowStatus::Reserved => return err!(ErrorCode::InvalidRun),
+        };
+        *counter = counter
+            .checked_add(1)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        self.house.total_available_base_units = self
+            .house
+            .total_available_base_units
+            .checked_add(credit)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        self.house.total_max_gross_base_units = self
+            .house
+            .total_max_gross_base_units
+            .checked_sub(snapshot.max_gross_base_units)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        assert_vault(self.house.key(), &self.house, &self.vault)?;
+        self.receipt.set_inner(ResultReceipt {
+            schema_version: SCHEMA_VERSION,
+            bump: receipt_bump,
+            run: snapshot.run,
+            owner: snapshot.owner,
+            nonce: snapshot.nonce,
+            market: snapshot.market,
+            snapshot_hash: self.escrow.snapshot_hash,
+            rules: snapshot.rules_binding,
+            cat: snapshot.cat,
+            oracle: snapshot.oracle,
+            start_observation: self.run.start_observation,
+            stake_base_units: snapshot.stake_base_units,
+            terminal,
+            settled_at_slot: clock.slot,
+            settled_at_seconds: clock.unix_timestamp,
+        });
+        self.escrow.receipt = Some(self.receipt.key());
+        self.escrow.status = status;
+        Ok(())
+    }
+}
+
 pub fn handle_abort_undelegated_reservation(
     ctx: Context<AbortUndelegatedReservation>,
 ) -> Result<()> {
     let a = ctx.accounts;
     let clock = Clock::get()?;
-    let snapshot = &a.escrow.snapshot;
-    let hash = snapshot_hash(snapshot)?;
-    require!(
-        snapshot.protocol_version == PROTOCOL_VERSION
-            && snapshot.run == a.run.key()
-            && a.run.escrow == a.escrow.key()
-            && a.run.snapshot == *snapshot
-            && a.escrow.snapshot_hash == hash
-            && a.run.snapshot_hash == hash,
-        ErrorCode::InvalidRun
-    );
-    // An expired deadline on base never overrides a run that entered delegation.
+    a.validate_open_reservation()?;
+    // Base time cannot determine whether a delegated run earned progress.
     require!(
         !a.escrow.delegation_initiated
-            && a.escrow.status == EscrowStatus::Reserved
-            && a.escrow.receipt.is_none()
-            && clock.unix_timestamp >= snapshot.activation_deadline_seconds
+            && clock.unix_timestamp >= a.escrow.snapshot.activation_deadline_seconds
             && a.run.phase == RunPhase::Ready
             && a.run.active_ticks == 0
             && a.run.terminal.is_none()
@@ -72,44 +155,6 @@ pub fn handle_abort_undelegated_reservation(
             && a.run.crank.generation == 0,
         ErrorCode::ReservationNotRefundable
     );
-    let stake = snapshot.stake_base_units;
-    require!(
-        max_gross_reservation(stake).ok() == Some(snapshot.max_gross_base_units),
-        ErrorCode::InvalidRun
-    );
-    assert_vault(a.house.key(), &a.house, &a.vault)?;
-    a.player.available_base_units = a
-        .player
-        .available_base_units
-        .checked_add(stake)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    a.player.locked_stake_base_units = a
-        .player
-        .locked_stake_base_units
-        .checked_sub(stake)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    a.player.settled_runs = a
-        .player
-        .settled_runs
-        .checked_add(1)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    a.player.technical_refunds = a
-        .player
-        .technical_refunds
-        .checked_add(1)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    a.house.total_available_base_units = a
-        .house
-        .total_available_base_units
-        .checked_add(stake)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    a.house.total_max_gross_base_units = a
-        .house
-        .total_max_gross_base_units
-        .checked_sub(snapshot.max_gross_base_units)
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    assert_vault(a.house.key(), &a.house, &a.vault)?;
-
     let terminal = RunTerminal {
         reason: TerminalReason::TechnicalAbort,
         fault: Some(FaultReason::ActivationExpired),
@@ -120,28 +165,15 @@ pub fn handle_abort_undelegated_reservation(
         processed_sequence: 0,
         final_observation: None,
         gross_payout_base_units: 0,
-        refund_base_units: stake,
+        refund_base_units: a.escrow.snapshot.stake_base_units,
     };
-    a.receipt.set_inner(ResultReceipt {
-        schema_version: SCHEMA_VERSION,
-        bump: ctx.bumps.receipt,
-        run: snapshot.run,
-        owner: snapshot.owner,
-        nonce: snapshot.nonce,
-        market: snapshot.market,
-        snapshot_hash: hash,
-        rules: snapshot.rules_binding,
-        cat: snapshot.cat,
-        oracle: snapshot.oracle,
-        start_observation: None,
-        stake_base_units: stake,
+    a.finish(
         terminal,
-        settled_at_slot: clock.slot,
-        settled_at_seconds: clock.unix_timestamp,
-    });
+        EscrowStatus::RefundedTechnical,
+        ctx.bumps.receipt,
+        clock,
+    )?;
     a.run.terminal = Some(terminal);
     a.run.phase = RunPhase::TerminalRecorded;
-    a.escrow.receipt = Some(a.receipt.key());
-    a.escrow.status = EscrowStatus::RefundedTechnical;
     Ok(())
 }

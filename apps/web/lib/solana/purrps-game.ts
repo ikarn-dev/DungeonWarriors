@@ -2014,6 +2014,133 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "settleReturnedRun";
+      discriminator: [184, 160, 77, 196, 31, 157, 194, 116];
+      accounts: [
+        {
+          name: "settlement";
+          accounts: [
+            {
+              name: "escrow";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "run";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 103, 97, 109, 101];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "player";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [112, 108, 97, 121, 101, 114];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "house";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [104, 111, 117, 115, 101];
+                  },
+                ];
+              };
+            },
+            {
+              name: "vault";
+            },
+            {
+              name: "payer";
+              writable: true;
+              signer: true;
+            },
+            {
+              name: "receipt";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 101, 115, 117, 108, 116];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "systemProgram";
+              address: "11111111111111111111111111111111";
+            },
+          ];
+        },
+        {
+          name: "leaderboard";
+          writable: true;
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [];
+    },
+    {
       name: "withdraw";
       discriminator: [183, 18, 70, 156, 148, 109, 161, 34];
       accounts: [
@@ -2180,6 +2307,10 @@ export type PurrpsGame = {
     {
       name: "houseState";
       discriminator: [160, 248, 45, 36, 81, 236, 18, 77];
+    },
+    {
+      name: "leaderboard";
+      discriminator: [247, 186, 238, 243, 194, 30, 9, 36];
     },
     {
       name: "playerAccount";
@@ -3723,6 +3854,73 @@ export type PurrpsGame = {
                 name: "playerIntent";
               };
             };
+          },
+        ];
+      };
+    },
+    {
+      name: "leaderboard";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "market";
+            type: {
+              defined: {
+                name: "market";
+              };
+            };
+          },
+          {
+            name: "count";
+            type: "u8";
+          },
+          {
+            name: "entries";
+            type: {
+              array: [
+                {
+                  option: {
+                    defined: {
+                      name: "leaderboardEntry";
+                    };
+                  };
+                },
+                20,
+              ];
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "leaderboardEntry";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "run";
+            type: "pubkey";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "score";
+            type: "u64";
           },
         ];
       };
@@ -7276,6 +7474,133 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "settle_returned_run",
+      discriminator: [184, 160, 77, 196, 31, 157, 194, 116],
+      accounts: [
+        {
+          name: "settlement",
+          accounts: [
+            {
+              name: "escrow",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "run",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 103, 97, 109, 101],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "player",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [112, 108, 97, 121, 101, 114],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "house",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [104, 111, 117, 115, 101],
+                  },
+                ],
+              },
+            },
+            {
+              name: "vault",
+            },
+            {
+              name: "payer",
+              writable: true,
+              signer: true,
+            },
+            {
+              name: "receipt",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 101, 115, 117, 108, 116],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "system_program",
+              address: "11111111111111111111111111111111",
+            },
+          ],
+        },
+        {
+          name: "leaderboard",
+          writable: true,
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [],
+    },
+    {
       name: "withdraw",
       discriminator: [183, 18, 70, 156, 148, 109, 161, 34],
       accounts: [
@@ -7442,6 +7767,10 @@ export const PURRPS_GAME_IDL = {
     {
       name: "HouseState",
       discriminator: [160, 248, 45, 36, 81, 236, 18, 77],
+    },
+    {
+      name: "Leaderboard",
+      discriminator: [247, 186, 238, 243, 194, 30, 9, 36],
     },
     {
       name: "PlayerAccount",
@@ -8838,6 +9167,73 @@ export const PURRPS_GAME_IDL = {
                 name: "PlayerIntent",
               },
             },
+          },
+        ],
+      },
+    },
+    {
+      name: "Leaderboard",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "market",
+            type: {
+              defined: {
+                name: "Market",
+              },
+            },
+          },
+          {
+            name: "count",
+            type: "u8",
+          },
+          {
+            name: "entries",
+            type: {
+              array: [
+                {
+                  option: {
+                    defined: {
+                      name: "LeaderboardEntry",
+                    },
+                  },
+                },
+                20,
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "LeaderboardEntry",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "run",
+            type: "pubkey",
+          },
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "score",
+            type: "u64",
           },
         ],
       },

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use std::io::{self, Read};
 
 use crate::{
     contracts::{CatSnapshot, Market, OracleBinding, VersionBinding},
@@ -39,11 +40,29 @@ pub struct LeaderboardEntry {
 // Base-only [LEADERBOARD_SEED, [market as u8]]. At most 20 settled win/loss
 // entries, score descending then raw run Pubkey bytes ascending; refunds excluded.
 #[account]
-#[derive(InitSpace)]
 pub struct Leaderboard {
     pub schema_version: u16,
     pub bump: u8,
     pub market: Market,
     pub count: u8,
-    pub entries: [Option<LeaderboardEntry>; 20],
+    // Keep the fixed array's wire layout while leaving room on the SBF stack.
+    #[borsh(deserialize_with = "read_leaderboard_entries")]
+    pub entries: Box<[Option<LeaderboardEntry>; 20]>,
+}
+
+impl Space for Leaderboard {
+    const INIT_SPACE: usize = 5 + 20 * (1 + LeaderboardEntry::INIT_SPACE);
+}
+
+fn read_leaderboard_entries<R: Read>(
+    reader: &mut R,
+) -> io::Result<Box<[Option<LeaderboardEntry>; 20]>> {
+    let mut entries = Vec::with_capacity(20);
+    for _ in 0..20 {
+        entries.push(Option::<LeaderboardEntry>::deserialize_reader(reader)?);
+    }
+    entries
+        .into_boxed_slice()
+        .try_into()
+        .map_err(|_| io::ErrorKind::InvalidData.into())
 }

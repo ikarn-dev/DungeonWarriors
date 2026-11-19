@@ -36,6 +36,10 @@ pub mod purrps_game {
         crate::instructions::abort_reservation::handle_abort_undelegated_reservation(ctx)
     }
 
+    pub fn settle_returned_run(ctx: Context<SettleReturnedRun>) -> Result<()> {
+        crate::instructions::settle_returned::handle_settle_returned_run(ctx)
+    }
+
     pub fn authorize_session(
         ctx: Context<AuthorizeSession>,
         args: AuthorizeSessionArgs,

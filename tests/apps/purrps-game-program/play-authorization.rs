@@ -21,6 +21,8 @@ mod paid_capsules;
 mod play;
 #[path = "play-recovery.rs"]
 mod recovery;
+#[path = "returned-settlement.rs"]
+mod returned_settlement;
 #[path = "support/game-setup.rs"]
 mod setup;
 #[path = "support/harness.rs"]
