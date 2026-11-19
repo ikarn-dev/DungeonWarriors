@@ -24,6 +24,9 @@ import {
 import { checkErStream } from "./check-er-stream.mjs";
 
 const maxResponseBytes = 256 * 1024;
+// Pinned by hydra-api 0.2.1's ephemeral namespace.
+const erHydra = "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf";
+const erHydraLoader = "LoaderV411111111111111111111111111111111111";
 
 // Bounded read-only requests. Never follow a redirect with private RPC/Redis
 // credentials, and never return raw provider errors or endpoints in a report.
@@ -140,12 +143,40 @@ async function checkEr(config) {
   }
 }
 
+async function checkErScheduler(config) {
+  const result = accountsSchema.parse(
+    await rpc(config.MAGICBLOCK_ER_HTTP_URL, "getMultipleAccounts", [
+      [DEVNET.clock, erHydra],
+      {
+        encoding: "base64",
+        commitment: "processed",
+        dataSlice: { offset: 0, length: 40 },
+      },
+    ]),
+  );
+  const [clockAccount, hydra] = result.value;
+  if (
+    result.value.length !== 2 ||
+    !hydra?.executable ||
+    hydra.owner !== erHydraLoader
+  )
+    throw new Error("ER_HYDRA_UNAVAILABLE");
+  if (clockAccount == null) throw new Error("CLOCK_MISMATCH");
+  const { slot, nowSeconds } = decodeClock(clockAccount);
+  if (slot === 0n || nowSeconds <= 0n) throw new Error("CLOCK_MISMATCH");
+  return {
+    clockSlot: slot.toString(),
+    clockUnixSeconds: nowSeconds.toString(),
+  };
+}
+
 const safeCodes = new Set([
   "WRONG_NETWORK",
   "MISSING_BASE_ACCOUNT",
   "VRF_IDENTITY_MISMATCH",
   "SPONSOR_UNDERFUNDED",
   "VALIDATOR_MISMATCH",
+  "ER_HYDRA_UNAVAILABLE",
   "MISSING_ER_ACCOUNT",
   "ORACLE_ACCOUNT_MISMATCH",
   "MALFORMED_ORACLE",
@@ -192,6 +223,7 @@ export async function runReadiness(environment) {
       },
     ],
     ["er_identity_and_oracles", () => checkEr(config)],
+    ["er_hydra_and_clock", () => checkErScheduler(config)],
     ["er_websocket_delivery", () => checkErStream(config)],
     [
       "upstash_ping",
@@ -207,8 +239,8 @@ export async function runReadiness(environment) {
   const results = await Promise.all(
     checks.map(async ([name, check]) => {
       try {
-        await check();
-        return { name, status: "passed" };
+        const observed = await check();
+        return { name, status: "passed", ...(observed && { observed }) };
       } catch (error) {
         const code =
           error instanceof Error && safeCodes.has(error.message)
@@ -234,7 +266,10 @@ export async function runReadiness(environment) {
       "hosted_sponsored_transaction",
       "web_sessions_nonce_atomicity",
     ],
-    unmeasured: ["ER_compute_fees_capacity"],
+    unmeasured: [
+      "ER_authenticated_subsecond_timing",
+      "ER_compute_fees_capacity",
+    ],
   };
 }
 

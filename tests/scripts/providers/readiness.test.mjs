@@ -32,7 +32,7 @@ function account(owner, data, executable = false) {
   };
 }
 
-function providerResponse(method, host, overrides = {}) {
+function providerResponse(method, host, overrides, params) {
   if (method === "getGenesisHash") return devnetGenesis;
   if (method === "getIdentity") return { identity: publicKey };
   if (method === "getBalance")
@@ -59,6 +59,21 @@ function providerResponse(method, host, overrides = {}) {
     const clock = Buffer.alloc(40);
     clock.writeBigUInt64LE(123_456_790n, 0);
     clock.writeBigInt64LE(1_700_000_002n, 32);
+    if (params[1].dataSlice !== undefined) {
+      return {
+        context: { slot: 123_456_790 },
+        value: [
+          account(DEVNET.sysvarOwner, clock),
+          overrides.hydraMissing
+            ? null
+            : account(
+                "LoaderV411111111111111111111111111111111111",
+                Buffer.alloc(40),
+                true,
+              ),
+        ],
+      };
+    }
     const values = [
       account(DEVNET.sysvarOwner, clock),
       ...Array.from({ length: 3 }, () => account(DEVNET.oracleProgram, oracle)),
@@ -130,6 +145,7 @@ function stubProviders(context, change = () => undefined, overrides = {}) {
             body.method,
             new URL(url).hostname,
             overrides,
+            body.params,
           ),
         };
     return new Response(JSON.stringify(payload));
@@ -137,13 +153,22 @@ function stubProviders(context, change = () => undefined, overrides = {}) {
   return requests;
 }
 
-test("readiness performs seven read-only requests and never passes the integration gate", async (context) => {
+test("readiness checks the deployed scheduler without passing the integration gate", async (context) => {
   const requests = stubProviders(context);
   const report = await runReadiness(environment);
   assert.equal(report.status, "provider_reads_passed");
   assert.equal(report.integrationGate, "not_built");
-  assert.equal(report.checks.length, 5);
-  assert.equal(requests.length, 7);
+  assert.equal(report.checks.length, 6);
+  assert.equal(requests.length, 8);
+  assert.deepEqual(
+    report.checks.find(({ name }) => name === "er_hydra_and_clock"),
+    {
+      name: "er_hydra_and_clock",
+      status: "passed",
+      observed: { clockSlot: "123456790", clockUnixSeconds: "1700000002" },
+    },
+  );
+  assert.ok(report.unmeasured.includes("ER_authenticated_subsecond_timing"));
   assert.deepEqual(report.remainingBuildTasks, [
     "er_runner_delegation_crank_liveness",
     "commit_completion",
@@ -155,6 +180,20 @@ test("readiness performs seven read-only requests and never passes the integrati
   const json = JSON.stringify(report);
   assert.ok(!json.includes(environment.UPSTASH_REDIS_REST_TOKEN));
   assert.ok(!json.includes(environment.HELIUS_DEVNET_RPC_URL));
+});
+
+test("missing ER Hydra fails the scheduler check", async (context) => {
+  stubProviders(context, undefined, { hydraMissing: true });
+  const report = await runReadiness(environment);
+  assert.equal(report.status, "provider_reads_failed");
+  assert.deepEqual(
+    report.checks.find(({ name }) => name === "er_hydra_and_clock"),
+    {
+      name: "er_hydra_and_clock",
+      status: "failed",
+      code: "ER_HYDRA_UNAVAILABLE",
+    },
+  );
 });
 
 test("bad configuration stops before contacting a provider", async (context) => {
@@ -214,6 +253,7 @@ test("wrong chains, spoofed identities and underfunding fail without leaking err
       "SPONSOR_UNDERFUNDED",
       "MINT_MISMATCH",
       "VALIDATOR_MISMATCH",
+      undefined,
       undefined,
       "PROVIDER_UNAVAILABLE_OR_INVALID",
     ],
