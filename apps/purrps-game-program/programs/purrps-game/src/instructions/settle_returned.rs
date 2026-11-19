@@ -23,7 +23,20 @@ pub struct SettleReturnedRun<'info> {
 }
 
 pub fn handle_settle_returned_run(ctx: Context<SettleReturnedRun>) -> Result<()> {
-    let a = &mut ctx.accounts.settlement;
+    settle_returned(
+        &mut ctx.accounts.settlement,
+        &mut ctx.accounts.leaderboard,
+        ctx.bumps.leaderboard,
+        ctx.bumps.settlement.receipt,
+    )
+}
+
+pub(super) fn settle_returned(
+    a: &mut AbortUndelegatedReservation<'_>,
+    board: &mut Account<'_, Leaderboard>,
+    board_bump: u8,
+    receipt_bump: u8,
+) -> Result<()> {
     a.validate_open_reservation()?;
     // The typed account requires Purrps program ownership, which a delegated
     // base mirror lacks. READY or ACTIVE state cannot settle on return.
@@ -37,12 +50,11 @@ pub fn handle_settle_returned_run(ctx: Context<SettleReturnedRun>) -> Result<()>
     );
     let terminal = a.run.terminal.ok_or(ErrorCode::InvalidRun)?;
     let status = validate_terminal(&a.run, &terminal)?;
-    let board = &mut ctx.accounts.leaderboard;
     let snapshot = &a.escrow.snapshot;
     if board.schema_version == 0 {
         board.set_inner(Leaderboard {
             schema_version: SCHEMA_VERSION,
-            bump: ctx.bumps.leaderboard,
+            bump: board_bump,
             market: snapshot.market,
             count: 0,
             entries: Box::new([None; 20]),
@@ -51,7 +63,7 @@ pub fn handle_settle_returned_run(ctx: Context<SettleReturnedRun>) -> Result<()>
     require!(
         board.schema_version == SCHEMA_VERSION
             && board.market == snapshot.market
-            && board.bump == ctx.bumps.leaderboard,
+            && board.bump == board_bump,
         ErrorCode::InvalidRun
     );
     if status != EscrowStatus::RefundedTechnical {
@@ -65,15 +77,13 @@ pub fn handle_settle_returned_run(ctx: Context<SettleReturnedRun>) -> Result<()>
             },
         )?;
     }
-    a.finish(
-        terminal,
-        status,
-        ctx.bumps.settlement.receipt,
-        Clock::get()?,
-    )
+    a.finish(terminal, status, receipt_bump, Clock::get()?)
 }
 
-fn validate_terminal(run: &RunGameState, terminal: &RunTerminal) -> Result<EscrowStatus> {
+pub(super) fn validate_terminal(
+    run: &RunGameState,
+    terminal: &RunTerminal,
+) -> Result<EscrowStatus> {
     let stake = run.snapshot.stake_base_units;
     let checkpoint_ticks = u64::from(run.snapshot.rules.checkpoint_ticks);
     require!(

@@ -72,11 +72,15 @@ custom-panic = []
 [dependencies]
 anchor-lang = { version = "=1.1.2", features = ["init-if-needed"] }
 anchor-spl = "=1.1.2"
-ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank", "solana-system-interface"] }
+ephemeral-rollups-sdk = { version = "=0.17.3", default-features = false, features = ["anchor", "vrf", "crank", "instruction", "solana-system-interface"] }
 session-keys = { version = "=3.1.1", features = ["no-entrypoint"] }
+solana-instructions-sysvar = "=3.0.1"
 solana-sha256-hasher = { version = "=3.1.0", features = ["sha2"] }
 
 [dev-dependencies]
+bincode = "=1.3.3"
+magicblock-magic-program-api = "=0.10.1"
+solana-program-runtime = "=3.1.14"
 litesvm = "=0.10.0"
 solana-message = "=3.1.0"
 solana-transaction = "=3.1.0"

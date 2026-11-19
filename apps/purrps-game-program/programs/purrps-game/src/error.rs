@@ -66,4 +66,6 @@ pub enum ErrorCode {
     ControlRateExceeded,
     #[msg("Run world cannot safely advance")]
     InvalidRunWorld,
+    #[msg("Completion did not come from the pinned validator and run balance")]
+    InvalidCompletionAction,
 }

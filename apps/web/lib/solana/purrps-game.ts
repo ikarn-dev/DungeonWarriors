@@ -880,6 +880,59 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "fundRunCompletion";
+      discriminator: [75, 22, 142, 65, 76, 136, 154, 191];
+      accounts: [
+        {
+          name: "runEscrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "budget";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "runEscrow.gameState";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "sponsor";
+          signer: true;
+        },
+        {
+          name: "actionBalance";
+          writable: true;
+        },
+      ];
+      args: [];
+    },
+    {
       name: "fundSponsorship";
       discriminator: [49, 133, 197, 147, 150, 126, 251, 33];
       accounts: [
@@ -1604,6 +1657,88 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "reclaimCompletionBalance";
+      discriminator: [194, 164, 70, 156, 201, 0, 247, 188];
+      accounts: [
+        {
+          name: "runEscrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "budget";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "run";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "sponsor";
+          writable: true;
+        },
+        {
+          name: "actionBalance";
+          writable: true;
+        },
+        {
+          name: "delegationProgram";
+          address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh";
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [];
+    },
+    {
       name: "refundCapsule";
       discriminator: [17, 72, 179, 34, 38, 133, 69, 107];
       accounts: [
@@ -1692,6 +1827,78 @@ export type PurrpsGame = {
         },
       ];
       args: [];
+    },
+    {
+      name: "requestCompletion";
+      discriminator: [139, 93, 162, 68, 8, 54, 15, 62];
+      accounts: [
+        {
+          name: "runEscrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "runEscrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+        },
+        {
+          name: "budget";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "run";
+              },
+            ];
+          };
+        },
+        {
+          name: "actionBalance";
+        },
+        {
+          name: "leaderboard";
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "magicContext";
+          writable: true;
+          address: "MagicContext1111111111111111111111111111111";
+        },
+        {
+          name: "magicProgram";
+          address: "Magic11111111111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "expectedAttempt";
+          type: "u16";
+        },
+      ];
     },
     {
       name: "reserveRun";
@@ -2257,6 +2464,143 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "settleRunAction";
+      discriminator: [60, 158, 250, 122, 216, 215, 7, 208];
+      accounts: [
+        {
+          name: "settlement";
+          accounts: [
+            {
+              name: "escrow";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "run";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 103, 97, 109, 101];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "player";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [112, 108, 97, 121, 101, 114];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "house";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [104, 111, 117, 115, 101];
+                  },
+                ];
+              };
+            },
+            {
+              name: "vault";
+            },
+            {
+              name: "payer";
+              writable: true;
+              signer: true;
+            },
+            {
+              name: "receipt";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 101, 115, 117, 108, 116];
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.owner";
+                    account: "runEscrow";
+                  },
+                  {
+                    kind: "account";
+                    path: "escrow.snapshot.nonce";
+                    account: "runEscrow";
+                  },
+                ];
+              };
+            },
+            {
+              name: "systemProgram";
+              address: "11111111111111111111111111111111";
+            },
+          ];
+        },
+        {
+          name: "leaderboard";
+          writable: true;
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+        {
+          name: "instructions";
+          address: "Sysvar1nstructions1111111111111111111111111";
+        },
+        {
+          name: "escrowAuth";
+        },
+        {
+          name: "escrow";
+        },
+      ];
+      args: [];
+    },
+    {
       name: "submitIntents";
       discriminator: [86, 196, 23, 28, 86, 219, 110, 80];
       accounts: [
@@ -2691,6 +3035,11 @@ export type PurrpsGame = {
       code: 6031;
       name: "invalidRunWorld";
       msg: "Run world cannot safely advance";
+    },
+    {
+      code: 6032;
+      name: "invalidCompletionAction";
+      msg: "Completion did not come from the pinned validator and run balance";
     },
   ];
   types: [
@@ -6616,6 +6965,59 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "fund_run_completion",
+      discriminator: [75, 22, 142, 65, 76, 136, 154, 191],
+      accounts: [
+        {
+          name: "run_escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "budget",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "run_escrow.game_state",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "sponsor",
+          signer: true,
+        },
+        {
+          name: "action_balance",
+          writable: true,
+        },
+      ],
+      args: [],
+    },
+    {
       name: "fund_sponsorship",
       discriminator: [49, 133, 197, 147, 150, 126, 251, 33],
       accounts: [
@@ -7299,6 +7701,88 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "reclaim_completion_balance",
+      discriminator: [194, 164, 70, 156, 201, 0, 247, 188],
+      accounts: [
+        {
+          name: "run_escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "budget",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "run",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "sponsor",
+          writable: true,
+        },
+        {
+          name: "action_balance",
+          writable: true,
+        },
+        {
+          name: "delegation_program",
+          address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh",
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [],
+    },
+    {
       name: "refund_capsule",
       discriminator: [17, 72, 179, 34, 38, 133, 69, 107],
       accounts: [
@@ -7387,6 +7871,78 @@ export const PURRPS_GAME_IDL = {
         },
       ],
       args: [],
+    },
+    {
+      name: "request_completion",
+      discriminator: [139, 93, 162, 68, 8, 54, 15, 62],
+      accounts: [
+        {
+          name: "run_escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "run_escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+        },
+        {
+          name: "budget",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "run",
+              },
+            ],
+          },
+        },
+        {
+          name: "action_balance",
+        },
+        {
+          name: "leaderboard",
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "magic_context",
+          writable: true,
+          address: "MagicContext1111111111111111111111111111111",
+        },
+        {
+          name: "magic_program",
+          address: "Magic11111111111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "expected_attempt",
+          type: "u16",
+        },
+      ],
     },
     {
       name: "reserve_run",
@@ -7935,6 +8491,143 @@ export const PURRPS_GAME_IDL = {
         {
           name: "system_program",
           address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [],
+    },
+    {
+      name: "settle_run_action",
+      discriminator: [60, 158, 250, 122, 216, 215, 7, 208],
+      accounts: [
+        {
+          name: "settlement",
+          accounts: [
+            {
+              name: "escrow",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "run",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 103, 97, 109, 101],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "player",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [112, 108, 97, 121, 101, 114],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "house",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [104, 111, 117, 115, 101],
+                  },
+                ],
+              },
+            },
+            {
+              name: "vault",
+            },
+            {
+              name: "payer",
+              writable: true,
+              signer: true,
+            },
+            {
+              name: "receipt",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 101, 115, 117, 108, 116],
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.owner",
+                    account: "RunEscrow",
+                  },
+                  {
+                    kind: "account",
+                    path: "escrow.snapshot.nonce",
+                    account: "RunEscrow",
+                  },
+                ],
+              },
+            },
+            {
+              name: "system_program",
+              address: "11111111111111111111111111111111",
+            },
+          ],
+        },
+        {
+          name: "leaderboard",
+          writable: true,
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+        {
+          name: "instructions",
+          address: "Sysvar1nstructions1111111111111111111111111",
+        },
+        {
+          name: "escrow_auth",
+        },
+        {
+          name: "escrow",
         },
       ],
       args: [],
@@ -11416,6 +12109,11 @@ export const PURRPS_GAME_IDL = {
       code: 6031,
       name: "InvalidRunWorld",
       msg: "Run world cannot safely advance",
+    },
+    {
+      code: 6032,
+      name: "InvalidCompletionAction",
+      msg: "Completion did not come from the pinned validator and run balance",
     },
   ],
   constants: [

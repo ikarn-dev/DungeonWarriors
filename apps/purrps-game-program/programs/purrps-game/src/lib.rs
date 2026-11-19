@@ -41,6 +41,25 @@ pub mod purrps_game {
         crate::instructions::settle_returned::handle_settle_returned_run(ctx)
     }
 
+    pub fn request_completion(
+        ctx: Context<RequestCompletion>,
+        expected_attempt: u16,
+    ) -> Result<()> {
+        crate::instructions::completion::handle_request_completion(ctx, expected_attempt)
+    }
+
+    pub fn settle_run_action(ctx: Context<SettleRunAction>) -> Result<()> {
+        crate::instructions::completion::handle_settle_run_action(ctx)
+    }
+
+    pub fn fund_run_completion(ctx: Context<FundRunCompletion>) -> Result<()> {
+        crate::instructions::completion_funding::handle_fund_run_completion(ctx)
+    }
+
+    pub fn reclaim_completion_balance(ctx: Context<ReclaimCompletionBalance>) -> Result<()> {
+        crate::instructions::completion_funding::handle_reclaim_completion_balance(ctx)
+    }
+
     pub fn authorize_session(
         ctx: Context<AuthorizeSession>,
         args: AuthorizeSessionArgs,

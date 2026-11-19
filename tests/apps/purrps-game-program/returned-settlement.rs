@@ -9,7 +9,11 @@ use purrps_game::{
     },
 };
 
-fn terminal_fixture(p: &mut Play, reason: TerminalReason, nonce: u64) -> (Pubkey, Pubkey) {
+pub(super) fn terminal_fixture(
+    p: &mut Play,
+    reason: TerminalReason,
+    nonce: u64,
+) -> (Pubkey, Pubkey) {
     let owner = p.owner.pubkey();
     let run_key = pda(purrps_game::RUN_GAME_SEED, owner, nonce);
     let escrow_key = pda(purrps_game::RUN_ESCROW_SEED, owner, nonce);
@@ -85,7 +89,7 @@ pub(super) fn settlement(p: &Play, nonce: u64) -> accounts::SettleReturnedRun {
     }
 }
 
-fn reserved() -> Play {
+pub(super) fn reserved() -> Play {
     let mut p = Play::new();
     p.authorize();
     p.admit_fixture();
