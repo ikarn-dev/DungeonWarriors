@@ -5,6 +5,7 @@ import { Redis } from "@upstash/redis";
 import type { z } from "zod";
 import {
   authConfigSchema,
+  erConfigSchema,
   rpcConfigSchema,
   sponsorConfigSchema,
 } from "../providers/config.ts";
@@ -35,6 +36,7 @@ function requiredConfig<T>(schema: z.ZodType<T>) {
 }
 export const serverConfig = () => requiredConfig(authConfigSchema);
 export const baseRpcConfig = () => requiredConfig(rpcConfigSchema);
+export const erRpcConfig = () => requiredConfig(erConfigSchema);
 export const sponsorshipConfig = () => requiredConfig(sponsorConfigSchema);
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");

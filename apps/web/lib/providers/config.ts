@@ -118,6 +118,10 @@ export const authConfigSchema = structure.pick({
   UPSTASH_REDIS_REST_TOKEN: true,
 });
 export const rpcConfigSchema = structure.pick({ HELIUS_DEVNET_RPC_URL: true });
+export const erConfigSchema = structure.pick({
+  MAGICBLOCK_ER_HTTP_URL: true,
+  MAGICBLOCK_VALIDATOR_IDENTITY: true,
+});
 const sponsorFields = structure.pick({
   SPONSOR_PUBLIC_KEY: true,
   SPONSOR_MIN_BALANCE_LAMPORTS: true,

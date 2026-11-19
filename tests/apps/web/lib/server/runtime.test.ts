@@ -6,6 +6,7 @@ import {
   serverConfig,
   sponsorshipConfig,
 } from "../../../../../apps/web/lib/server/runtime";
+import { checkedConnection } from "../../../../../apps/web/lib/server/transaction-network";
 import { environment } from "./fixtures";
 
 it("fails closed when the SDK timeout response is marked successful", () => {
@@ -34,7 +35,10 @@ describe("configuration by API capability", () => {
       environment.UPSTASH_REDIS_REST_TOKEN,
     );
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
   it("allows auth with only origin and Redis configured while unused providers are absent", () => {
     expect(serverConfig()).toEqual({
       APP_ORIGIN: environment.APP_ORIGIN,
@@ -54,6 +58,31 @@ describe("configuration by API capability", () => {
       "https://mainnet.helius-rpc.com/?api-key=secret",
     );
     expect(() => baseRpcConfig()).toThrow("SERVICE_NOT_CONFIGURED");
+  });
+  it("requires the configured ER host and both validator identities", async () => {
+    const identity = environment.MAGICBLOCK_VALIDATOR_IDENTITY;
+    const url = environment.MAGICBLOCK_ER_HTTP_URL;
+    vi.stubEnv("MAGICBLOCK_VALIDATOR_IDENTITY", identity);
+    vi.stubEnv("MAGICBLOCK_ER_HTTP_URL", "https://unapproved.example");
+    const fetchStub = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ result: { identity: "different-validator" } }),
+      );
+    vi.stubGlobal("fetch", fetchStub);
+    await expect(checkedConnection("er", identity)).rejects.toThrow(
+      "SERVICE_NOT_CONFIGURED",
+    );
+    vi.stubEnv("MAGICBLOCK_ER_HTTP_URL", url);
+    await expect(
+      checkedConnection("er", "other-run-validator"),
+    ).rejects.toThrow("ER_VALIDATOR_MISMATCH");
+    expect(fetchStub).not.toHaveBeenCalled();
+    await expect(checkedConnection("er", identity)).rejects.toThrow(
+      "ER_VALIDATOR_MISMATCH",
+    );
+    fetchStub.mockResolvedValue(Response.json({ result: { identity } }));
+    expect((await checkedConnection("er", identity)).rpcEndpoint).toBe(url);
   });
   it("preserves sponsor reserve and balance checks in the independent policy", () => {
     for (const [name, value] of Object.entries(environment))

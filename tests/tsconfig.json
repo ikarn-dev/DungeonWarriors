@@ -7,6 +7,10 @@
     "typeRoots": ["../apps/web/node_modules/@types"],
     "paths": {
       "@solana/web3.js": ["../apps/web/node_modules/@solana/web3.js"],
+      "@solana/spl-token": ["../apps/web/node_modules/@solana/spl-token"],
+      "@magicblock-labs/ephemeral-rollups-sdk": [
+        "../apps/web/node_modules/@magicblock-labs/ephemeral-rollups-sdk"
+      ],
       "@anchor-lang/core": ["../apps/web/node_modules/@anchor-lang/core"],
       "vitest": ["../apps/web/node_modules/vitest"],
       "@/*": ["../apps/web/*"]

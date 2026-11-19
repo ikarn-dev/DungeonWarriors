@@ -1,9 +1,19 @@
 import "server-only";
-import { BorshCoder, convertIdlToCamelCase } from "@anchor-lang/core";
+import {
+  BorshCoder,
+  convertIdlToCamelCase,
+  type IdlAccounts,
+} from "@anchor-lang/core";
+import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { type AccountInfo, Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+import {
+  decodeEscrowAccount,
+  decodeRunAccount,
+  runAddresses,
+} from "../game/run-accounts";
 import { DEVNET } from "../solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
+import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
 import { ApiError, baseRpcConfig } from "./runtime";
 
 export const program = new PublicKey(DEVNET.program);
@@ -12,7 +22,7 @@ export const coder = new BorshCoder(idl);
 export const u64Input = z
   .string()
   .regex(/^(0|[1-9][0-9]{0,19})$/)
-  .refine((n) => BigInt(n) <= 0xffffffffffffffffn);
+  .pipe(z.string().refine((n) => BigInt(n) <= 0xffffffffffffffffn));
 export function nonceBytes(value: string | bigint) {
   const b = Buffer.alloc(8);
   b.writeBigUInt64LE(BigInt(value));
@@ -65,6 +75,88 @@ export const stateInput = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
+export async function finalizedRunState(
+  wallet: string,
+  nonce: string,
+  accounts: readonly (AccountInfo<Buffer> | null)[],
+) {
+  const identity = { owner: wallet, nonce: BigInt(nonce) };
+  const addresses = runAddresses(identity);
+  const [escrowInfo, runInfo, receiptInfo, clock] = accounts;
+  const invalid = () => new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+  if (escrowInfo == null) {
+    if (runInfo != null || receiptInfo != null) throw invalid();
+    return { status: "absent" as const };
+  }
+  const escrow = await decodeEscrowAccount(
+    identity,
+    addresses.escrow[0],
+    escrowInfo,
+  ).catch(() => {
+    throw invalid();
+  });
+  const receipt = account<IdlAccounts<PurrpsGame>["resultReceipt"]>(
+    "resultReceipt",
+    receiptInfo ?? null,
+  );
+  if (escrow.receipt !== null) {
+    if (
+      receipt === null ||
+      receipt.schemaVersion !== 1 ||
+      receipt.bump !== addresses.receipt[1] ||
+      receipt.owner.toBase58() !== wallet ||
+      receipt.nonce.toString() !== nonce ||
+      !receipt.run.equals(addresses.run[0]) ||
+      Buffer.from(receipt.snapshotHash).toString("hex") !== escrow.snapshotHash
+    )
+      throw invalid();
+    return {
+      status:
+        escrow.status === "refundedTechnical"
+          ? ("refunded" as const)
+          : ("settled" as const),
+      receipt: escrow.receipt,
+      grossPayoutBaseUnits: receipt.terminal.grossPayoutBaseUnits.toString(),
+      refundBaseUnits: receipt.terminal.refundBaseUnits.toString(),
+    };
+  }
+  if (receipt !== null) throw invalid();
+  if (runInfo == null || runInfo.owner.equals(DELEGATION_PROGRAM_ID)) {
+    if (!escrow.delegationInitiated) throw invalid();
+    return { status: "recoveryPending" as const };
+  }
+  const run = await decodeRunAccount(identity, addresses.run[0], runInfo).catch(
+    () => {
+      throw invalid();
+    },
+  );
+  if (run.snapshotHash !== escrow.snapshotHash) throw invalid();
+  if (escrow.delegationInitiated) {
+    const terminal =
+      run.observation.phase === "terminalRecorded" ||
+      run.observation.phase === "completionRequested";
+    return {
+      status: terminal
+        ? ("settlementReady" as const)
+        : ("recoveryPending" as const),
+    };
+  }
+  if (
+    run.observation.phase !== "ready" ||
+    clock == null ||
+    clock.owner.toBase58() !== DEVNET.sysvarOwner ||
+    clock.executable ||
+    clock.data.length !== 40
+  )
+    throw invalid();
+  return {
+    status:
+      clock.data.readBigInt64LE(32) >= BigInt(escrow.activationDeadlineSeconds)
+        ? ("refundReady" as const)
+        : ("reserved" as const),
+  };
+}
+
 export async function readState(
   wallet: string,
   input: z.infer<typeof stateInput>,
@@ -87,6 +179,8 @@ export async function readState(
       addresses = [
         pda("run-escrow", owner.toBytes(), nonceBytes(input.nonce)),
         pda("run-game", owner.toBytes(), nonceBytes(input.nonce)),
+        pda("result", owner.toBytes(), nonceBytes(input.nonce)),
+        new PublicKey(DEVNET.clock),
       ];
       break;
     case "history": {
@@ -105,7 +199,20 @@ export async function readState(
   const values = await rpc.getMultipleAccountsInfoAndContext(addresses, {
     commitment: "finalized",
   });
-  const accounts = values.value.map((value, i) => {
+  const run =
+    input.kind === "run"
+      ? await finalizedRunState(wallet, input.nonce, values.value)
+      : null;
+  const entries =
+    input.kind === "run" ? values.value.slice(0, 3) : values.value;
+  const accounts = entries.map((entry, i) => {
+    // The delegated base mirror may lag and cannot establish gameplay or payouts.
+    const value =
+      input.kind === "run" &&
+      i === 1 &&
+      entry?.owner.equals(DELEGATION_PROGRAM_ID)
+        ? null
+        : entry;
     if (
       value !== null &&
       (!value.owner.equals(program) ||
@@ -177,5 +284,6 @@ export async function readState(
     slot: values.context.slot,
     fetchedAt: new Date().toISOString(),
     accounts,
+    ...(run === null ? {} : { run }),
   };
 }

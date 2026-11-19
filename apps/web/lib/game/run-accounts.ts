@@ -271,5 +271,11 @@ export async function decodeEscrowAccount(
     status,
     receipt: e.receipt?.toBase58() ?? null,
     snapshotHash: hex(e.snapshotHash),
+    delegationInitiated: e.delegationInitiated,
+    validator: e.snapshot.oracle.validator.toBase58(),
+    market: enumTag(e.snapshot.market).toUpperCase(),
+    inputKey: e.snapshot.inputPermission.inputKey.toBase58(),
+    delegationEpoch: e.snapshot.delegationEpoch.toString(),
+    activationDeadlineSeconds: e.snapshot.activationDeadlineSeconds.toString(),
   };
 }

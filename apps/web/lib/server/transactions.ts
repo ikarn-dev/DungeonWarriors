@@ -6,25 +6,26 @@ import {
   type MessageV0,
   PublicKey,
   SystemProgram,
-  TransactionInstruction,
+  type TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { z } from "zod";
+import { decodeEscrowAccount, runAddresses } from "../game/run-accounts";
 import { DEVNET } from "../solana/addresses.ts";
 import { verifyWalletSignature } from "./auth";
+import { coder, idl, nonceBytes, pda, program, u64Input } from "./chain";
 import {
-  coder,
-  connection,
-  idl,
-  nonceBytes,
-  pda,
-  program,
-  u64Input,
-} from "./chain";
+  gameInstructions,
+  gameIntentSchema,
+  gameNetwork,
+  programInstruction,
+} from "./game-transactions";
 import { ApiError, runtime, sponsorshipConfig } from "./runtime";
+import { checkedConnection } from "./transaction-network";
 
 export const intentSchema = z.discriminatedUnion("operation", [
+  gameIntentSchema,
   z
     .object({ operation: z.literal("createPlayer"), sponsored: z.boolean() })
     .strict(),
@@ -67,21 +68,25 @@ type Intent = z.infer<typeof intentSchema>;
 const MAX_SPONSORED_COMPUTE_UNITS = 200_000;
 const SPONSORED_FEE_LIMIT_LAMPORTS = 100_000n;
 
-function sponsoredInstructions(
+function reviewedInstructions(
   message: MessageV0,
-  appInstruction: MessageV0["compiledInstructions"][number],
-  expected: TransactionInstruction,
+  expected: readonly TransactionInstruction[],
 ) {
   let units: number | undefined;
   let price: bigint | undefined;
+  let nextApplicationInstruction = 0;
   const instructions = message.compiledInstructions.map((ix) => {
-    if (ix === appInstruction) return expected;
     if (
-      ix.accountKeyIndexes.length !== 0 ||
       !message.staticAccountKeys[ix.programIdIndex]?.equals(
         ComputeBudgetProgram.programId,
       )
-    )
+    ) {
+      const application = expected[nextApplicationInstruction++];
+      if (application === undefined)
+        throw new ApiError("TRANSACTION_REJECTED", 400);
+      return application;
+    }
+    if (ix.accountKeyIndexes.length !== 0)
       throw new ApiError("TRANSACTION_REJECTED", 400);
     const data = Buffer.from(ix.data);
     if (data[0] === 2 && data.length === 5 && units === undefined) {
@@ -96,8 +101,10 @@ function sponsoredInstructions(
     throw new ApiError("TRANSACTION_REJECTED", 400);
   });
   if (
-    (price ?? 0n) * BigInt(units ?? MAX_SPONSORED_COMPUTE_UNITS) >
-    SPONSORED_FEE_LIMIT_LAMPORTS * 1_000_000n
+    nextApplicationInstruction !== expected.length ||
+    (price ?? 0n) *
+      BigInt(units ?? expected.length * MAX_SPONSORED_COMPUTE_UNITS) >
+      SPONSORED_FEE_LIMIT_LAMPORTS * 1_000_000n
   )
     throw new ApiError("TRANSACTION_REJECTED", 400);
   return instructions;
@@ -108,7 +115,10 @@ function accountRoles(items: IdlInstructionAccountItem[]): string[] {
     "accounts" in item ? accountRoles(item.accounts) : [item.name],
   );
 }
-export function instructionFor(wallet: string, intent: Intent) {
+export function instructionFor(
+  wallet: string,
+  intent: Exclude<Intent, { operation: "game" }>,
+) {
   if (intent.operation === "owner")
     throw new ApiError("PREPARE_NOT_SUPPORTED", 400);
   const owner = new PublicKey(wallet);
@@ -124,6 +134,7 @@ export function instructionFor(wallet: string, intent: Intent) {
     systemProgram: SystemProgram.programId,
   };
   let args: object = {};
+  let operationId = `${intent.operation}:${wallet}`;
   if (intent.operation === "claimStarter") {
     const budget =
       sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS -
@@ -131,9 +142,11 @@ export function instructionFor(wallet: string, intent: Intent) {
     if (budget <= 0n) throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
     const version = Buffer.alloc(4);
     version.writeUInt32LE(intent.catalogVersion);
+    const draw = pda("draw", owner.toBytes(), nonceBytes(intent.nonce));
+    operationId = draw.toBase58();
     Object.assign(values, {
       catalog: pda("catalog", version),
-      draw: pda("draw", owner.toBytes(), nonceBytes(intent.nonce)),
+      draw,
       oracleQueue: new PublicKey(DEVNET.vrfQueue),
       programIdentity: pda("identity"),
       vrfProgram: new PublicKey(DEVNET.vrfProgram),
@@ -155,52 +168,66 @@ export function instructionFor(wallet: string, intent: Intent) {
         cat: { [intent.cat]: {} },
       },
     };
-  const definition = idl.instructions.find(
-    (ix) => ix.name === intent.operation,
-  );
-  if (definition === undefined)
-    throw new ApiError("INSTRUCTION_NOT_BUILT", 503);
-  const keys = definition.accounts.map((meta) => {
-    if (!("name" in meta) || !(meta.name in values))
-      throw new ApiError("UNSUPPORTED_ACCOUNT_LAYOUT", 503);
-    const pubkey = values[meta.name];
-    if (pubkey === undefined)
-      throw new ApiError("UNSUPPORTED_ACCOUNT_LAYOUT", 503);
-    return {
-      pubkey,
-      isSigner: "signer" in meta && meta.signer === true,
-      isWritable: "writable" in meta && meta.writable === true,
-    };
-  });
   return {
-    instruction: new TransactionInstruction({
-      programId: program,
-      keys,
-      data: coder.instruction.encode(intent.operation, args),
-    }),
+    instruction: programInstruction(intent.operation, values, args),
     payer,
-    operationId:
-      intent.operation === "claimStarter"
-        ? values["draw"]?.toBase58()
-        : `${intent.operation}:${wallet}`,
+    operationId,
   };
 }
+function instructionsFor(wallet: string, intent: Intent) {
+  if (intent.operation === "game") return gameInstructions(wallet, intent);
+  const { instruction, ...built } = instructionFor(wallet, intent);
+  return { ...built, instructions: [instruction] };
+}
+
+const networkFor = (intent: Intent) =>
+  intent.operation === "game" ? gameNetwork(intent.action) : "base";
+
+async function connectionFor(wallet: string, intent: Intent) {
+  if (intent.operation !== "game" || gameNetwork(intent.action) === "base")
+    return checkedConnection("base");
+  const action = intent.action;
+  if (!("nonce" in action)) throw new ApiError("INVALID_REQUEST", 400);
+  const identity = { owner: wallet, nonce: BigInt(action.nonce) };
+  const address = runAddresses(identity).escrow[0];
+  const base = await checkedConnection("base");
+  const info = await base.getAccountInfo(address, "finalized");
+  if (info === null) throw new ApiError("RUN_NOT_FOUND", 409);
+  const escrow = await decodeEscrowAccount(identity, address, info).catch(
+    () => {
+      throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+    },
+  );
+  if (
+    escrow.status !== "reserved" ||
+    !escrow.delegationInitiated ||
+    ("market" in action && action.market !== escrow.market) ||
+    ("delegationEpoch" in action &&
+      action.delegationEpoch !== escrow.delegationEpoch) ||
+    ("inputKey" in action && action.inputKey !== escrow.inputKey)
+  )
+    throw new ApiError("RUN_SCOPE_MISMATCH", 409);
+  return checkedConnection("er", escrow.validator);
+}
+
 export async function prepare(wallet: string, intent: Intent) {
-  const built = instructionFor(wallet, intent);
-  const rpc = connection();
-  if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
-    throw new ApiError("WRONG_NETWORK", 503);
-  const block = await rpc.getLatestBlockhash("finalized");
+  const built = instructionsFor(wallet, intent);
+  const network = networkFor(intent);
+  const rpc = await connectionFor(wallet, intent);
+  const block = await rpc.getLatestBlockhash(
+    network === "er" ? "confirmed" : "finalized",
+  );
   const message = new TransactionMessage({
     payerKey: built.payer,
     recentBlockhash: block.blockhash,
-    instructions: [built.instruction],
+    instructions: built.instructions,
   }).compileToV0Message();
   return {
     transaction: Buffer.from(
       new VersionedTransaction(message).serialize(),
     ).toString("base64"),
     ...block,
+    network,
     operationId: built.operationId,
   };
 }
@@ -223,7 +250,8 @@ export function validateTransaction(
     message.version !== 0 ||
     message.addressTableLookups.length > 0 ||
     message.compiledInstructions.length === 0 ||
-    message.compiledInstructions.length > (intent.sponsored ? 3 : 1) ||
+    message.compiledInstructions.length >
+      (intent.sponsored ? 3 : intent.operation === "game" ? 4 : 1) ||
     message.staticAccountKeys.length > 32
   )
     throw new ApiError("TRANSACTION_REJECTED", 400);
@@ -254,15 +282,16 @@ export function validateTransaction(
     )
       throw new ApiError("TRANSACTION_REJECTED", 400);
   } else {
-    const built = instructionFor(wallet, intent);
+    const built = instructionsFor(wallet, intent);
     const expected = new TransactionMessage({
       payerKey: built.payer,
       recentBlockhash: message.recentBlockhash,
       // Wallets can add fee instructions after preparation. Every other byte
       // must still match a transaction rebuilt from the approved intent.
-      instructions: intent.sponsored
-        ? sponsoredInstructions(message, ix, built.instruction)
-        : [built.instruction],
+      instructions:
+        intent.sponsored || intent.operation === "game"
+          ? reviewedInstructions(message, built.instructions)
+          : built.instructions,
     }).compileToV0Message();
     if (
       !Buffer.from(expected.serialize()).equals(
@@ -306,16 +335,19 @@ function sponsorKey() {
 const chargeBudget = `local n=tonumber(redis.call('GET',KEYS[1]) or '0'); local spent=tonumber(redis.call('GET',KEYS[2]) or '0'); if n>=tonumber(ARGV[1]) or spent+tonumber(ARGV[2])>tonumber(ARGV[3]) then return 0 end; redis.call('INCR',KEYS[1]); redis.call('EXPIRE',KEYS[1],3600); redis.call('INCRBY',KEYS[2],ARGV[2]); redis.call('EXPIRE',KEYS[2],3600); return 1`;
 export async function submit(wallet: string, intent: Intent, encoded: string) {
   const tx = validateTransaction(wallet, intent, encoded);
-  const rpc = connection();
-  const r = runtime();
-  if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
-    throw new ApiError("WRONG_NETWORK", 503);
-  const fee = await rpc.getFeeForMessage(tx.message, "confirmed");
-  if (fee.value === null) throw new ApiError("BLOCKHASH_EXPIRED", 409);
-  if (!Number.isSafeInteger(fee.value) || fee.value < 0)
+  const network = networkFor(intent);
+  const rpc = await connectionFor(wallet, intent);
+  // The ER simulates v0 transactions, but its fee RPC cannot load v0 messages.
+  const fee =
+    network === "base"
+      ? (await rpc.getFeeForMessage(tx.message, "confirmed")).value
+      : null;
+  if (network === "base" && fee === null)
+    throw new ApiError("BLOCKHASH_EXPIRED", 409);
+  if (fee !== null && (!Number.isSafeInteger(fee) || fee < 0))
     throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
   if (intent.sponsored) {
-    if (BigInt(fee.value) > SPONSORED_FEE_LIMIT_LAMPORTS)
+    if (fee === null || BigInt(fee) > SPONSORED_FEE_LIMIT_LAMPORTS)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     const policy = sponsorshipConfig();
     const key = sponsorKey();
@@ -368,7 +400,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
       (intent.operation === "createPlayer"
         ? rent.reduce((total, n) => total + BigInt(n), 0n)
         : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS -
-          SPONSORED_FEE_LIMIT_LAMPORTS) + BigInt(fee.value);
+          SPONSORED_FEE_LIMIT_LAMPORTS) + BigInt(fee);
     // The simulated payer balance already reflects the network fee.
     if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
@@ -386,6 +418,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     )
       throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
     const operation = instructionFor(wallet, intent).operationId;
+    const r = runtime();
     const admitted = await r.redis.eval(
       chargeBudget,
       [
@@ -401,6 +434,8 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
       sigVerify: true,
       commitment: "confirmed",
     });
+    if (simulation.value.err === "BlockhashNotFound")
+      throw new ApiError("BLOCKHASH_EXPIRED", 409);
     if (simulation.value.err !== null)
       throw new ApiError("SIMULATION_REJECTED", 409);
   }
@@ -413,8 +448,8 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
       preflightCommitment: "confirmed",
       maxRetries: 2,
     });
-    return { status: "requested", signature, unknownResponse: false };
+    return { status: "requested", signature, network, unknownResponse: false };
   } catch {
-    return { status: "requested", signature, unknownResponse: true };
+    return { status: "requested", signature, network, unknownResponse: true };
   }
 }

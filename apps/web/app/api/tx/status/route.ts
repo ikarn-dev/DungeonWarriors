@@ -1,7 +1,6 @@
 import { utils } from "@anchor-lang/core";
 import { z } from "zod";
 import { authenticate } from "../../../../lib/server/auth";
-import { connection } from "../../../../lib/server/chain";
 import {
   assertOrigin,
   body,
@@ -11,9 +10,14 @@ import {
   sessionToken,
 } from "../../../../lib/server/http";
 import { ApiError, rateLimit } from "../../../../lib/server/runtime";
+import {
+  checkedConnection,
+  networkSchema,
+} from "../../../../lib/server/transaction-network";
 
 const input = z
   .object({
+    network: networkSchema.default("base"),
     signature: z
       .string()
       .min(64)
@@ -30,9 +34,24 @@ export async function POST(request: Request) {
     const value = await body(request, input);
     if (utils.bytes.bs58.decode(value.signature).length !== 64)
       throw new ApiError("INVALID_SIGNATURE", 400);
-    const result = await connection().getSignatureStatuses([value.signature], {
+    const rpc = await checkedConnection(value.network);
+    const result = await rpc.getSignatureStatuses([value.signature], {
       searchTransactionHistory: true,
     });
-    return json({ slot: result.context.slot, status: result.value[0] ?? null });
+    const status = result.value[0] ?? null;
+    const resolution =
+      status === null
+        ? "unknown"
+        : status.confirmationStatus === "finalized"
+          ? status.err === null
+            ? "finalized"
+            : "failed"
+          : "pending";
+    return json({
+      slot: result.context.slot,
+      network: value.network,
+      status,
+      resolution,
+    });
   });
 }
