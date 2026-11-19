@@ -10,8 +10,8 @@ import {
   TransactionMessage,
   type VersionedTransaction,
 } from "@solana/web3.js";
-import { DEVNET } from "../solana/addresses";
-import { PURRPS_GAME_IDL } from "../solana/purrps-game";
+import { DEVNET } from "../solana/addresses.ts";
+import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
 import type { CatId } from "./catalog";
 export type LobbyIntent =
   | { operation: "createPlayer"; sponsored: boolean }
