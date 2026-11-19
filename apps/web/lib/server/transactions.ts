@@ -1,7 +1,9 @@
 import "server-only";
 import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
 import {
+  ComputeBudgetProgram,
   Keypair,
+  type MessageV0,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -62,6 +64,45 @@ export const submitInput = z
   .object({ intent: intentSchema, transaction: z.string().min(1).max(1800) })
   .strict();
 type Intent = z.infer<typeof intentSchema>;
+const MAX_SPONSORED_COMPUTE_UNITS = 200_000;
+const SPONSORED_FEE_LIMIT_LAMPORTS = 100_000n;
+
+function sponsoredInstructions(
+  message: MessageV0,
+  appInstruction: MessageV0["compiledInstructions"][number],
+  expected: TransactionInstruction,
+) {
+  let units: number | undefined;
+  let price: bigint | undefined;
+  const instructions = message.compiledInstructions.map((ix) => {
+    if (ix === appInstruction) return expected;
+    if (
+      ix.accountKeyIndexes.length !== 0 ||
+      !message.staticAccountKeys[ix.programIdIndex]?.equals(
+        ComputeBudgetProgram.programId,
+      )
+    )
+      throw new ApiError("TRANSACTION_REJECTED", 400);
+    const data = Buffer.from(ix.data);
+    if (data[0] === 2 && data.length === 5 && units === undefined) {
+      units = data.readUInt32LE(1);
+      if (units > 0 && units <= MAX_SPONSORED_COMPUTE_UNITS)
+        return ComputeBudgetProgram.setComputeUnitLimit({ units });
+    }
+    if (data[0] === 3 && data.length === 9 && price === undefined) {
+      price = data.readBigUInt64LE(1);
+      return ComputeBudgetProgram.setComputeUnitPrice({ microLamports: price });
+    }
+    throw new ApiError("TRANSACTION_REJECTED", 400);
+  });
+  if (
+    (price ?? 0n) * BigInt(units ?? MAX_SPONSORED_COMPUTE_UNITS) >
+    SPONSORED_FEE_LIMIT_LAMPORTS * 1_000_000n
+  )
+    throw new ApiError("TRANSACTION_REJECTED", 400);
+  return instructions;
+}
+
 function accountRoles(items: IdlInstructionAccountItem[]): string[] {
   return items.flatMap((item) =>
     "accounts" in item ? accountRoles(item.accounts) : [item.name],
@@ -85,7 +126,8 @@ export function instructionFor(wallet: string, intent: Intent) {
   let args: object = {};
   if (intent.operation === "claimStarter") {
     const budget =
-      sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n;
+      sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS -
+      SPONSORED_FEE_LIMIT_LAMPORTS;
     if (budget <= 0n) throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
     const version = Buffer.alloc(4);
     version.writeUInt32LE(intent.catalogVersion);
@@ -180,16 +222,15 @@ export function validateTransaction(
   if (
     message.version !== 0 ||
     message.addressTableLookups.length > 0 ||
-    message.compiledInstructions.length !== 1 ||
+    message.compiledInstructions.length === 0 ||
+    message.compiledInstructions.length > (intent.sponsored ? 3 : 1) ||
     message.staticAccountKeys.length > 32
   )
     throw new ApiError("TRANSACTION_REJECTED", 400);
-  const ix = message.compiledInstructions[0];
-  if (
-    ix === undefined ||
-    !message.staticAccountKeys[ix.programIdIndex]?.equals(program)
-  )
-    throw new ApiError("TRANSACTION_REJECTED", 400);
+  const ix = message.compiledInstructions.find((instruction) =>
+    message.staticAccountKeys[instruction.programIdIndex]?.equals(program),
+  );
+  if (ix === undefined) throw new ApiError("TRANSACTION_REJECTED", 400);
   const definition = idl.instructions.find((value) =>
     Buffer.from(value.discriminator).equals(
       Buffer.from(ix.data.subarray(0, 8)),
@@ -217,7 +258,11 @@ export function validateTransaction(
     const expected = new TransactionMessage({
       payerKey: built.payer,
       recentBlockhash: message.recentBlockhash,
-      instructions: [built.instruction],
+      // Wallets can add fee instructions after preparation. Every other byte
+      // must still match a transaction rebuilt from the approved intent.
+      instructions: intent.sponsored
+        ? sponsoredInstructions(message, ix, built.instruction)
+        : [built.instruction],
     }).compileToV0Message();
     if (
       !Buffer.from(expected.serialize()).equals(
@@ -267,7 +312,11 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     throw new ApiError("WRONG_NETWORK", 503);
   const fee = await rpc.getFeeForMessage(tx.message, "confirmed");
   if (fee.value === null) throw new ApiError("BLOCKHASH_EXPIRED", 409);
+  if (!Number.isSafeInteger(fee.value) || fee.value < 0)
+    throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
   if (intent.sponsored) {
+    if (BigInt(fee.value) > SPONSORED_FEE_LIMIT_LAMPORTS)
+      throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     const policy = sponsorshipConfig();
     const key = sponsorKey();
     const loader = PublicKey.findProgramAddressSync(
@@ -297,7 +346,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     if (simulation.value.err !== null || after === undefined)
       throw new ApiError("SIMULATION_REJECTED", 409);
     if (
-      ![balance, after, fee.value].every(
+      ![balance, after].every(
         (value) => Number.isSafeInteger(value) && value >= 0,
       )
     )
@@ -318,8 +367,8 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     const cost =
       (intent.operation === "createPlayer"
         ? rent.reduce((total, n) => total + BigInt(n), 0n)
-        : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n) +
-      BigInt(fee.value);
+        : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS -
+          SPONSORED_FEE_LIMIT_LAMPORTS) + BigInt(fee.value);
     // The simulated payer balance already reflects the network fee.
     if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);

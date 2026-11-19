@@ -1,5 +1,6 @@
 import { BN, type IdlInstructionAccountItem } from "@anchor-lang/core";
 import {
+  ComputeBudgetProgram,
   Keypair,
   PublicKey,
   SystemProgram,
@@ -128,7 +129,7 @@ function transaction(
   };
 }
 describe("complete transaction validation", () => {
-  it("charges simulated rent and network fee once and rejects an actual overage before co-signing", async () => {
+  it("charges rent and the wallet's actual network fee once and rejects both fee and debit overages", async () => {
     const owner = wallet();
     const sponsor = Keypair.generate();
     const loader = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
@@ -137,7 +138,7 @@ describe("complete transaction validation", () => {
     programData[12] = 1;
     wallet().publicKey.toBuffer().copy(programData, 13);
     const balance = 1_100_000_000;
-    const fee = 10_000;
+    let fee = 90_000;
     const playerRent = 2_000_000;
     const collectionRent = 1_307_080;
     const cost = fee + playerRent + collectionRent;
@@ -169,7 +170,15 @@ describe("complete transaction validation", () => {
     );
     vi.stubEnv("SPONSOR_HOURLY_BUDGET_LAMPORTS", "1000000000");
     try {
-      const t = transaction(owner, true);
+      const built = instructionFor(owner.address, {
+        operation: "createPlayer",
+        sponsored: true,
+      });
+      const t = transaction(owner, true, [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 400_000 }),
+        built.instruction,
+      ]);
       await expect(
         submit(owner.address, t.intent, t.encoded()),
       ).resolves.toMatchObject({
@@ -188,6 +197,13 @@ describe("complete transaction validation", () => {
       await expect(
         submit(owner.address, t.intent, t.encoded()),
       ).rejects.toThrow("SPONSOR_BUDGET_UNAVAILABLE");
+      expect(sponsorTest.admit).toHaveBeenCalledTimes(1);
+      expect(submitRaw).toHaveBeenCalledTimes(1);
+      fee = 100_001;
+      await expect(
+        submit(owner.address, t.intent, t.encoded()),
+      ).rejects.toThrow("SPONSOR_BUDGET_UNAVAILABLE");
+      expect(simulation).toHaveBeenCalledTimes(2);
       expect(sponsorTest.admit).toHaveBeenCalledTimes(1);
       expect(submitRaw).toHaveBeenCalledTimes(1);
     } finally {
@@ -240,6 +256,45 @@ describe("complete transaction validation", () => {
       expect(
         validateTransaction(owner.address, t.intent, t.encoded()),
       ).toBeDefined();
+    }
+  });
+  it("rejects duplicate, excessive and unrelated wallet additions to sponsored messages", () => {
+    const owner = wallet();
+    const built = instructionFor(owner.address, {
+      operation: "createPlayer",
+      sponsored: true,
+    });
+    const price = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 400_000,
+    });
+    for (const instructions of [
+      [price, price, built.instruction],
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_001 }),
+        built.instruction,
+      ],
+      [
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 500_001 }),
+        built.instruction,
+      ],
+      [
+        ComputeBudgetProgram.requestHeapFrame({ bytes: 64 * 1024 }),
+        built.instruction,
+      ],
+      [
+        new TransactionInstruction({
+          programId: price.programId,
+          keys: built.instruction.keys.slice(0, 1),
+          data: price.data,
+        }),
+        built.instruction,
+      ],
+      [price, built.instruction, built.instruction],
+    ]) {
+      const t = transaction(owner, true, instructions);
+      expect(() =>
+        validateTransaction(owner.address, t.intent, t.encoded()),
+      ).toThrow("TRANSACTION_REJECTED");
     }
   });
   it("rejects changed recipients/accounts, extra instructions, foreign programs and unsigned owners", () => {
