@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ephemeral_rollups_sdk::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 
 use crate::{
     constants::{RUN_GAME_SEED, SCHEMA_VERSION},
@@ -17,6 +18,9 @@ pub struct RunInput<'info> {
         constraint=run.snapshot.run == run.key() @ ErrorCode::InvalidRun)]
     pub run: Box<Account<'info, RunGameState>>,
     pub authority: Signer<'info>,
+    /// CHECK: Fixed MagicBlock native account. Base Solana lacks the ER context.
+    #[account(address=MAGIC_CONTEXT_ID,owner=MAGIC_PROGRAM_ID)]
+    pub magic_context: UncheckedAccount<'info>,
 }
 
 pub(super) fn validate_input_snapshot(run: &RunGameState) -> Result<()> {

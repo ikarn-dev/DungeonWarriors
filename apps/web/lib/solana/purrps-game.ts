@@ -516,6 +516,104 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "delegateRun";
+      discriminator: [20, 67, 38, 40, 32, 211, 235, 131];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "escrow";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "ownerProgram";
+          address: "F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx";
+        },
+        {
+          name: "buffer";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [98, 117, 102, 102, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "run";
+              },
+            ];
+          };
+        },
+        {
+          name: "delegationRecord";
+          writable: true;
+        },
+        {
+          name: "delegationMetadata";
+          writable: true;
+        },
+        {
+          name: "delegationProgram";
+          address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh";
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "runIdentityArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "deposit";
       discriminator: [242, 35, 198, 137, 82, 225, 242, 182];
       accounts: [
@@ -591,6 +689,60 @@ export type PurrpsGame = {
           };
         },
       ];
+    },
+    {
+      name: "expireDelegatedActivation";
+      discriminator: [172, 3, 115, 181, 64, 219, 158, 152];
+      accounts: [
+        {
+          name: "escrow";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.owner";
+                account: "runEscrow";
+              },
+              {
+                kind: "account";
+                path: "escrow.snapshot.nonce";
+                account: "runEscrow";
+              },
+            ];
+          };
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
+      ];
+      args: [];
     },
     {
       name: "fulfillCapsule";
@@ -1041,6 +1193,10 @@ export type PurrpsGame = {
           name: "authority";
           signer: true;
         },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
       ];
       args: [
         {
@@ -1404,6 +1560,37 @@ export type PurrpsGame = {
           name: "oracleObservation";
         };
       };
+    },
+    {
+      name: "processUndelegation";
+      discriminator: [196, 28, 41, 206, 48, 37, 51, 167];
+      accounts: [
+        {
+          name: "baseAccount";
+          writable: true;
+        },
+        {
+          name: "buffer";
+          signer: true;
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "accountSeeds";
+          type: {
+            vec: "bytes";
+          };
+        },
+      ];
     },
     {
       name: "publishCatalog";
@@ -2182,6 +2369,10 @@ export type PurrpsGame = {
           name: "authority";
           signer: true;
         },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
       ];
       args: [];
     },
@@ -2630,6 +2821,10 @@ export type PurrpsGame = {
           name: "authority";
           signer: true;
         },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
       ];
       args: [
         {
@@ -2670,6 +2865,10 @@ export type PurrpsGame = {
         },
         {
           name: "priceUpdate";
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
         },
       ];
       args: [];
@@ -5395,6 +5594,22 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "runIdentityArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "delegationEpoch";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
       name: "runPhase";
       type: {
         kind: "enum";
@@ -6601,6 +6816,104 @@ export const PURRPS_GAME_IDL = {
       args: [],
     },
     {
+      name: "delegate_run",
+      discriminator: [20, 67, 38, 40, 32, 211, 235, 131],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "escrow",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "owner_program",
+          address: "F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx",
+        },
+        {
+          name: "buffer",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [98, 117, 102, 102, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "run",
+              },
+            ],
+          },
+        },
+        {
+          name: "delegation_record",
+          writable: true,
+        },
+        {
+          name: "delegation_metadata",
+          writable: true,
+        },
+        {
+          name: "delegation_program",
+          address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh",
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "RunIdentityArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "deposit",
       discriminator: [242, 35, 198, 137, 82, 225, 242, 182],
       accounts: [
@@ -6676,6 +6989,60 @@ export const PURRPS_GAME_IDL = {
           },
         },
       ],
+    },
+    {
+      name: "expire_delegated_activation",
+      discriminator: [172, 3, 115, 181, 64, 219, 158, 152],
+      accounts: [
+        {
+          name: "escrow",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.owner",
+                account: "RunEscrow",
+              },
+              {
+                kind: "account",
+                path: "escrow.snapshot.nonce",
+                account: "RunEscrow",
+              },
+            ],
+          },
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
+      ],
+      args: [],
     },
     {
       name: "fulfill_capsule",
@@ -7114,6 +7481,10 @@ export const PURRPS_GAME_IDL = {
           name: "authority",
           signer: true,
         },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
       ],
       args: [
         {
@@ -7448,6 +7819,37 @@ export const PURRPS_GAME_IDL = {
           name: "OracleObservation",
         },
       },
+    },
+    {
+      name: "process_undelegation",
+      discriminator: [196, 28, 41, 206, 48, 37, 51, 167],
+      accounts: [
+        {
+          name: "base_account",
+          writable: true,
+        },
+        {
+          name: "buffer",
+          signer: true,
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "account_seeds",
+          type: {
+            vec: "bytes",
+          },
+        },
+      ],
     },
     {
       name: "publish_catalog",
@@ -8214,6 +8616,10 @@ export const PURRPS_GAME_IDL = {
           name: "authority",
           signer: true,
         },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
       ],
       args: [],
     },
@@ -8662,6 +9068,10 @@ export const PURRPS_GAME_IDL = {
           name: "authority",
           signer: true,
         },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
       ],
       args: [
         {
@@ -8702,6 +9112,10 @@ export const PURRPS_GAME_IDL = {
         },
         {
           name: "price_update",
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
         },
       ],
       args: [],
@@ -11255,6 +11669,22 @@ export const PURRPS_GAME_IDL = {
                 },
               },
             },
+          },
+        ],
+      },
+    },
+    {
+      name: "RunIdentityArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "delegation_epoch",
+            type: "u64",
           },
         ],
       },

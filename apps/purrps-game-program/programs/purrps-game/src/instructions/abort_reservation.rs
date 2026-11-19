@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
-use super::house::assert_vault;
+use super::{delegation::unplayed_reservation, house::assert_vault};
 use crate::{
     constants::*,
     contracts::snapshot_hash,
@@ -146,27 +146,10 @@ pub fn handle_abort_undelegated_reservation(
     require!(
         !a.escrow.delegation_initiated
             && clock.unix_timestamp >= a.escrow.snapshot.activation_deadline_seconds
-            && a.run.phase == RunPhase::Ready
-            && a.run.active_ticks == 0
-            && a.run.terminal.is_none()
-            && a.run.start_observation.is_none()
-            && a.run.observation_count == 0
-            && a.run.crank.task == Pubkey::default()
-            && a.run.crank.generation == 0,
+            && unplayed_reservation(&a.run),
         ErrorCode::ReservationNotRefundable
     );
-    let terminal = RunTerminal {
-        reason: TerminalReason::TechnicalAbort,
-        fault: Some(FaultReason::ActivationExpired),
-        active_ticks: 0,
-        qualified_checkpoints: 0,
-        score: 0,
-        coins: 0,
-        processed_sequence: 0,
-        final_observation: None,
-        gross_payout_base_units: 0,
-        refund_base_units: a.escrow.snapshot.stake_base_units,
-    };
+    let terminal = activation_expired(a.escrow.snapshot.stake_base_units);
     a.finish(
         terminal,
         EscrowStatus::RefundedTechnical,
@@ -176,4 +159,19 @@ pub fn handle_abort_undelegated_reservation(
     a.run.terminal = Some(terminal);
     a.run.phase = RunPhase::TerminalRecorded;
     Ok(())
+}
+
+pub(super) fn activation_expired(stake: u64) -> RunTerminal {
+    RunTerminal {
+        reason: TerminalReason::TechnicalAbort,
+        fault: Some(FaultReason::ActivationExpired),
+        active_ticks: 0,
+        qualified_checkpoints: 0,
+        score: 0,
+        coins: 0,
+        processed_sequence: 0,
+        final_observation: None,
+        gross_payout_base_units: 0,
+        refund_base_units: stake,
+    }
 }

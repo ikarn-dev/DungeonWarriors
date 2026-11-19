@@ -1,4 +1,5 @@
 use super::*;
+use ephemeral_rollups_sdk::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 use purrps_game::{
     accounts, instruction,
     oracle::{inspect_account, InspectedOracle},
@@ -41,6 +42,9 @@ fn reserve() -> (Play, Pubkey, InspectedOracle) {
     account.data = bytes;
     account.owner = binding.program;
     p.h.svm.set_account(binding.account, account).unwrap();
+    let mut context = p.h.svm.get_account(&p.key.pubkey()).unwrap();
+    context.owner = MAGIC_PROGRAM_ID;
+    p.h.svm.set_account(MAGIC_CONTEXT_ID, context).unwrap();
     (p, key, oracle)
 }
 
@@ -84,6 +88,7 @@ fn signed_queue_binds_run_and_sequence_and_applies_control_budget_atomically() {
             accounts::RunInput {
                 run: key,
                 authority,
+                magic_context: MAGIC_CONTEXT_ID,
             },
         )
     };
@@ -119,6 +124,7 @@ fn signed_queue_binds_run_and_sequence_and_applies_control_budget_atomically() {
             accounts::RunInput {
                 run: key,
                 authority: signer,
+                magic_context: MAGIC_CONTEXT_ID,
             },
         )
     };
@@ -150,6 +156,7 @@ fn owner_revokes_only_the_current_run_key_and_retries_preserve_deadline() {
             accounts::RunInput {
                 run: key,
                 authority,
+                magic_context: MAGIC_CONTEXT_ID,
             },
         )
     };
@@ -162,6 +169,7 @@ fn owner_revokes_only_the_current_run_key_and_retries_preserve_deadline() {
         accounts::RunInput {
             run: key,
             authority: p.key.pubkey(),
+            magic_context: MAGIC_CONTEXT_ID,
         },
     );
     rejected(p.h.send(revoke(p.key.pubkey()), &p.key), "InvalidOwner");
@@ -278,6 +286,7 @@ fn oracle_recovery_keeps_ticks_frozen_and_expiry_records_one_refund() {
             accounts::RecoverRunOracle {
                 run: key,
                 price_update,
+                magic_context: MAGIC_CONTEXT_ID,
             },
         )
     };

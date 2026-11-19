@@ -21,7 +21,8 @@ use contracts::Market;
 use instruction_args::{
     AmountArgs, ApplyUpgradeArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs,
     FundSponsorshipArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs,
-    RequestCapsuleArgs, ReserveRunArgs, SelectCatArgs, SetAdmissionArgs, SubmitIntentsArgs,
+    RequestCapsuleArgs, ReserveRunArgs, RunIdentityArgs, SelectCatArgs, SetAdmissionArgs,
+    SubmitIntentsArgs,
 };
 pub use instructions::*;
 use oracle::InspectedOracle;
@@ -83,6 +84,21 @@ pub mod purrps_game {
     }
     pub fn reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
         crate::instructions::reserve::handle_reserve_run(ctx, args)
+    }
+
+    pub fn delegate_run(ctx: Context<DelegateRun>, args: RunIdentityArgs) -> Result<()> {
+        crate::instructions::delegation::handle_delegate_run(ctx, args)
+    }
+
+    pub fn expire_delegated_activation(ctx: Context<ExpireDelegatedActivation>) -> Result<()> {
+        crate::instructions::delegation::handle_expire_delegated_activation(ctx)
+    }
+
+    pub fn process_undelegation(
+        ctx: Context<ReturnDelegatedRun>,
+        account_seeds: Vec<Vec<u8>>,
+    ) -> Result<()> {
+        crate::instructions::delegation::handle_process_undelegation(ctx, account_seeds)
     }
 
     pub fn submit_intents(ctx: Context<RunInput>, args: SubmitIntentsArgs) -> Result<()> {

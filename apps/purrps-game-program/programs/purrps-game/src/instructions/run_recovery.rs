@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ephemeral_rollups_sdk::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 
 use super::run_inputs::validate_input_snapshot;
 use crate::{
@@ -19,6 +20,9 @@ pub struct RecoverRunOracle<'info> {
     /// CHECK: Pin address before classifying an oracle failure. A payer cannot substitute a missing feed.
     #[account(address = run.snapshot.oracle.account @ ErrorCode::InvalidOracleData)]
     pub price_update: UncheckedAccount<'info>,
+    /// CHECK: Fixed MagicBlock native account. Base Solana lacks the ER context.
+    #[account(address=MAGIC_CONTEXT_ID,owner=MAGIC_PROGRAM_ID)]
+    pub magic_context: UncheckedAccount<'info>,
 }
 
 pub fn handle_recover_run_oracle(ctx: Context<RecoverRunOracle>) -> Result<()> {
