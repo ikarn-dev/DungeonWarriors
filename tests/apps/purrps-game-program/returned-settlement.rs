@@ -67,7 +67,7 @@ fn leaderboard_key() -> (Pubkey, u8) {
     )
 }
 
-fn settlement(p: &Play, nonce: u64) -> accounts::SettleReturnedRun {
+pub(super) fn settlement(p: &Play, nonce: u64) -> accounts::SettleReturnedRun {
     let owner = p.owner.pubkey();
     accounts::SettleReturnedRun {
         settlement: accounts::AbortUndelegatedReservation {

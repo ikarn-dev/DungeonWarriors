@@ -60,4 +60,10 @@ pub enum ErrorCode {
     DrawExpired,
     #[msg("A paid draw can only be refunded at or after its deadline")]
     DrawNotExpired,
+    #[msg("Run input is invalid, expired, out of sequence, or exceeds the remaining queue")]
+    InvalidRunInput,
+    #[msg("Run control update limit reached for this chain-clock second")]
+    ControlRateExceeded,
+    #[msg("Run world cannot safely advance")]
+    InvalidRunWorld,
 }

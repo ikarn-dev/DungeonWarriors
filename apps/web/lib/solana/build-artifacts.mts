@@ -32,6 +32,10 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "reserve_run",
   "abort_undelegated_reservation",
   "settle_returned_run",
+  "submit_intents",
+  "heartbeat",
+  "revoke_run_input_key",
+  "suspend_or_resume_run",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

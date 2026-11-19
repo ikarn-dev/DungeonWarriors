@@ -10,6 +10,7 @@ pub mod oracle;
 pub mod protocol;
 pub mod publication;
 pub mod rules;
+pub mod run_engine;
 pub mod simulation;
 pub mod state;
 
@@ -20,7 +21,7 @@ use contracts::Market;
 use instruction_args::{
     AmountArgs, ApplyUpgradeArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs,
     FundSponsorshipArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs,
-    RequestCapsuleArgs, ReserveRunArgs, SelectCatArgs, SetAdmissionArgs,
+    RequestCapsuleArgs, ReserveRunArgs, SelectCatArgs, SetAdmissionArgs, SubmitIntentsArgs,
 };
 pub use instructions::*;
 use oracle::InspectedOracle;
@@ -63,6 +64,20 @@ pub mod purrps_game {
     }
     pub fn reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
         crate::instructions::reserve::handle_reserve_run(ctx, args)
+    }
+
+    pub fn submit_intents(ctx: Context<RunInput>, args: SubmitIntentsArgs) -> Result<()> {
+        crate::instructions::run_inputs::handle_submit_intents(ctx, args)
+    }
+    pub fn heartbeat(ctx: Context<RunInput>, intent: protocol::IntentEnvelope) -> Result<()> {
+        crate::instructions::run_inputs::handle_heartbeat(ctx, intent)
+    }
+    pub fn revoke_run_input_key(ctx: Context<RunInput>) -> Result<()> {
+        crate::instructions::run_inputs::handle_revoke_run_input_key(ctx)
+    }
+
+    pub fn suspend_or_resume_run(ctx: Context<RecoverRunOracle>) -> Result<()> {
+        crate::instructions::run_recovery::handle_recover_run_oracle(ctx)
     }
 
     pub fn claim_starter(ctx: Context<ClaimStarter>, args: RequestCapsuleArgs) -> Result<()> {

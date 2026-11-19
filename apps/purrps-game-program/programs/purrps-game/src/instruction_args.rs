@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     catalog::{CatId, Catalog, Rarity},
     contracts::{Market, OracleBinding, VersionBinding},
-    protocol::IntentEnvelope,
+    protocol::{IntentEnvelope, MAX_INTENTS_PER_SUBMISSION},
     rules::GameRules,
     state::{draws::CapsuleKind, economy::SponsorPurpose},
 };
@@ -74,8 +74,20 @@ pub struct RunIdentityArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
 pub struct SubmitIntentsArgs {
-    // Handler validates 1..=MAX_INTENTS_PER_SUBMISSION before any queue mutation.
+    #[borsh(deserialize_with = "read_intent_submission")]
     pub intents: Vec<IntentEnvelope>,
+}
+
+fn read_intent_submission<R: std::io::Read>(
+    reader: &mut R,
+) -> std::io::Result<Vec<IntentEnvelope>> {
+    let count = u32::deserialize_reader(reader)? as usize;
+    if !(1..=MAX_INTENTS_PER_SUBMISSION).contains(&count) {
+        return Err(std::io::ErrorKind::InvalidData.into());
+    }
+    (0..count)
+        .map(|_| IntentEnvelope::deserialize_reader(reader))
+        .collect()
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]

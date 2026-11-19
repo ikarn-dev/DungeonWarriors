@@ -197,6 +197,14 @@ fn pickups(
 
 // Terrain is swept X then Y; supported feet follow continuous ramp surfaces.
 // Bounded copies make failures atomic for both the program core and predictor.
+pub(crate) fn command_terminal(action: &PlayerIntent, qualified: u64) -> Option<TerminalReason> {
+    match action {
+        PlayerIntent::CashOut if qualified > 0 => Some(TerminalReason::CashOut),
+        PlayerIntent::Surrender => Some(TerminalReason::Surrender),
+        _ => None,
+    }
+}
+
 pub fn step(
     frame: &SimulationFrame,
     entities: &[WorldEntity],
@@ -226,14 +234,7 @@ pub fn step(
         .checked_add(1)
         .ok_or(SimulationError::NumericOverflow)?;
     for action in actions {
-        let reason = match action {
-            PlayerIntent::CashOut if frame.qualified_checkpoints > 0 => {
-                Some(TerminalReason::CashOut)
-            }
-            PlayerIntent::Surrender => Some(TerminalReason::Surrender),
-            _ => None,
-        };
-        if let Some(reason) = reason {
+        if let Some(reason) = command_terminal(action, frame.qualified_checkpoints) {
             terminate(&mut result.frame, reason);
             return Ok(result);
         }

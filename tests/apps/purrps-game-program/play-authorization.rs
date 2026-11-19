@@ -23,6 +23,8 @@ mod play;
 mod recovery;
 #[path = "returned-settlement.rs"]
 mod returned_settlement;
+#[path = "run-lifecycle.rs"]
+mod run_lifecycle;
 #[path = "run-oracle.rs"]
 mod run_oracle;
 #[path = "support/game-setup.rs"]

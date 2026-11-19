@@ -959,6 +959,48 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "heartbeat";
+      discriminator: [202, 104, 56, 6, 240, 170, 63, 134];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+      ];
+      args: [
+        {
+          name: "intent";
+          type: {
+            defined: {
+              name: "intentEnvelope";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "increment";
       discriminator: [11, 18, 104, 9, 104, 174, 59, 33];
       accounts: [
@@ -1904,6 +1946,39 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "revokeRunInputKey";
+      discriminator: [10, 249, 190, 190, 246, 228, 48, 105];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+      ];
+      args: [];
+    },
+    {
       name: "revokeSession";
       discriminator: [86, 92, 198, 120, 144, 2, 7, 194];
       accounts: [
@@ -2177,6 +2252,80 @@ export type PurrpsGame = {
         {
           name: "systemProgram";
           address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [];
+    },
+    {
+      name: "submitIntents";
+      discriminator: [86, 196, 23, 28, 86, 219, 110, 80];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "submitIntentsArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "suspendOrResumeRun";
+      discriminator: [89, 140, 157, 59, 139, 142, 140, 136];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "priceUpdate";
         },
       ];
       args: [];
@@ -2527,6 +2676,21 @@ export type PurrpsGame = {
       code: 6028;
       name: "drawNotExpired";
       msg: "A paid draw can only be refunded at or after its deadline";
+    },
+    {
+      code: 6029;
+      name: "invalidRunInput";
+      msg: "Run input is invalid, expired, out of sequence, or exceeds the remaining queue";
+    },
+    {
+      code: 6030;
+      name: "controlRateExceeded";
+      msg: "Run control update limit reached for this chain-clock second";
+    },
+    {
+      code: 6031;
+      name: "invalidRunWorld";
+      msg: "Run world cannot safely advance";
     },
   ];
   types: [
@@ -5418,6 +5582,24 @@ export type PurrpsGame = {
       };
     },
     {
+      name: "submitIntentsArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "intents";
+            type: {
+              vec: {
+                defined: {
+                  name: "intentEnvelope";
+                };
+              };
+            };
+          },
+        ];
+      };
+    },
+    {
       name: "suspension";
       type: {
         kind: "struct";
@@ -6501,6 +6683,48 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "heartbeat",
+      discriminator: [202, 104, 56, 6, 240, 170, 63, 134],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+      ],
+      args: [
+        {
+          name: "intent",
+          type: {
+            defined: {
+              name: "IntentEnvelope",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "increment",
       discriminator: [11, 18, 104, 9, 104, 174, 59, 33],
       accounts: [
@@ -7405,6 +7629,39 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "revoke_run_input_key",
+      discriminator: [10, 249, 190, 190, 246, 228, 48, 105],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+      ],
+      args: [],
+    },
+    {
       name: "revoke_session",
       discriminator: [86, 92, 198, 120, 144, 2, 7, 194],
       accounts: [
@@ -7678,6 +7935,80 @@ export const PURRPS_GAME_IDL = {
         {
           name: "system_program",
           address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [],
+    },
+    {
+      name: "submit_intents",
+      discriminator: [86, 196, 23, 28, 86, 219, 110, 80],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "SubmitIntentsArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "suspend_or_resume_run",
+      discriminator: [89, 140, 157, 59, 139, 142, 140, 136],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "price_update",
         },
       ],
       args: [],
@@ -10772,6 +11103,24 @@ export const PURRPS_GAME_IDL = {
       },
     },
     {
+      name: "SubmitIntentsArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "intents",
+            type: {
+              vec: {
+                defined: {
+                  name: "IntentEnvelope",
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
       name: "Suspension",
       type: {
         kind: "struct",
@@ -11052,6 +11401,21 @@ export const PURRPS_GAME_IDL = {
       code: 6028,
       name: "DrawNotExpired",
       msg: "A paid draw can only be refunded at or after its deadline",
+    },
+    {
+      code: 6029,
+      name: "InvalidRunInput",
+      msg: "Run input is invalid, expired, out of sequence, or exceeds the remaining queue",
+    },
+    {
+      code: 6030,
+      name: "ControlRateExceeded",
+      msg: "Run control update limit reached for this chain-clock second",
+    },
+    {
+      code: 6031,
+      name: "InvalidRunWorld",
+      msg: "Run world cannot safely advance",
     },
   ],
   constants: [
