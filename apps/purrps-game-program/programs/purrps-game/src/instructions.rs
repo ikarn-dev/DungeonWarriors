@@ -1,4 +1,5 @@
 pub mod abort_reservation;
+pub mod capsules;
 pub mod create_player;
 pub mod credit;
 pub mod house;
@@ -12,8 +13,10 @@ pub mod reserve;
 pub mod session;
 pub mod sponsorship;
 pub mod starter;
+pub mod upgrade;
 
 pub use abort_reservation::*;
+pub use capsules::*;
 pub use create_player::*;
 pub use credit::*;
 pub use house::*;
@@ -27,3 +30,4 @@ pub use reserve::*;
 pub use session::*;
 pub use sponsorship::*;
 pub use starter::*;
+pub use upgrade::*;

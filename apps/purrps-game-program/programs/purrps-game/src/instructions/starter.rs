@@ -210,19 +210,16 @@ pub struct SetAdmission<'info> {
     pub admin: Signer<'info>,
 }
 pub fn handle_set_admission(ctx: Context<SetAdmission>, args: SetAdmissionArgs) -> Result<()> {
-    // Paid draws and ER execution do not exist yet; publishing cannot admit them.
-    require!(
-        !args.purchases && !args.reservations,
-        ErrorCode::AdmissionClosed
-    );
-    if args.starter {
+    // Run admission remains closed until delegation and settlement exist.
+    require!(!args.reservations, ErrorCode::AdmissionClosed);
+    if args.starter || args.purchases {
         require!(
             ctx.accounts.config.catalog.is_some() && ctx.accounts.config.rules.is_some(),
             ErrorCode::InvalidConfiguration
         );
     }
     ctx.accounts.config.allow_starter = args.starter;
-    ctx.accounts.config.allow_purchases = false;
+    ctx.accounts.config.allow_purchases = args.purchases;
     ctx.accounts.config.allow_reservations = false;
     Ok(())
 }

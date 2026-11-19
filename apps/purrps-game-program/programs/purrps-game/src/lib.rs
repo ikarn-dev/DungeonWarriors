@@ -18,9 +18,9 @@ use anchor_lang::prelude::*;
 pub use constants::*;
 use contracts::Market;
 use instruction_args::{
-    AmountArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs, FundSponsorshipArgs,
-    InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs, RequestCapsuleArgs, ReserveRunArgs,
-    SelectCatArgs, SetAdmissionArgs,
+    AmountArgs, ApplyUpgradeArgs, AuthorizeSessionArgs, ConfigureSponsorshipArgs,
+    FundSponsorshipArgs, InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs,
+    RequestCapsuleArgs, ReserveRunArgs, SelectCatArgs, SetAdmissionArgs,
 };
 pub use instructions::*;
 use oracle::InspectedOracle;
@@ -73,6 +73,23 @@ pub mod purrps_game {
     }
     pub fn select_cat(ctx: Context<SelectCat>, args: SelectCatArgs) -> Result<()> {
         crate::instructions::starter::handle_select_cat(ctx, args)
+    }
+
+    pub fn purchase_capsule(ctx: Context<PurchaseCapsule>, args: RequestCapsuleArgs) -> Result<()> {
+        crate::instructions::capsules::handle_purchase_capsule(ctx, args)
+    }
+    pub fn fulfill_capsule(
+        ctx: Context<FulfillCapsule>,
+        randomness: [u8; 32],
+        seed: [u8; 32],
+    ) -> Result<()> {
+        crate::instructions::capsules::handle_fulfill_capsule(ctx, randomness, seed)
+    }
+    pub fn refund_capsule(ctx: Context<ResolveCapsule>) -> Result<()> {
+        crate::instructions::capsules::handle_refund_capsule(ctx)
+    }
+    pub fn apply_upgrade(ctx: Context<ApplyUpgrade>, args: ApplyUpgradeArgs) -> Result<()> {
+        crate::instructions::upgrade::handle_apply_upgrade(ctx, args)
     }
     pub fn set_admission(ctx: Context<SetAdmission>, args: SetAdmissionArgs) -> Result<()> {
         crate::instructions::starter::handle_set_admission(ctx, args)

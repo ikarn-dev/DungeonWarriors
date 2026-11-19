@@ -56,4 +56,8 @@ pub enum ErrorCode {
     InvalidSponsorBudget,
     #[msg("Only expired, unplayed reservations that were never delegated can be refunded here")]
     ReservationNotRefundable,
+    #[msg("The paid draw's fulfillment deadline has passed")]
+    DrawExpired,
+    #[msg("A paid draw can only be refunded at or after its deadline")]
+    DrawNotExpired,
 }

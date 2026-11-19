@@ -130,6 +130,58 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "applyUpgrade";
+      discriminator: [144, 186, 27, 211, 104, 117, 35, 249];
+      accounts: [
+        {
+          name: "owner";
+          signer: true;
+          relations: ["collection"];
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "arg";
+                path: "args.expectedDefiningCatalogVersion";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "applyUpgradeArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "authorizeSession";
       discriminator: [187, 218, 251, 161, 99, 40, 34, 34];
       accounts: [
@@ -536,6 +588,138 @@ export type PurrpsGame = {
             defined: {
               name: "amountArgs";
             };
+          };
+        },
+      ];
+    },
+    {
+      name: "fulfillCapsule";
+      discriminator: [51, 174, 97, 77, 59, 31, 36, 76];
+      accounts: [
+        {
+          name: "vrfProgramIdentity";
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ];
+          signer: true;
+        },
+        {
+          name: "payment";
+          accounts: [
+            {
+              name: "config";
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+                  },
+                ];
+              };
+              relations: ["house"];
+            },
+            {
+              name: "draw";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [100, 114, 97, 119];
+                  },
+                  {
+                    kind: "account";
+                    path: "draw.owner";
+                    account: "capsuleDraw";
+                  },
+                  {
+                    kind: "account";
+                    path: "draw.nonce";
+                    account: "capsuleDraw";
+                  },
+                ];
+              };
+            },
+            {
+              name: "collection";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+                  },
+                  {
+                    kind: "account";
+                    path: "draw.owner";
+                    account: "capsuleDraw";
+                  },
+                ];
+              };
+            },
+            {
+              name: "player";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [112, 108, 97, 121, 101, 114];
+                  },
+                  {
+                    kind: "account";
+                    path: "draw.owner";
+                    account: "capsuleDraw";
+                  },
+                ];
+              };
+            },
+            {
+              name: "house";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [104, 111, 117, 115, 101];
+                  },
+                ];
+              };
+            },
+            {
+              name: "vault";
+            },
+          ];
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "payment.draw.catalog.version";
+                account: "resolveCapsule";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "randomness";
+          type: {
+            array: ["u8", 32];
+          };
+        },
+        {
+          name: "seed";
+          type: {
+            array: ["u8", 32];
           };
         },
       ];
@@ -1192,6 +1376,239 @@ export type PurrpsGame = {
           };
         },
       ];
+    },
+    {
+      name: "purchaseCapsule";
+      discriminator: [146, 71, 96, 94, 105, 172, 157, 31];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house"];
+        },
+        {
+          name: "owner";
+          writable: true;
+          signer: true;
+          relations: ["player", "collection"];
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "arg";
+                path: "args.expectedCatalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+        {
+          name: "draw";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [100, 114, 97, 119];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+              {
+                kind: "arg";
+                path: "args.expectedDrawNonce";
+              },
+            ];
+          };
+        },
+        {
+          name: "oracleQueue";
+          writable: true;
+        },
+        {
+          name: "programIdentity";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [105, 100, 101, 110, 116, 105, 116, 121];
+              },
+            ];
+          };
+        },
+        {
+          name: "vrfProgram";
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz";
+        },
+        {
+          name: "slotHashes";
+          address: "SysvarS1otHashes111111111111111111111111111";
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "requestCapsuleArgs";
+            };
+          };
+        },
+      ];
+    },
+    {
+      name: "refundCapsule";
+      discriminator: [17, 72, 179, 34, 38, 133, 69, 107];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house"];
+        },
+        {
+          name: "draw";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [100, 114, 97, 119];
+              },
+              {
+                kind: "account";
+                path: "draw.owner";
+                account: "capsuleDraw";
+              },
+              {
+                kind: "account";
+                path: "draw.nonce";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "draw.owner";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "draw.owner";
+                account: "capsuleDraw";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+      ];
+      args: [];
     },
     {
       name: "reserveRun";
@@ -1929,6 +2346,16 @@ export type PurrpsGame = {
       name: "reservationNotRefundable";
       msg: "Only expired, unplayed reservations that were never delegated can be refunded here";
     },
+    {
+      code: 6027;
+      name: "drawExpired";
+      msg: "The paid draw's fulfillment deadline has passed";
+    },
+    {
+      code: 6028;
+      name: "drawNotExpired";
+      msg: "A paid draw can only be refunded at or after its deadline";
+    },
   ];
   types: [
     {
@@ -1963,6 +2390,42 @@ export type PurrpsGame = {
           {
             name: "amountBaseUnits";
             type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "applyUpgradeArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "expectedInventoryVersion";
+            type: "u64";
+          },
+          {
+            name: "expectedDefiningCatalogVersion";
+            type: "u32";
+          },
+          {
+            name: "expectedCatLevel";
+            type: "u8";
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catId";
+              };
+            };
+          },
+          {
+            name: "grade";
+            type: {
+              defined: {
+                name: "rarity";
+              };
+            };
           },
         ];
       };
@@ -4994,6 +5457,58 @@ export const PURRPS_GAME_IDL = {
       args: [],
     },
     {
+      name: "apply_upgrade",
+      discriminator: [144, 186, 27, 211, 104, 117, 35, 249],
+      accounts: [
+        {
+          name: "owner",
+          signer: true,
+          relations: ["collection"],
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "arg",
+                path: "args.expected_defining_catalog_version",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "ApplyUpgradeArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "authorize_session",
       discriminator: [187, 218, 251, 161, 99, 40, 34, 34],
       accounts: [
@@ -5388,6 +5903,138 @@ export const PURRPS_GAME_IDL = {
             defined: {
               name: "AmountArgs",
             },
+          },
+        },
+      ],
+    },
+    {
+      name: "fulfill_capsule",
+      discriminator: [51, 174, 97, 77, 59, 31, 36, 76],
+      accounts: [
+        {
+          name: "vrf_program_identity",
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ],
+          signer: true,
+        },
+        {
+          name: "payment",
+          accounts: [
+            {
+              name: "config",
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+                  },
+                ],
+              },
+              relations: ["house"],
+            },
+            {
+              name: "draw",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [100, 114, 97, 119],
+                  },
+                  {
+                    kind: "account",
+                    path: "draw.owner",
+                    account: "CapsuleDraw",
+                  },
+                  {
+                    kind: "account",
+                    path: "draw.nonce",
+                    account: "CapsuleDraw",
+                  },
+                ],
+              },
+            },
+            {
+              name: "collection",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+                  },
+                  {
+                    kind: "account",
+                    path: "draw.owner",
+                    account: "CapsuleDraw",
+                  },
+                ],
+              },
+            },
+            {
+              name: "player",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [112, 108, 97, 121, 101, 114],
+                  },
+                  {
+                    kind: "account",
+                    path: "draw.owner",
+                    account: "CapsuleDraw",
+                  },
+                ],
+              },
+            },
+            {
+              name: "house",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [104, 111, 117, 115, 101],
+                  },
+                ],
+              },
+            },
+            {
+              name: "vault",
+            },
+          ],
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "payment.draw.catalog.version",
+                account: "ResolveCapsule",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "randomness",
+          type: {
+            array: ["u8", 32],
+          },
+        },
+        {
+          name: "seed",
+          type: {
+            array: ["u8", 32],
           },
         },
       ],
@@ -6003,6 +6650,239 @@ export const PURRPS_GAME_IDL = {
           },
         },
       ],
+    },
+    {
+      name: "purchase_capsule",
+      discriminator: [146, 71, 96, 94, 105, 172, 157, 31],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house"],
+        },
+        {
+          name: "owner",
+          writable: true,
+          signer: true,
+          relations: ["player", "collection"],
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "arg",
+                path: "args.expected_catalog_version",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+        {
+          name: "draw",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [100, 114, 97, 119],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+              {
+                kind: "arg",
+                path: "args.expected_draw_nonce",
+              },
+            ],
+          },
+        },
+        {
+          name: "oracle_queue",
+          writable: true,
+        },
+        {
+          name: "program_identity",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [105, 100, 101, 110, 116, 105, 116, 121],
+              },
+            ],
+          },
+        },
+        {
+          name: "vrf_program",
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz",
+        },
+        {
+          name: "slot_hashes",
+          address: "SysvarS1otHashes111111111111111111111111111",
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "RequestCapsuleArgs",
+            },
+          },
+        },
+      ],
+    },
+    {
+      name: "refund_capsule",
+      discriminator: [17, 72, 179, 34, 38, 133, 69, 107],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house"],
+        },
+        {
+          name: "draw",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [100, 114, 97, 119],
+              },
+              {
+                kind: "account",
+                path: "draw.owner",
+                account: "CapsuleDraw",
+              },
+              {
+                kind: "account",
+                path: "draw.nonce",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "draw.owner",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "draw.owner",
+                account: "CapsuleDraw",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+      ],
+      args: [],
     },
     {
       name: "reserve_run",
@@ -6625,6 +7505,42 @@ export const PURRPS_GAME_IDL = {
           {
             name: "amount_base_units",
             type: "u64",
+          },
+        ],
+      },
+    },
+    {
+      name: "ApplyUpgradeArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "expected_inventory_version",
+            type: "u64",
+          },
+          {
+            name: "expected_defining_catalog_version",
+            type: "u32",
+          },
+          {
+            name: "expected_cat_level",
+            type: "u8",
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatId",
+              },
+            },
+          },
+          {
+            name: "grade",
+            type: {
+              defined: {
+                name: "Rarity",
+              },
+            },
           },
         ],
       },
@@ -9648,6 +10564,16 @@ export const PURRPS_GAME_IDL = {
       code: 6026,
       name: "ReservationNotRefundable",
       msg: "Only expired, unplayed reservations that were never delegated can be refunded here",
+    },
+    {
+      code: 6027,
+      name: "DrawExpired",
+      msg: "The paid draw's fulfillment deadline has passed",
+    },
+    {
+      code: 6028,
+      name: "DrawNotExpired",
+      msg: "A paid draw can only be refunded at or after its deadline",
     },
   ],
   constants: [

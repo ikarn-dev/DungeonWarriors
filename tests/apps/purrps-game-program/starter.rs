@@ -269,32 +269,37 @@ fn queue_cpi_failure_rolls_back_claim_nonce_lock_and_draw_creation() {
     assert!(c.pending_draw.is_none());
 }
 #[test]
-fn admission_cannot_enable_unbuilt_purchases_or_er_execution() {
+fn purchase_admission_requires_publication_and_run_admission_stays_closed() {
     let (mut h, _, _, _, _, _) = fixture();
     let a = setup::admin(&h);
-    for args in [
-        SetAdmissionArgs {
-            starter: false,
-            purchases: true,
-            reservations: false,
-        },
-        SetAdmissionArgs {
-            starter: false,
-            purchases: false,
-            reservations: true,
-        },
-    ] {
-        let ix = Instruction::new_with_bytes(
+    let admission = |config, purchases, reservations| {
+        Instruction::new_with_bytes(
             purrps_game::ID,
-            &purrps_game::instruction::SetAdmission { args }.data(),
+            &purrps_game::instruction::SetAdmission {
+                args: SetAdmissionArgs {
+                    starter: false,
+                    purchases,
+                    reservations,
+                },
+            }
+            .data(),
             purrps_game::accounts::SetAdmission {
-                config: h.config,
+                config,
                 admin: a.pubkey(),
             }
             .to_account_metas(None),
-        );
-        assert!(h.send(ix, &a).is_err());
-    }
+        )
+    };
+    let config = h.config;
+    let mut cfg: GameConfig = h.read(config);
+    let catalog = cfg.catalog.take();
+    setup::put(&mut h, config, &cfg);
+    assert!(h.send(admission(config, true, false), &a).is_err());
+    cfg.catalog = catalog;
+    setup::put(&mut h, config, &cfg);
+    h.send(admission(config, true, false), &a).unwrap();
+    assert!(h.read::<GameConfig>(config).allow_purchases);
+    assert!(h.send(admission(config, false, true), &a).is_err());
 }
 
 #[test]
