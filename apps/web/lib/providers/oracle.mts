@@ -83,6 +83,7 @@ export function validateOracleQuote(
     policy.maxExponent > 18 ||
     policy.minExponent > policy.maxExponent ||
     quote.price <= 0n ||
+    quote.confidence * 10_000n > quote.price * 200n ||
     quote.postedSlot === 0n ||
     quote.postedSlot > policy.currentSlot ||
     quote.publishedAtSeconds < 0n ||

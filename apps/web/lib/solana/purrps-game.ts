@@ -1270,6 +1270,47 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "inspectRunOracle";
+      discriminator: [246, 71, 184, 157, 131, 62, 204, 132];
+      accounts: [
+        {
+          name: "state";
+          accounts: [
+            {
+              name: "run";
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 103, 97, 109, 101];
+                  },
+                  {
+                    kind: "account";
+                    path: "run.snapshot.owner";
+                    account: "runGameState";
+                  },
+                  {
+                    kind: "account";
+                    path: "run.snapshot.nonce";
+                    account: "runGameState";
+                  },
+                ];
+              };
+            },
+          ];
+        },
+        {
+          name: "priceUpdate";
+        },
+      ];
+      args: [];
+      returns: {
+        defined: {
+          name: "oracleObservation";
+        };
+      };
+    },
+    {
       name: "publishCatalog";
       discriminator: [66, 196, 22, 78, 35, 243, 245, 190];
       accounts: [
@@ -6740,6 +6781,47 @@ export const PURRPS_GAME_IDL = {
         },
       ],
       args: [],
+    },
+    {
+      name: "inspect_run_oracle",
+      discriminator: [246, 71, 184, 157, 131, 62, 204, 132],
+      accounts: [
+        {
+          name: "state",
+          accounts: [
+            {
+              name: "run",
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 103, 97, 109, 101],
+                  },
+                  {
+                    kind: "account",
+                    path: "run.snapshot.owner",
+                    account: "RunGameState",
+                  },
+                  {
+                    kind: "account",
+                    path: "run.snapshot.nonce",
+                    account: "RunGameState",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          name: "price_update",
+        },
+      ],
+      args: [],
+      returns: {
+        defined: {
+          name: "OracleObservation",
+        },
+      },
     },
     {
       name: "publish_catalog",

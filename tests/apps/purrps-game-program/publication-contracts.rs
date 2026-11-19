@@ -133,6 +133,12 @@ fn oracle_reads_validate_identity_full_precision_padding_and_chain_clock() {
     assert_eq!(result.quote.price, 9_007_199_254_740_993);
     assert_eq!(result.quote.exponent, -8);
     assert_eq!(result.quote.ema_price, 9_007_199_254_740_999);
+    let confidence_cap = result.quote.price as u64 / 50;
+    let mut uncertain = bytes.clone();
+    uncertain[81..89].copy_from_slice(&confidence_cap.to_le_bytes());
+    assert!(inspect(&uncertain, 1_700_000_002).is_ok());
+    uncertain[81..89].copy_from_slice(&(confidence_cap + 1).to_le_bytes());
+    assert!(inspect(&uncertain, 1_700_000_002).is_err());
     assert!(inspect(&bytes, 1_700_000_003).is_err());
     assert!(inspect(&bytes, 1_699_999_999).is_err());
     assert!(inspect_account(

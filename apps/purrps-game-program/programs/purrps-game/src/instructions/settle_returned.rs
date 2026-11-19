@@ -102,14 +102,7 @@ fn validate_terminal(run: &RunGameState, terminal: &RunTerminal) -> Result<Escro
         );
     } else {
         let start = run.start_observation.ok_or(ErrorCode::InvalidRun)?;
-        let count = usize::from(run.observation_count);
-        let head = usize::from(run.observation_head);
-        let capacity = run.observations.len();
-        require!(
-            count > 0 && count <= capacity && head < capacity,
-            ErrorCode::InvalidRun
-        );
-        let last = run.observations[(head + count - 1) % capacity];
+        let last = run.latest_observation()?.ok_or(ErrorCode::InvalidRun)?;
         require!(
             terminal.final_observation == Some(last)
                 && last.sequence >= start.sequence

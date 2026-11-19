@@ -15,6 +15,7 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "deposit",
   "withdraw",
   "inspect_run",
+  "inspect_run_oracle",
   "inspect_run_escrow",
   "claim_starter",
   "fulfill_starter",

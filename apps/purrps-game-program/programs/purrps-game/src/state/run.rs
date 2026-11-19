@@ -202,6 +202,17 @@ pub struct RunGameState {
 }
 
 impl RunGameState {
+    pub fn latest_observation(&self) -> Result<Option<OracleObservation>> {
+        let head = usize::from(self.observation_head);
+        let count = usize::from(self.observation_count);
+        let capacity = self.observations.len();
+        require!(
+            head < capacity && count <= capacity,
+            crate::error::ErrorCode::InvalidRun
+        );
+        Ok((count > 0).then(|| self.observations[(head + count - 1) % capacity]))
+    }
+
     // READY has no earned progress or generated world; activation supplies a validated observation.
     pub fn ready(bump: u8, escrow: Pubkey, snapshot: RunSnapshot, snapshot_hash: [u8; 32]) -> Self {
         let physics = snapshot.rules.physics;

@@ -5,6 +5,7 @@ use crate::{
     contracts::{Market, OracleBinding},
     error::ErrorCode,
     publication::validate_oracle_binding,
+    state::run::OracleObservation,
 };
 
 const DISCRIMINATOR: [u8; 8] = [234, 161, 14, 36, 172, 239, 15, 232];
@@ -29,6 +30,41 @@ pub struct InspectedOracle {
     pub market: Market,
     pub quote: HostedOracleQuote,
     pub content_hash: [u8; 32],
+}
+
+impl InspectedOracle {
+    pub fn next_observation(
+        &self,
+        previous: Option<OracleObservation>,
+    ) -> Result<OracleObservation> {
+        let quote = self.quote;
+        let sequence = if let Some(last) = previous {
+            if self.content_hash == last.content_hash {
+                return Ok(last);
+            }
+            require!(
+                quote.exponent == last.exponent
+                    && quote.posted_slot >= last.posted_slot
+                    && quote.published_at_seconds >= last.published_at_seconds
+                    && (quote.posted_slot != last.posted_slot
+                        || quote.published_at_seconds != last.published_at_seconds),
+                ErrorCode::InvalidOracleData
+            );
+            last.sequence
+                .checked_add(1)
+                .ok_or(ErrorCode::ArithmeticOverflow)?
+        } else {
+            1
+        };
+        Ok(OracleObservation {
+            sequence,
+            price: quote.price,
+            exponent: quote.exponent,
+            published_at_seconds: quote.published_at_seconds,
+            posted_slot: quote.posted_slot,
+            content_hash: self.content_hash,
+        })
+    }
 }
 
 pub fn decode_quote(data: &[u8]) -> Result<HostedOracleQuote> {
@@ -57,6 +93,7 @@ pub fn validate_quote(
     require!(
         quote.verification_level == 1
             && quote.price > 0
+            && u128::from(quote.confidence) * 10_000 <= (quote.price as u128) * 200
             && quote.posted_slot > 0
             && quote.posted_slot <= current_slot
             && quote.published_at_seconds >= 0
