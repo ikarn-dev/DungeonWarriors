@@ -320,7 +320,8 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
         ? rent.reduce((total, n) => total + BigInt(n), 0n)
         : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS - 100000n) +
       BigInt(fee.value);
-    if (BigInt(Math.max(0, balance - after)) + BigInt(fee.value) > cost)
+    // The simulated payer balance already reflects the network fee.
+    if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     if (
       cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS ||

@@ -1,5 +1,6 @@
 import { BN, type IdlInstructionAccountItem } from "@anchor-lang/core";
 import {
+  Keypair,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -9,6 +10,17 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { config, wallet } from "./fixtures";
 
+const sponsorTest = vi.hoisted(() => ({
+  connection: vi.fn(),
+  sponsor: vi.fn(),
+  admit: vi.fn(),
+}));
+vi.mock("../../../../../apps/web/lib/server/chain", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../../../apps/web/lib/server/chain")
+  >()),
+  connection: sponsorTest.connection,
+}));
 vi.mock("server-only", () => ({}));
 vi.mock(
   "../../../../../apps/web/lib/server/runtime",
@@ -16,16 +28,22 @@ vi.mock(
     ...(await importOriginal<
       typeof import("../../../../../apps/web/lib/server/runtime")
     >()),
-    runtime: () => ({ config }),
-    sponsorshipConfig: () => config,
+    runtime: () => ({
+      config,
+      prefix: "test",
+      redis: { eval: sponsorTest.admit },
+    }),
+    sponsorshipConfig: () => sponsorTest.sponsor() ?? config,
   }),
 );
 
 import { coder, idl } from "../../../../../apps/web/lib/server/chain";
 import {
   instructionFor,
+  submit,
   validateTransaction,
 } from "../../../../../apps/web/lib/server/transactions";
+import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
 
 function scalarTransaction(
   instruction: "reserveRun" | "revokeSession",
@@ -110,6 +128,76 @@ function transaction(
   };
 }
 describe("complete transaction validation", () => {
+  it("charges simulated rent and network fee once and rejects an actual overage before co-signing", async () => {
+    const owner = wallet();
+    const sponsor = Keypair.generate();
+    const loader = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
+    const programData = Buffer.alloc(45);
+    programData.writeUInt32LE(3);
+    programData[12] = 1;
+    wallet().publicKey.toBuffer().copy(programData, 13);
+    const balance = 1_100_000_000;
+    const fee = 10_000;
+    const playerRent = 2_000_000;
+    const collectionRent = 1_307_080;
+    const cost = fee + playerRent + collectionRent;
+    const submitRaw = vi.fn(async (_bytes: Uint8Array) => "sent");
+    const simulation = vi.fn();
+    simulation.mockResolvedValue({
+      value: { err: null, accounts: [{ lamports: balance - cost }] },
+    });
+    sponsorTest.connection.mockReturnValue({
+      getGenesisHash: async () => DEVNET.genesisHash,
+      getFeeForMessage: async () => ({ value: fee }),
+      getAccountInfo: async () => ({ owner: loader, data: programData }),
+      getBalance: async () => balance,
+      simulateTransaction: simulation,
+      getMinimumBalanceForRentExemption: async (size: number) =>
+        size === coder.accounts.size("playerAccount")
+          ? playerRent
+          : collectionRent,
+      sendRawTransaction: submitRaw,
+    });
+    sponsorTest.sponsor.mockReturnValue({
+      ...config,
+      SPONSOR_PUBLIC_KEY: sponsor.publicKey.toBase58(),
+    });
+    sponsorTest.admit.mockResolvedValue(1);
+    vi.stubEnv(
+      "SPONSOR_SECRET_KEY",
+      Buffer.from(sponsor.secretKey).toString("base64"),
+    );
+    vi.stubEnv("SPONSOR_HOURLY_BUDGET_LAMPORTS", "1000000000");
+    try {
+      const t = transaction(owner, true);
+      await expect(
+        submit(owner.address, t.intent, t.encoded()),
+      ).resolves.toMatchObject({
+        status: "requested",
+        unknownResponse: false,
+      });
+      expect(sponsorTest.admit).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        [config.SPONSOR_MAX_ATTEMPTS, String(cost), "1000000000"],
+      );
+      expect(submitRaw).toHaveBeenCalledTimes(1);
+      simulation.mockResolvedValue({
+        value: { err: null, accounts: [{ lamports: balance - cost - 1 }] },
+      });
+      await expect(
+        submit(owner.address, t.intent, t.encoded()),
+      ).rejects.toThrow("SPONSOR_BUDGET_UNAVAILABLE");
+      expect(sponsorTest.admit).toHaveBeenCalledTimes(1);
+      expect(submitRaw).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+      sponsorTest.connection.mockReset();
+      sponsorTest.sponsor.mockReset();
+      sponsorTest.admit.mockReset();
+    }
+  });
+
   it("accepts a play-key reservation only for its authenticated owner and keeps owner-only payer scope", () => {
     const owner = wallet();
     const play = wallet();
