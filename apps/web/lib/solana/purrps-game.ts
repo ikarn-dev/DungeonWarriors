@@ -2325,6 +2325,262 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "reserveQuotedRun";
+      discriminator: [166, 229, 169, 67, 125, 125, 53, 15];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house", "policy"];
+        },
+        {
+          name: "allocation";
+          accounts: [
+            {
+              name: "owner";
+            },
+            {
+              name: "payer";
+              writable: true;
+              signer: true;
+            },
+            {
+              name: "escrow";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119];
+                  },
+                  {
+                    kind: "account";
+                    path: "owner";
+                  },
+                  {
+                    kind: "arg";
+                    path: "args.expectedRunNonce";
+                  },
+                ];
+              };
+            },
+            {
+              name: "run";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [114, 117, 110, 45, 103, 97, 109, 101];
+                  },
+                  {
+                    kind: "account";
+                    path: "owner";
+                  },
+                  {
+                    kind: "arg";
+                    path: "args.expectedRunNonce";
+                  },
+                ];
+              };
+            },
+            {
+              name: "systemProgram";
+              address: "11111111111111111111111111111111";
+            },
+          ];
+        },
+        {
+          name: "authority";
+          signer: true;
+        },
+        {
+          name: "authorization";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 101, 115, 115, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+              {
+                kind: "account";
+                path: "authorization.nonce";
+                account: "sessionAuthorization";
+              },
+            ];
+          };
+        },
+        {
+          name: "sessionToken";
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "allocation.owner";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+        {
+          name: "rules";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 108, 101, 115];
+              },
+              {
+                kind: "account";
+                path: "rules.binding.version";
+                account: "gameRulesVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "catalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "catalog.binding.version";
+                account: "catalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "definingCatalog";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 97, 116, 97, 108, 111, 103];
+              },
+              {
+                kind: "account";
+                path: "definingCatalog.binding.version";
+                account: "catalogVersion";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+        {
+          name: "policy";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  115,
+                  112,
+                  111,
+                  110,
+                  115,
+                  111,
+                  114,
+                  45,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "budget";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [115, 112, 111, 110, 115, 111, 114];
+              },
+              {
+                kind: "account";
+                path: "allocation.run";
+                account: "reservationAllocation";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "reserveRunArgs";
+            };
+          };
+        },
+        {
+          name: "maxGross";
+          type: "u64";
+        },
+      ];
+    },
+    {
       name: "reserveRun";
       discriminator: [160, 174, 11, 70, 247, 0, 45, 153];
       accounts: [
@@ -3497,6 +3753,11 @@ export type PurrpsGame = {
       code: 6033;
       name: "invalidCrank";
       msg: "Only the registered Hydra trigger may advance this run";
+    },
+    {
+      code: 6034;
+      name: "unsettledRun";
+      msg: "Finish the existing run before reserving another";
     },
   ];
   types: [
@@ -8850,6 +9111,250 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "reserve_quoted_run",
+      discriminator: [166, 229, 169, 67, 125, 125, 53, 15],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house", "policy"],
+        },
+        {
+          name: "allocation",
+          accounts: [
+            {
+              name: "owner",
+            },
+            {
+              name: "payer",
+              writable: true,
+              signer: true,
+            },
+            {
+              name: "escrow",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 101, 115, 99, 114, 111, 119],
+                  },
+                  {
+                    kind: "account",
+                    path: "owner",
+                  },
+                  {
+                    kind: "arg",
+                    path: "args.expected_run_nonce",
+                  },
+                ],
+              },
+            },
+            {
+              name: "run",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [114, 117, 110, 45, 103, 97, 109, 101],
+                  },
+                  {
+                    kind: "account",
+                    path: "owner",
+                  },
+                  {
+                    kind: "arg",
+                    path: "args.expected_run_nonce",
+                  },
+                ],
+              },
+            },
+            {
+              name: "system_program",
+              address: "11111111111111111111111111111111",
+            },
+          ],
+        },
+        {
+          name: "authority",
+          signer: true,
+        },
+        {
+          name: "authorization",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 101, 115, 115, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+              {
+                kind: "account",
+                path: "authorization.nonce",
+                account: "SessionAuthorization",
+              },
+            ],
+          },
+        },
+        {
+          name: "session_token",
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "allocation.owner",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+        {
+          name: "rules",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 108, 101, 115],
+              },
+              {
+                kind: "account",
+                path: "rules.binding.version",
+                account: "GameRulesVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "catalog.binding.version",
+                account: "CatalogVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "defining_catalog",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 97, 116, 97, 108, 111, 103],
+              },
+              {
+                kind: "account",
+                path: "defining_catalog.binding.version",
+                account: "CatalogVersion",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+        {
+          name: "policy",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  115, 112, 111, 110, 115, 111, 114, 45, 112, 111, 108, 105, 99,
+                  121,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "budget",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [115, 112, 111, 110, 115, 111, 114],
+              },
+              {
+                kind: "account",
+                path: "allocation.run",
+                account: "ReservationAllocation",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "ReserveRunArgs",
+            },
+          },
+        },
+        {
+          name: "max_gross",
+          type: "u64",
+        },
+      ],
+    },
+    {
       name: "reserve_run",
       discriminator: [160, 174, 11, 70, 247, 0, 45, 153],
       accounts: [
@@ -13076,6 +13581,11 @@ export const PURRPS_GAME_IDL = {
       code: 6033,
       name: "InvalidCrank",
       msg: "Only the registered Hydra trigger may advance this run",
+    },
+    {
+      code: 6034,
+      name: "UnsettledRun",
+      msg: "Finish the existing run before reserving another",
     },
   ],
   constants: [

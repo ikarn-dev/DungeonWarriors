@@ -60,8 +60,7 @@ pub fn handle_authorize_session(
     args: AuthorizeSessionArgs,
 ) -> Result<()> {
     require!(
-        args.expected_session_nonce == ctx.accounts.player.next_session_nonce
-            && args.allowance_base_units > 0,
+        args.expected_session_nonce == ctx.accounts.player.next_session_nonce,
         ErrorCode::InvalidSession
     );
     validate_token(

@@ -6,6 +6,8 @@ import {
   Connection,
   type Keypair,
   PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -20,6 +22,7 @@ import {
   type GameSignature,
   type RunActionSubmitter,
 } from "../lib/game/run-client";
+import { crankInstructions } from "../lib/game/run-crank";
 import { RunState } from "../lib/game/run-feed";
 import type { GameIntent } from "../lib/game/run-transactions";
 import { readWebJson, webApi } from "../lib/game/web-api";
@@ -59,6 +62,7 @@ const schema = z.object({
         .regex(/^https:\/\/devnet-(us|eu|as)\.magicblock\.app\/?$/),
       inputKey: publicKeySchema,
       activationExpired: z.boolean(),
+      recoveryAvailable: z.boolean().optional(),
     })
     .nullable(),
 });
@@ -84,8 +88,8 @@ export default function RunStage({
 }: {
   wallet: string;
   nonce: string;
-  close: () => void;
-  playKey?: Keypair;
+  close?: (() => void) | undefined;
+  playKey?: Keypair | undefined;
   runSettled?: () => void;
   submitAction?: RunActionSubmitter | undefined;
 }) {
@@ -98,12 +102,15 @@ export default function RunStage({
   const [artError, setArtError] = useState(false);
   const [settlement, setSettlement] = useState<string | null>(null);
   const mount = useRef<HTMLDivElement>(null);
+  const gameHeading = useRef<HTMLHeadingElement>(null);
+  const focused = useRef(false);
   const [control, setControl] = useState<{
     rpc: Connection;
     run: PublicKey;
   } | null>(null);
   const [base, setBase] = useState<z.infer<typeof schema>["run"] | null>(null);
   const [activationExpired, setActivationExpired] = useState(false);
+  const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const [confirmedAction, setConfirmedAction] = useState<
     GameIntent["action"]["kind"] | null
   >(null);
@@ -160,7 +167,9 @@ export default function RunStage({
       setVisible({ run: decoded, market });
       setStatus(
         decoded.observation.phase === "active"
-          ? "Run active on MagicBlock"
+          ? decoded.observation.activeTicks === 0n
+            ? "Waiting for the first MagicBlock tick"
+            : "Run active on MagicBlock"
           : decoded.observation.phase === "suspended"
             ? "Run suspended"
             : decoded.observation.phase === "ready"
@@ -218,6 +227,7 @@ export default function RunStage({
         setError(null);
         setBase(response.run);
         setActivationExpired(response.er?.activationExpired === true);
+        setRecoveryAvailable(response.er?.recoveryAvailable === true);
         const funds = response.run.pending ?? response.run;
         const gross = funds.grossPayoutBaseUnits;
         const refund = funds.refundBaseUnits;
@@ -283,6 +293,85 @@ export default function RunStage({
     };
   }, [wallet, nonce, playKey]);
 
+  const phase = visible?.run.observation.phase;
+  const started = (visible?.run.observation.activeTicks ?? 0n) > 0n;
+  useEffect(() => {
+    if (playKey && started && !focused.current) {
+      focused.current = true;
+      gameHeading.current?.focus();
+    }
+  }, [playKey, started]);
+  const crank = visible?.run.crank;
+  const crankActive = phase === "active" || phase === "suspended";
+  const crankOracle = crank?.oracle;
+  const crankEpoch = crank?.epoch;
+  const crankGeneration = crank?.generation;
+  const crankInterval = crank?.intervalMs;
+  useEffect(() => {
+    if (
+      !control ||
+      !playKey ||
+      !crankActive ||
+      !crankOracle ||
+      !crankEpoch ||
+      !crankInterval ||
+      !crankGeneration ||
+      crankGeneration === "0"
+    )
+      return;
+    const controller = new AbortController();
+    const { rpc, run } = control;
+    const instructions = crankInstructions(
+      run,
+      playKey.publicKey,
+      new PublicKey(crankOracle),
+      crankEpoch,
+      crankGeneration,
+    );
+    let timer: ReturnType<typeof setTimeout>;
+    let lastBlockhash = "";
+    async function drive(key: Keypair, interval: number) {
+      const started = performance.now();
+      try {
+        const { blockhash } = await rpc.getLatestBlockhash("confirmed");
+        if (controller.signal.aborted || lastBlockhash === blockhash) return;
+        const message = new TransactionMessage({
+          payerKey: key.publicKey,
+          recentBlockhash: blockhash,
+          instructions,
+        }).compileToV0Message();
+        const tx = new VersionedTransaction(message);
+        tx.sign([key]);
+        lastBlockhash = blockhash;
+        await rpc.sendRawTransaction(tx.serialize(), {
+          skipPreflight: true,
+          maxRetries: 0,
+        });
+      } catch {
+        // A later blockhash can retry a due scheduler task. Only confirmed snapshots drive the UI.
+      } finally {
+        if (!controller.signal.aborted)
+          timer = setTimeout(
+            () => void drive(key, interval),
+            Math.max(0, interval - (performance.now() - started)),
+          );
+      }
+    }
+    void drive(playKey, crankInterval);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [
+    control,
+    playKey,
+    crankActive,
+    crankOracle,
+    crankEpoch,
+    crankGeneration,
+    crankInterval,
+  ]);
+
   const cat = visible?.run.cat;
   const version = visible?.run.assetBinding.version;
   const hash = visible?.run.assetBinding.contentHash;
@@ -338,7 +427,9 @@ export default function RunStage({
             ? Math.min(
                 RULES_V1.maxPredictionTicks,
                 Math.floor(
-                  ((performance.now() - active.sampledAt) * 60) / 1000,
+                  ((performance.now() - active.sampledAt) *
+                    RULES_V1.ticksPerSecond) /
+                    1000,
                 ),
               )
             : 0;
@@ -374,11 +465,15 @@ export default function RunStage({
         ? { kind: "settleReturnedRun", nonce, market }
         : activationExpired && visible?.run.observation.phase === "ready"
           ? { kind: "expireDelegatedActivation", nonce }
-          : !terminal &&
+          : recoveryAvailable &&
               market &&
-              visible?.run.observation.phase === "terminalRecorded"
-            ? { kind: "requestCompletion", nonce, market }
-            : null;
+              (phase === "active" || phase === "suspended")
+            ? { kind: "suspendOrResumeRun", nonce, market }
+            : !terminal &&
+                market &&
+                visible?.run.observation.phase === "terminalRecorded"
+              ? { kind: "requestCompletion", nonce, market }
+              : null;
   async function settle() {
     if (
       !submitAction ||
@@ -438,17 +533,23 @@ export default function RunStage({
       aria-label="Run viewer"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-medium">
+        <h3
+          className="font-medium focus-visible:outline-2"
+          ref={gameHeading}
+          tabIndex={-1}
+        >
           Run {formatNumber.format(BigInt(nonce))}
           {visible ? ` · ${visible.market}` : ""}
         </h3>
-        <button
-          type="button"
-          className="min-h-11 px-2 text-sm underline"
-          onClick={terminal && runSettled ? runSettled : close}
-        >
-          {terminal ? "Done" : "Close viewer"}
-        </button>
+        {(close || (terminal && runSettled)) && (
+          <button
+            type="button"
+            className="min-h-11 px-2 text-sm underline"
+            onClick={terminal && runSettled ? runSettled : close}
+          >
+            {terminal ? "Done" : "Close viewer"}
+          </button>
+        )}
       </div>
       <output className="text-sm">{error ?? status}</output>
       {settlement && (
@@ -492,6 +593,7 @@ export default function RunStage({
                   grossPayout(
                     visible.run.stake,
                     frame.qualifiedCheckpoints,
+                    visible.run.maxGross,
                   ).toString(),
                 )}{" "}
                 USDC
@@ -533,9 +635,11 @@ export default function RunStage({
               ? "Refund expired reservation"
               : nextAction?.kind === "expireDelegatedActivation"
                 ? "Recover expired run"
-                : nextAction?.kind === "settleReturnedRun"
-                  ? "Finalize result"
-                  : "Settle run"}
+                : nextAction?.kind === "suspendOrResumeRun"
+                  ? "Recover stalled run"
+                  : nextAction?.kind === "settleReturnedRun"
+                    ? "Finalize result"
+                    : "Settle run"}
         </button>
       )}
       {!terminal && finalizing && (

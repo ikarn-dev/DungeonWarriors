@@ -102,6 +102,7 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     (player.schemaVersion !== 1 ||
       collection.schemaVersion !== 1 ||
       !player.owner.equals(owner) ||
+      player.settledRuns.gt(player.nextRunNonce) ||
       !collection.owner.equals(owner) ||
       collection.ownedMask > 15)
   )
@@ -174,6 +175,8 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     allowStarter: cfg?.allowStarter ?? false,
     allowPurchases: cfg?.allowPurchases ?? false,
     allowReservations: cfg?.allowReservations ?? false,
+    nextRunNonce: player?.nextRunNonce.toString() ?? "0",
+    settledRuns: player?.settledRuns.toString() ?? "0",
     rulesVersion: cfg?.rules?.version ?? null,
     available: player?.availableBaseUnits.toString() ?? "0",
     upgrades: Object.fromEntries(

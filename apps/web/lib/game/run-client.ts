@@ -1,12 +1,59 @@
 import { utils } from "@anchor-lang/core";
-import { type Keypair, VersionedTransaction } from "@solana/web3.js";
+import { type Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { z } from "zod";
+import { decodeEscrowAccount, runAddresses } from "./run-accounts";
 import {
   type GameIntent,
   gameNetwork,
   validatePreparedGame,
 } from "./run-transactions";
 import { decodeBase64, encodeBase64, WebApiError, webApi } from "./web-api";
+
+export const PLAY_SESSION_SECONDS = 30 * 60;
+
+export async function readRunIdentity(
+  wallet: string,
+  nonce: string,
+  signal: AbortSignal,
+) {
+  const identity = { owner: wallet, nonce: BigInt(nonce) };
+  const address = runAddresses(identity).escrow[0];
+  const response = await webApi<{
+    accounts?: Array<{
+      address: string;
+      account: {
+        owner: string;
+        data: string;
+        executable: boolean;
+      } | null;
+    }>;
+  }>("/api/chain/state", { kind: "run", nonce }, signal);
+  const escrow = response.accounts?.find(
+    (row) => row.address === address.toBase58(),
+  )?.account;
+  if (!escrow) throw new WebApiError("RUN_NOT_FOUND");
+  return decodeEscrowAccount(identity, address, {
+    owner: new PublicKey(escrow.owner),
+    data: utils.bytes.base64.decode(escrow.data),
+    executable: escrow.executable,
+  });
+}
+
+export async function readRunMedia(catalog: number, signal: AbortSignal) {
+  const value = await webApi(
+    "/api/chain/state",
+    { kind: "catalogMedia", version: catalog },
+    signal,
+  );
+  return z
+    .object({
+      media: z.object({
+        version: z.number().int().positive(),
+        contentHash: z.string().regex(/^[0-9a-f]{64}$/),
+      }),
+    })
+    .parse(value).media;
+}
 
 export const runEntrySchema = z.object({
   commitment: z.literal("finalized"),
@@ -16,6 +63,9 @@ export const runEntrySchema = z.object({
     z.object({
       status: z.literal("ready"),
       maxStake: z.string().regex(/^\d{1,20}$/),
+      available: z.string().regex(/^\d{1,20}$/),
+      houseHeadroom: z.string().regex(/^\d{1,20}$/),
+      maxMultiplierBps: z.number().int().min(10_000),
       nonce: z.string().regex(/^\d{1,20}$/),
       sessionNonce: z.string().regex(/^\d{1,20}$/),
       clockSeconds: z
@@ -67,7 +117,11 @@ export async function sendGameAction(
   validatePreparedGame(tx, wallet, intent, prepared);
   const signed = await sign(tx);
   signal.throwIfAborted();
-  if (action.kind === "authorizeSession" || action.kind === "activateRun") {
+  if (
+    action.kind === "authorizeSession" ||
+    action.kind === "activateRun" ||
+    (action.kind === "reserveRun" && action.expiresAtSeconds !== undefined)
+  ) {
     if (!playKey || playKey.publicKey.toBase58() !== action.inputKey)
       throw new WebApiError("INVALID_PLAY_KEY");
     signed.sign([playKey]);

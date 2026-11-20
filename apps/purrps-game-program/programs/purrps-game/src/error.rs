@@ -70,4 +70,6 @@ pub enum ErrorCode {
     InvalidCompletionAction,
     #[msg("Only the registered Hydra trigger may advance this run")]
     InvalidCrank,
+    #[msg("Finish the existing run before reserving another")]
+    UnsettledRun,
 }

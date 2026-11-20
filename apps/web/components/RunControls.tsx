@@ -3,6 +3,7 @@
 import type { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import type { PlayerIntent } from "../lib/game/protocol";
+import { RULES_V1 } from "../lib/game/rules";
 import { sendRunInput } from "../lib/game/run-input";
 
 const button =
@@ -187,7 +188,10 @@ export default function RunControls({
         busy = false;
       }
     }
-    const commands = setInterval(() => void flush(), 50);
+    const commands = setInterval(
+      () => void flush(),
+      1000 / RULES_V1.maxControlUpdatesPerSecond,
+    );
     const heartbeat = setInterval(() => {
       if (active) liveness = { kind: "heartbeat", active: true };
     }, 1000);

@@ -89,7 +89,15 @@ pub mod purrps_game {
         crate::instructions::sponsorship::handle_reclaim_expired_run_budget(ctx)
     }
     pub fn reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
-        crate::instructions::reserve::handle_reserve_run(ctx, args)
+        crate::instructions::reserve::handle_reserve_run(ctx, args, None)
+    }
+
+    pub fn reserve_quoted_run(
+        ctx: Context<ReserveRun>,
+        args: ReserveRunArgs,
+        max_gross: u64,
+    ) -> Result<()> {
+        crate::instructions::reserve::handle_reserve_run(ctx, args, Some(max_gross))
     }
 
     pub fn delegate_run(ctx: Context<DelegateRun>, args: RunIdentityArgs) -> Result<()> {

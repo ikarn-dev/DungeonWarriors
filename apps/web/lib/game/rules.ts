@@ -142,15 +142,18 @@ export function speedBps(activeTicks: bigint): number {
 export function earnedMultiplierBps(qualifiedCheckpoints: bigint): number {
   checkedU64(qualifiedCheckpoints);
   if (qualifiedCheckpoints === 0n) return 0;
-  if (qualifiedCheckpoints <= 6n) {
-    const bps =
-      RULES_V1.initialMultiplierBps[Number(qualifiedCheckpoints - 1n)];
+  const tiers = RULES_V1.initialMultiplierBps;
+  const tierCount = BigInt(tiers.length);
+  if (qualifiedCheckpoints <= tierCount) {
+    const bps = tiers[Number(qualifiedCheckpoints - 1n)];
     if (bps === undefined) throw new RangeError("Invalid checkpoint tier");
     return bps;
   }
-  const steps = qualifiedCheckpoints - 6n;
-  return Math.min(
-    30_000 + Number(steps > 14n ? 14n : steps) * RULES_V1.multiplierStepBps,
-    RULES_V1.maxMultiplierBps,
-  );
+  const lastTier = tiers[tiers.length - 1] ?? 0;
+  const earned =
+    BigInt(lastTier) +
+    (qualifiedCheckpoints - tierCount) * BigInt(RULES_V1.multiplierStepBps);
+  return earned < BigInt(RULES_V1.maxMultiplierBps)
+    ? Number(earned)
+    : RULES_V1.maxMultiplierBps;
 }

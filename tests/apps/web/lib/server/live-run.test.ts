@@ -66,6 +66,14 @@ it("returns a decoded snapshot pinned to the finalized escrow and rejects incomp
   rpc.account.mockResolvedValue({ context: { slot: 800 }, value: account });
   rpc.er.mockResolvedValue({
     getAccountInfoAndContext: rpc.account,
+    getAccountInfo: async (key: PublicKey) => {
+      expect(key.toBase58()).toBe(DEVNET.clock);
+      return {
+        owner: new PublicKey(DEVNET.sysvarOwner),
+        executable: false,
+        data: Buffer.alloc(40),
+      };
+    },
     rpcEndpoint: "https://devnet-as.magicblock.app/",
   });
   await expect(readLiveRun(wallet, "1")).resolves.toMatchObject({
@@ -76,6 +84,7 @@ it("returns a decoded snapshot pinned to the finalized escrow and rejects incomp
       market: "BTC",
       endpoint: "https://devnet-as.magicblock.app/",
       inputKey: original.snapshot.inputPermission.inputKey.toBase58(),
+      recoveryAvailable: false,
     },
   });
   expect(rpc.er).toHaveBeenCalledWith(

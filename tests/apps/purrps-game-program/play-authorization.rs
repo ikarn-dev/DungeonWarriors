@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, AccountDeserialize};
+use anchor_lang::{prelude::*, AccountDeserialize, InstructionData};
 use purrps_game::{
     catalog::CatId,
     contracts::snapshot_hash,
@@ -75,14 +75,13 @@ fn session_requires_actual_external_owner_canonical_scope_and_finite_allowance()
         "AccountOwnedByWrongProgram",
     );
     p.h.svm.set_account(p.token, original.clone()).unwrap();
-    for case in 0..6 {
+    for case in 0..5 {
         let mut a = p.auth_args();
         match case {
             0 => a.input_key = Keypair::new().pubkey(),
             1 => a.expires_at_seconds = NOW,
             2 => a.expires_at_seconds = NOW + 7201,
-            3 => a.allowance_base_units = 0,
-            4 => a.expected_session_nonce = 1,
+            3 => a.expected_session_nonce = 1,
             _ => a.input_key = Pubkey::default(),
         }
         rejected(p.h.send(p.auth_ix(a), &p.owner), "InvalidSession");
@@ -438,4 +437,59 @@ fn reservation_requires_open_admission_and_the_fixed_buffer_layout_stays_strict(
     bytes[offset..offset + 4].fill(0);
     assert!(RunGameState::try_deserialize(&mut bytes.as_slice()).is_err());
     assert!(8 + RunGameState::INIT_SPACE <= 10240);
+}
+
+#[test]
+fn quoted_reservation_caps_exposure_and_protects_the_open_run() {
+    let mut p = Play::new();
+    p.admit_fixture();
+    p.authorize();
+    p.fund(0);
+    p.fund(1);
+    let quote = |p: &Play, nonce, stake, maximum| {
+        let mut args = p.args(nonce);
+        args.stake_base_units = stake;
+        let mut ix = p.reserve_ix(args.clone(), p.owner.pubkey());
+        ix.data = purrps_game::instruction::ReserveQuotedRun {
+            args,
+            max_gross: maximum,
+        }
+        .data();
+        ix
+    };
+    rejected(
+        p.h.send(quote(&p, 0, 1_000_000, 10_000_001), &p.owner),
+        "InvalidAmount",
+    );
+    p.h.send(quote(&p, 0, 1_000_000, 2_000_000), &p.owner)
+        .unwrap();
+    let run = pda(purrps_game::RUN_GAME_SEED, p.owner.pubkey(), 0);
+    let snapshot = p.h.read::<RunGameState>(run).snapshot;
+    assert_eq!(snapshot.max_gross_base_units, 2_000_000);
+    assert_eq!(
+        p.h.read::<PlayerAccount>(p.player).locked_stake_base_units,
+        1_000_000
+    );
+    rejected(p.h.send(quote(&p, 1, 0, 0), &p.owner), "UnsettledRun");
+
+    let mut practice = Play::new();
+    practice.admit_fixture();
+    let mut auth = practice.auth_args();
+    auth.allowance_base_units = 0;
+    practice
+        .h
+        .send(practice.auth_ix(auth), &practice.owner)
+        .unwrap();
+    practice.fund(0);
+    let credit = practice
+        .h
+        .read::<PlayerAccount>(practice.player)
+        .available_base_units;
+    practice
+        .h
+        .send(quote(&practice, 0, 0, 0), &practice.owner)
+        .unwrap();
+    let player = practice.h.read::<PlayerAccount>(practice.player);
+    assert_eq!(player.available_base_units, credit);
+    assert_eq!(player.locked_stake_base_units, 0);
 }

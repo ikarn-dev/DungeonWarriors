@@ -103,7 +103,7 @@ export default function StarterPanel() {
     }
   }
   async function perform(action: (signal: AbortSignal) => Promise<void>) {
-    work.current?.abort();
+    if (work.current !== null && !work.current.signal.aborted) return;
     const controller = new AbortController();
     work.current = controller;
     setBusy(true);
@@ -120,7 +120,10 @@ export default function StarterPanel() {
             : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
         );
     } finally {
-      if (!controller.signal.aborted) setBusy(false);
+      if (work.current === controller) {
+        work.current = null;
+        if (!controller.signal.aborted) setBusy(false);
+      }
     }
   }
   async function signIn(signal: AbortSignal) {
@@ -537,7 +540,7 @@ export default function StarterPanel() {
                 />
                 {state.starter === "fulfilled" && address !== null && (
                   <RunEntry
-                    key={address}
+                    key={`run:${address}`}
                     state={state}
                     wallet={address}
                     blocked={blocked}
@@ -548,7 +551,7 @@ export default function StarterPanel() {
                 )}
                 {state.starter === "fulfilled" && address !== null && (
                   <CapsuleShop
-                    key={address}
+                    key={`shop:${address}`}
                     state={state}
                     wallet={address}
                     blocked={blocked}
@@ -564,7 +567,7 @@ export default function StarterPanel() {
                 )}
                 {address !== null && (
                   <AccountPanel
-                    key={address}
+                    key={`account:${address}`}
                     wallet={address}
                     blocked={blocked}
                     submitRunAction={submitRunAction}

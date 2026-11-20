@@ -5,7 +5,7 @@ use super::{delegation::unplayed_reservation, house::assert_vault};
 use crate::{
     constants::*,
     contracts::snapshot_hash,
-    economy::max_gross_reservation,
+    economy::valid_gross_cap,
     error::ErrorCode,
     protocol::{FaultReason, RunPhase, TerminalReason, PROTOCOL_VERSION},
     state::{
@@ -54,8 +54,11 @@ impl AbortUndelegatedReservation<'_> {
                 && self.run.snapshot_hash == hash
                 && self.escrow.status == EscrowStatus::Reserved
                 && self.escrow.receipt.is_none()
-                && max_gross_reservation(snapshot.stake_base_units).ok()
-                    == Some(snapshot.max_gross_base_units),
+                && valid_gross_cap(
+                    snapshot.stake_base_units,
+                    snapshot.max_gross_base_units,
+                    snapshot.rules.max_multiplier_bps,
+                ),
             ErrorCode::InvalidRun
         );
         Ok(())

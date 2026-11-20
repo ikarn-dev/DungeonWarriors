@@ -44,7 +44,9 @@ export async function readLiveRun(wallet: string, nonce: string) {
   if (snapshot.snapshotHash !== escrow.snapshotHash)
     throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
   let activationExpired = false;
-  if (snapshot.observation.phase === "ready") {
+  let recoveryAvailable = false;
+  const phase = snapshot.observation.phase;
+  if (phase === "ready" || phase === "suspended" || phase === "active") {
     const clock = await er.getAccountInfo(
       new PublicKey(DEVNET.clock),
       "confirmed",
@@ -56,8 +58,21 @@ export async function readLiveRun(wallet: string, nonce: string) {
       clock.data.length !== 40
     )
       throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+    const now = clock.data.readBigInt64LE(32);
     activationExpired =
-      clock.data.readBigInt64LE(32) >= BigInt(escrow.activationDeadlineSeconds);
+      phase === "ready" && now >= BigInt(escrow.activationDeadlineSeconds);
+    const timeout = BigInt(snapshot.suspensionTimeoutSeconds);
+    // One credited second and the scheduler backlog both precede a stalled-run refund.
+    const lastPossibleTick =
+      snapshot.crank.originSeconds +
+      (snapshot.crank.consumedMs + 999n) / 1000n +
+      3n;
+    recoveryAvailable =
+      snapshot.suspendedAt !== null
+        ? now >= snapshot.suspendedAt + timeout
+        : phase === "active" &&
+          snapshot.crank.generation !== "0" &&
+          now >= lastPossibleTick + timeout;
   }
   return {
     run: base.run,
@@ -69,6 +84,7 @@ export async function readLiveRun(wallet: string, nonce: string) {
       endpoint: er.rpcEndpoint,
       inputKey: escrow.inputKey,
       activationExpired,
+      recoveryAvailable,
     },
   };
 }

@@ -213,11 +213,19 @@ pub fn speed_bps(active_ticks: u64) -> u16 {
 }
 
 pub fn earned_multiplier_bps(qualified_checkpoints: u64) -> u32 {
-    match qualified_checkpoints {
-        0 => 0,
-        1..=6 => RULES_V1.initial_multiplier_bps[(qualified_checkpoints - 1) as usize],
-        // Cap the count before multiplication, including at u64::MAX.
-        q => (30_000 + q.saturating_sub(6).min(14) as u32 * RULES_V1.multiplier_step_bps)
-            .min(RULES_V1.max_multiplier_bps),
+    earned_multiplier_for_rules(&RULES_V1, qualified_checkpoints)
+}
+
+pub fn earned_multiplier_for_rules(rules: &GameRules, qualified_checkpoints: u64) -> u32 {
+    let tiers = &rules.initial_multiplier_bps;
+    if qualified_checkpoints == 0 {
+        return 0;
     }
+    if qualified_checkpoints <= tiers.len() as u64 {
+        return tiers[(qualified_checkpoints - 1) as usize];
+    }
+    let steps = qualified_checkpoints - tiers.len() as u64;
+    let earned = u64::from(tiers[tiers.len() - 1])
+        .saturating_add(steps.saturating_mul(u64::from(rules.multiplier_step_bps)));
+    earned.min(u64::from(rules.max_multiplier_bps)) as u32
 }

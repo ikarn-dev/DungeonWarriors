@@ -15,6 +15,7 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -28,11 +29,17 @@ import {
   decodeEscrowAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
+import { crankInstructions } from "../../../../../apps/web/lib/game/run-crank";
 import { validatePreparedGame } from "../../../../../apps/web/lib/game/run-transactions";
 import {
   DEVNET,
   LEADERBOARD_SEED,
 } from "../../../../../apps/web/lib/solana/addresses.ts";
+import {
+  crankAddress,
+  hydraProgram,
+  program,
+} from "../../../../../apps/web/lib/solana/program";
 import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game.ts";
 
 const rpc = vi.hoisted(() => ({
@@ -62,6 +69,40 @@ import {
 
 afterEach(() => vi.resetAllMocks());
 
+it("builds an adjacent Hydra trigger and onchain advance for the pinned run", () => {
+  const run = Keypair.generate().publicKey;
+  const payer = Keypair.generate().publicKey;
+  const oracle = Keypair.generate().publicKey;
+  const [compute, trigger, advance] = crankInstructions(
+    run,
+    payer,
+    oracle,
+    "7",
+    "3",
+  );
+  const task = crankAddress(run);
+  expect(compute?.programId).toEqual(ComputeBudgetProgram.programId);
+  expect(trigger?.programId).toEqual(hydraProgram);
+  expect(trigger?.data).toEqual(Buffer.from([1]));
+  expect(trigger?.keys).toEqual([
+    { pubkey: task, isWritable: true, isSigner: false },
+    { pubkey: payer, isWritable: true, isSigner: true },
+    { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isWritable: false, isSigner: false },
+  ]);
+  expect(advance?.programId).toEqual(program);
+  expect(advance?.keys.map((key) => key.pubkey)).toEqual([
+    run,
+    oracle,
+    task,
+    MAGIC_CONTEXT_ID,
+    SYSVAR_INSTRUCTIONS_PUBKEY,
+  ]);
+  const data = advance?.data ?? Buffer.alloc(0);
+  expect(coder.instruction.decode(data)?.name).toBe("advanceRun");
+  expect(data.readBigUInt64LE(8)).toBe(7n);
+  expect(data.readBigUInt64LE(16)).toBe(3n);
+});
+
 function intent(action: GameIntent["action"]): GameIntent {
   return { operation: "game", action, sponsored: false };
 }
@@ -87,6 +128,36 @@ const runNonce = {
 } as const;
 
 describe("game transaction intents", () => {
+  it("reviews a single atomic authorization and reservation with an exact gross cap", () => {
+    const owner = Keypair.generate();
+    const play = Keypair.generate();
+    const wallet = owner.publicKey.toBase58();
+    const value = intent({
+      kind: "reserveRun",
+      nonce: "0",
+      sessionNonce: "0",
+      inputKey: play.publicKey.toBase58(),
+      expiresAtSeconds: 1800000000,
+      inventoryVersion: "2",
+      rulesVersion: 1,
+      catalogVersion: 1,
+      definingCatalogVersion: 1,
+      cat: "acrobat",
+      market: "SOL",
+      stake: "5000000",
+      maxGross: "25000000",
+    });
+    const { built, encoded, tx } = assemble(owner, play, value);
+    expect(built.instructions).toHaveLength(3);
+    expect(tx.serialize().length).toBeLessThan(1232);
+    expect(tx.message.header.numRequiredSignatures).toBe(2);
+    expect(() => validateTransaction(wallet, value, encoded)).not.toThrow();
+    if (value.action.kind !== "reserveRun") throw new Error("Invalid fixture");
+    const changed = intent({ ...value.action, maxGross: "24999999" });
+    expect(() => validateTransaction(wallet, changed, encoded)).toThrow(
+      "TRANSACTION_REJECTED",
+    );
+  });
   it("validates wallet custody bytes on the client and preserves exact USDC amounts", () => {
     const owner = Keypair.generate();
     const wallet = owner.publicKey.toBase58();

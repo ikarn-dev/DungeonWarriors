@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use super::abort_reservation::*;
 use crate::{
     constants::{LEADERBOARD_SEED, SCHEMA_VERSION},
-    economy::gross_payout,
+    economy::capped_gross_payout,
     error::ErrorCode,
     protocol::{FaultReason, RunPhase, TerminalReason},
     state::{
@@ -64,7 +64,7 @@ pub(super) fn settle_returned(
         board.schema_version == SCHEMA_VERSION && board.bump == board_bump,
         ErrorCode::InvalidRun
     );
-    if status != EscrowStatus::RefundedTechnical {
+    if status != EscrowStatus::RefundedTechnical && snapshot.stake_base_units != 0 {
         insert_score(
             board,
             LeaderboardEntry {
@@ -122,8 +122,13 @@ pub(super) fn validate_terminal(
     let (status, payout, refund) = match terminal.reason {
         TerminalReason::CashOut | TerminalReason::AutoCashOut if terminal.fault.is_none() => (
             EscrowStatus::SettledWin,
-            gross_payout(stake, terminal.qualified_checkpoints)
-                .map_err(|_| error!(ErrorCode::InvalidRun))?,
+            capped_gross_payout(
+                stake,
+                terminal.qualified_checkpoints,
+                run.snapshot.max_gross_base_units,
+                &run.snapshot.rules,
+            )
+            .map_err(|_| error!(ErrorCode::InvalidRun))?,
             0,
         ),
         TerminalReason::Crash | TerminalReason::Surrender if terminal.fault.is_none() => {

@@ -10,15 +10,30 @@ export function maxGrossReservation(stakeBaseUnits: bigint): bigint {
   );
 }
 
+export function quotedGross(
+  stake: bigint,
+  headroom: bigint,
+  maxMultiplierBps: number,
+) {
+  checkedU64(stake);
+  checkedU64(headroom);
+  const full = (stake * BigInt(maxMultiplierBps)) / 10_000n;
+  const available = stake + headroom;
+  return checkedU64(full < available ? full : available);
+}
+
 export function grossPayout(
   stakeBaseUnits: bigint,
   qualifiedCheckpoints: bigint,
+  cap = maxGrossReservation(stakeBaseUnits),
 ): bigint {
-  maxGrossReservation(stakeBaseUnits);
+  checkedU64(stakeBaseUnits);
+  checkedU64(cap);
   const multiplierBps = earnedMultiplierBps(qualifiedCheckpoints);
   if (multiplierBps === 0)
     throw new RangeError("Cash-out requires a qualified checkpoint");
-  return checkedU64((stakeBaseUnits * BigInt(multiplierBps)) / 10_000n);
+  const earned = (stakeBaseUnits * BigInt(multiplierBps)) / 10_000n;
+  return earned < cap ? earned : cap;
 }
 
 export function requiredVaultBalance(

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use ephemeral_rollups_sdk::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 
-use super::run_inputs::validate_input_snapshot;
+use super::{run_crank::MAX_CLOCK_BACKLOG_MS, run_inputs::validate_input_snapshot};
 use crate::{
     constants::{RUN_GAME_SEED, SCHEMA_VERSION},
     error::ErrorCode,
@@ -34,6 +34,31 @@ pub fn handle_recover_run_oracle(ctx: Context<RecoverRunOracle>) -> Result<()> {
         ErrorCode::InvalidRun
     );
     let clock = Clock::get()?;
+    if run.phase == RunPhase::Active && run.crank.generation > 0 {
+        // The allocated budget timestamp trails the ER clock by one whole second.
+        let deadline = run
+            .crank
+            .clock_origin_seconds
+            .saturating_add(1)
+            .saturating_add(
+                run.crank
+                    .consumed_elapsed_ms
+                    .saturating_add(MAX_CLOCK_BACKLOG_MS)
+                    .div_ceil(1000),
+            )
+            .saturating_add(u64::from(run.snapshot.rules.suspension_timeout_seconds));
+        if u64::try_from(clock.unix_timestamp).is_ok_and(|now| now >= deadline) {
+            let fault_at =
+                deadline.saturating_sub(u64::from(run.snapshot.rules.suspension_timeout_seconds));
+            suspend(
+                run,
+                FaultReason::SchedulerGap,
+                i64::try_from(fault_at).map_err(|_| error!(ErrorCode::ArithmeticOverflow))?,
+            )?;
+            expire_suspension(run, clock.unix_timestamp)?;
+            return Ok(());
+        }
+    }
     if run.phase == RunPhase::Suspended && expire_suspension(run, clock.unix_timestamp)? {
         return Ok(());
     }

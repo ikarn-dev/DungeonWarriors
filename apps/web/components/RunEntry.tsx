@@ -4,11 +4,14 @@ import { Keypair, type VersionedTransaction } from "@solana/web3.js";
 import { useRef, useState } from "react";
 import { verifyManifestBinding } from "../lib/game/assets";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
-import { maxGrossReservation } from "../lib/game/economy";
+import { quotedGross } from "../lib/game/economy";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 import {
   confirmGameAction,
   type GameSignature,
+  PLAY_SESSION_SECONDS,
+  readRunIdentity,
+  readRunMedia,
   runEntrySchema,
   sendGameAction,
 } from "../lib/game/run-client";
@@ -21,14 +24,14 @@ type Market = (typeof MARKETS)[number]["market"];
 type Launch = {
   nonce: string;
   key: Keypair;
-  actions: GameIntent["action"][];
+  market: Market;
+  reserve: Extract<GameIntent["action"], { kind: "reserveRun" }>;
   step: number;
   pending: GameSignature | null;
 };
 
 const messages = [
-  "Authorize play in your wallet.",
-  "Approve the Devnet wager and reserve the run.",
+  "Approve play authorization and reserve the run.",
   "Approve delegation to MagicBlock.",
   "Approve activation on MagicBlock.",
 ];
@@ -56,23 +59,34 @@ export default function RunEntry({
   const [amount, setAmount] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [watching, setWatching] = useState(false);
+  const [practice, setPractice] = useState(false);
+  const [quote, setQuote] = useState<{
+    stake: bigint;
+    gross: bigint;
+    market: Market;
+  } | null>(null);
   const launch = useRef<Launch | null>(null);
+  const recovered =
+    state.nextRunNonce !== state.settledRuns
+      ? (BigInt(state.nextRunNonce) - 1n).toString()
+      : null;
+  const viewer =
+    (watching ? launch.current?.nonce : null) ??
+    (launch.current === null ? recovered : null);
   const cat = state.cats.find((owned) => owned.id === state.selected);
   const definingCatalogVersion = cat
     ? state.definingCatalogs[cat.id]
     : undefined;
   const running = launch.current?.step === messages.length;
   let stake: bigint | null = null;
-  let gross: bigint | null = null;
   try {
-    const exact = parseUsdc(amount);
-    gross = maxGrossReservation(exact);
-    stake = exact;
+    stake = practice ? 0n : parseUsdc(amount);
   } catch {
     /* Invalid amounts cannot start a run. */
   }
   const canStart =
     state.allowReservations &&
+    recovered === null &&
     sign !== undefined &&
     cat !== undefined &&
     stake !== null &&
@@ -110,21 +124,41 @@ export default function RunEntry({
         );
         return;
       }
-      if (stake > BigInt(entry.maxStake)) {
+      if (
+        stake > BigInt(entry.available) ||
+        entry.nonce !== state.nextRunNonce
+      ) {
+        setQuote(null);
+        await refresh(signal);
         setNotice(
-          entry.maxStake === "0"
-            ? "The house has no available collateral for a new wager."
-            : `The current run limit is ${displayUsdc(entry.maxStake)} USDC.`,
+          "Your account changed. Review the current balance and run status.",
         );
         return;
       }
-      const binding = state.assetBinding;
+      const cap = quotedGross(
+        stake,
+        BigInt(entry.houseHeadroom),
+        entry.maxMultiplierBps,
+      );
+      if (stake > 0n && cap <= stake) {
+        setQuote(null);
+        setNotice(
+          "The vault cannot back a profit for this wager. You can choose a practice run.",
+        );
+        return;
+      }
       if (
-        binding === null ||
-        definingCatalogVersion !== 1 ||
-        state.catalogVersion !== 1
-      )
-        throw new WebApiError("UNSUPPORTED_RUN");
+        quote?.stake !== stake ||
+        quote.market !== market ||
+        quote.gross > cap
+      ) {
+        setQuote({ stake, gross: cap, market });
+        setNotice(
+          quote ? "The available payout changed. Review the new terms." : null,
+        );
+        return;
+      }
+      const binding = await readRunMedia(definingCatalogVersion, signal);
       const assets = await fetch(
         `/game-assets/v${binding.version}/manifest.json`,
         { signal },
@@ -140,52 +174,63 @@ export default function RunEntry({
       const key = Keypair.generate();
       const inputKey = key.publicKey.toBase58();
       const stakeAmount = stake.toString();
-      const expiresAtSeconds = entry.clockSeconds + 1800;
+      const expiresAtSeconds = entry.clockSeconds + PLAY_SESSION_SECONDS;
       launch.current = {
         key,
+        market,
         nonce: entry.nonce,
         step: 0,
         pending: null,
-        actions: [
-          {
-            kind: "authorizeSession",
-            nonce: entry.sessionNonce,
-            inputKey,
-            expiresAtSeconds,
-            allowance: stakeAmount,
-          },
-          {
-            kind: "reserveRun",
-            nonce: entry.nonce,
-            sessionNonce: entry.sessionNonce,
-            inputKey,
-            inventoryVersion: state.inventoryVersion.toString(),
-            rulesVersion: state.rulesVersion,
-            catalogVersion: state.catalogVersion,
-            definingCatalogVersion,
-            cat: cat.id,
-            market,
-            stake: stakeAmount,
-          },
-          { kind: "delegateRun", nonce: entry.nonce, delegationEpoch: "1" },
-          {
-            kind: "activateRun",
-            nonce: entry.nonce,
-            delegationEpoch: "1",
-            inputKey,
-            market,
-          },
-        ],
+        reserve: {
+          kind: "reserveRun",
+          nonce: entry.nonce,
+          sessionNonce: entry.sessionNonce,
+          inputKey,
+          expiresAtSeconds,
+          inventoryVersion: state.inventoryVersion.toString(),
+          rulesVersion: state.rulesVersion,
+          catalogVersion: state.catalogVersion,
+          definingCatalogVersion,
+          cat: cat.id,
+          market,
+          stake: stakeAmount,
+          maxGross: quote.gross.toString(),
+        },
       };
     }
     const setup = launch.current;
     try {
-      for (
-        let action = setup.actions[setup.step];
-        action;
-        action = setup.actions[setup.step]
-      ) {
+      while (setup.step < messages.length) {
         signal.throwIfAborted();
+        let action: GameIntent["action"] | undefined =
+          setup.step === 0 ? setup.reserve : undefined;
+        if (setup.step >= 1 && !setup.pending) {
+          const reservation = await readRunIdentity(
+            wallet,
+            setup.nonce,
+            signal,
+          );
+          if (reservation.inputKey !== setup.key.publicKey.toBase58())
+            throw new WebApiError("RUN_SCOPE_MISMATCH");
+          if (setup.step === 1 && reservation.delegationInitiated) {
+            setup.step++;
+            setWatching(true);
+            continue;
+          }
+          const identity = {
+            nonce: setup.nonce,
+            delegationEpoch: reservation.delegationEpoch,
+          };
+          action =
+            setup.step === 1
+              ? { kind: "delegateRun", ...identity }
+              : {
+                  kind: "activateRun",
+                  ...identity,
+                  inputKey: reservation.inputKey,
+                  market: setup.market,
+                };
+        }
         setNotice(
           setup.pending
             ? "Checking the original transaction…"
@@ -193,16 +238,18 @@ export default function RunEntry({
         );
         const submitted =
           setup.pending ??
-          (await sendGameAction(
-            wallet,
-            sign,
-            action,
-            setup.key,
-            (value) => {
-              setup.pending = value;
-            },
-            signal,
-          ));
+          (action &&
+            (await sendGameAction(
+              wallet,
+              sign,
+              action,
+              setup.key,
+              (value) => {
+                setup.pending = value;
+              },
+              signal,
+            )));
+        if (!submitted) throw new WebApiError("RUN_SCOPE_MISMATCH");
         setNotice("Waiting for confirmation…");
         const status = await confirmGameAction(submitted, signal);
         if (status === "pending") {
@@ -212,19 +259,32 @@ export default function RunEntry({
           return;
         }
         setup.pending = null;
-        if (status === "failed") throw new WebApiError("TRANSACTION_FAILED");
+        if (status === "failed") {
+          if (setup.step === 0) {
+            launch.current = null;
+            setQuote(null);
+            await refresh(signal);
+          }
+          throw new WebApiError("TRANSACTION_FAILED");
+        }
         setup.step++;
-        if (setup.step === 3) setWatching(true);
+        if (setup.step === 2) setWatching(true);
       }
       setWatching(true);
       setNotice(null);
       await refresh(signal);
     } catch (error) {
       if (!signal.aborted) {
-        if (setup.step === 0 && setup.pending === null) launch.current = null;
+        if (setup.step === 0 && setup.pending === null) {
+          launch.current = null;
+          setQuote(null);
+        }
+        if (setup.step >= 1) setWatching(true);
         setNotice(
           setup.pending === null
-            ? "Setup stopped. Check your wallet and continue when ready."
+            ? setup.step === 0
+              ? "The wager was not reserved. Review the updated run terms to retry."
+              : "Setup stopped. Continue the existing run when ready."
             : "Check the original transaction before continuing setup.",
         );
       }
@@ -243,46 +303,78 @@ export default function RunEntry({
           ? `${CAT_NAMES[cat.id]} · Level ${cat.level}`
           : "Select a cat to run."}
       </p>
-      <fieldset
-        className="grid gap-3"
-        disabled={blocked || isContinuation || !state.allowReservations}
-      >
-        <label className="grid gap-1 text-sm">
-          Market
-          <select
-            className="min-h-11 rounded-md border px-3"
-            value={market}
-            onChange={(event) => {
-              const selected = MARKETS.find(
-                (item) => item.market === event.target.value,
-              );
-              if (selected) setMarket(selected.market);
-            }}
-          >
-            {MARKETS.map(({ market }) => (
-              <option key={market} value={market}>
-                {market}/USD
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">
-          Wager (Devnet USDC)
-          <input
-            className="min-h-11 rounded-md border border-[#cbd3be] px-3"
-            inputMode="decimal"
-            value={amount}
-            autoComplete="off"
-            maxLength={21}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-        </label>
-      </fieldset>
+      {viewer === null && (
+        <fieldset
+          className="grid gap-3"
+          disabled={blocked || isContinuation || !state.allowReservations}
+        >
+          <label className="grid gap-1 text-sm">
+            Market
+            <select
+              className="min-h-11 rounded-md border px-3"
+              value={market}
+              onChange={(event) => {
+                const selected = MARKETS.find(
+                  (item) => item.market === event.target.value,
+                );
+                if (selected) {
+                  setMarket(selected.market);
+                  setQuote(null);
+                }
+              }}
+            >
+              {MARKETS.map(({ market }) => (
+                <option key={market} value={market}>
+                  {market}/USD
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={practice}
+              onChange={(event) => {
+                setPractice(event.target.checked);
+                setQuote(null);
+              }}
+            />
+            Practice without a wager
+          </label>
+          {!practice && (
+            <label className="grid gap-1 text-sm">
+              Wager (Devnet USDC)
+              <input
+                className="min-h-11 rounded-md border border-[#cbd3be] px-3"
+                inputMode="decimal"
+                value={amount}
+                autoComplete="off"
+                maxLength={21}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setQuote(null);
+                }}
+              />
+            </label>
+          )}
+        </fieldset>
+      )}
       <p className="text-sm">
         Available in PURRPS: {displayUsdc(state.available)} USDC
-        {gross !== null &&
-          ` · Maximum gross payout: ${displayUsdc(gross.toString())} USDC`}
       </p>
+      {BigInt(state.nextRunNonce) - BigInt(state.settledRuns) > 1n && (
+        <p className="text-sm">
+          Earlier runs are still open. Open their pending entries in Run history
+          to recover them before starting again.
+        </p>
+      )}
+      {viewer === null && quote && (
+        <output className="text-sm">
+          {quote.stake === 0n
+            ? "Practice uses the real game with 0 USDC at risk and no payout."
+            : `Wager ${displayUsdc(quote.stake.toString())} USDC. Maximum gross payout ${displayUsdc(quote.gross.toString())} USDC. Earned checkpoint payouts stop at this cap.`}
+        </output>
+      )}
       {state.allowReservations && amount.length > 0 && stake === null && (
         <p className="text-sm">
           Enter a positive wager with up to six decimals.
@@ -303,7 +395,7 @@ export default function RunEntry({
           Play authorization lasts 30 minutes and covers this wager.
         </p>
       )}
-      {!running && (
+      {!running && (recovered === null || isContinuation) && (
         <button
           type="button"
           data-primary
@@ -311,7 +403,11 @@ export default function RunEntry({
           disabled={disabled}
           onClick={() => void work(start)}
         >
-          {isContinuation ? "Continue setup" : "Start Run"}
+          {isContinuation
+            ? "Continue existing setup"
+            : quote
+              ? "Approve run terms"
+              : "Review run"}
         </button>
       )}
       {notice && (
@@ -319,14 +415,16 @@ export default function RunEntry({
           {notice}
         </output>
       )}
-      {watching && launch.current ? (
+      {viewer !== null ? (
         <RunStage
+          key={viewer}
           wallet={wallet}
-          nonce={launch.current.nonce}
-          playKey={launch.current.key}
-          close={() => setWatching(false)}
+          nonce={viewer}
+          playKey={launch.current?.key}
+          close={recovered !== null ? undefined : () => setWatching(false)}
           runSettled={() => {
             launch.current = null;
+            setQuote(null);
             setWatching(false);
             void work(refresh);
           }}

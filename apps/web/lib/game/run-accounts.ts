@@ -89,7 +89,7 @@ function checkVersion(s: Accounts["runGameState"]["snapshot"]) {
   if (
     s.protocolVersion !== 1 ||
     s.rulesBinding.version !== 1 ||
-    s.cat.definingCatalog.version !== 1 ||
+    s.cat.definingCatalog.version < 1 ||
     s.assetManifest.version < 1 ||
     !types
       .encode("gameRules", s.rules)
@@ -190,7 +190,7 @@ export async function decodeRunAccount(
       worldOriginPixels: big(r.worldOriginPixels),
       nextEntityId: big(r.nextEntityId),
       run: key.toBase58(),
-      rulesVersion: 1,
+      rulesVersion: r.snapshot.rulesBinding.version,
       acceptedSequence: observation.acceptedSequence,
       processedSequence: observation.processedSequence,
       sample: {
@@ -236,12 +236,24 @@ export async function decodeRunAccount(
     prediction,
     stats,
     stake: big(r.snapshot.stakeBaseUnits),
+    maxGross: big(r.snapshot.maxGrossBaseUnits),
+    crank: {
+      oracle: r.snapshot.oracle.account.toBase58(),
+      epoch: r.snapshot.delegationEpoch.toString(),
+      generation: r.crank.generation.toString(),
+      intervalMs: r.snapshot.rules.crankIntervalMs,
+      originSeconds: big(r.crank.clockOriginSeconds),
+      consumedMs: big(r.crank.consumedElapsedMs),
+    },
     cat: enumTag(r.snapshot.cat.definition.id) as CatId,
     assetBinding: {
       version: r.snapshot.assetManifest.version,
       contentHash: hex(r.snapshot.assetManifest.contentHash),
     },
     snapshotHash: hex(r.snapshotHash),
+    suspendedAt:
+      r.suspension === null ? null : big(r.suspension.startedAtSeconds),
+    suspensionTimeoutSeconds: r.snapshot.rules.suspensionTimeoutSeconds,
     terminal: r.terminal === null ? null : fields(r.terminal),
   };
 }

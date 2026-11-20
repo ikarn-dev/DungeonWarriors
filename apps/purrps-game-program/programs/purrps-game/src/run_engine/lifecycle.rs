@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    economy::gross_payout,
+    economy::capped_gross_payout,
     error::ErrorCode,
     oracle::InspectedOracle,
     protocol::{FaultReason, InputAxis, PlayerIntent, RunPhase, TerminalReason},
@@ -141,10 +141,13 @@ fn terminal(
 ) -> Result<RunTerminal> {
     let stake = run.snapshot.stake_base_units;
     let payout = match reason {
-        TerminalReason::CashOut | TerminalReason::AutoCashOut => {
-            gross_payout(stake, frame.qualified_checkpoints)
-                .map_err(|_| error!(ErrorCode::InvalidRun))?
-        }
+        TerminalReason::CashOut | TerminalReason::AutoCashOut => capped_gross_payout(
+            stake,
+            frame.qualified_checkpoints,
+            run.snapshot.max_gross_base_units,
+            &run.snapshot.rules,
+        )
+        .map_err(|_| error!(ErrorCode::InvalidRun))?,
         _ => 0,
     };
     Ok(RunTerminal {

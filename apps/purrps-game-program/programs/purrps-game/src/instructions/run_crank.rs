@@ -28,7 +28,7 @@ use crate::{
 };
 
 const GENERATION: u64 = 1;
-const MAX_CLOCK_BACKLOG_MS: u64 = 1600;
+pub(super) const MAX_CLOCK_BACKLOG_MS: u64 = 1600;
 pub const CRANK_RENT_HEADROOM: u64 = 32_000;
 
 pub struct HydraProgram;

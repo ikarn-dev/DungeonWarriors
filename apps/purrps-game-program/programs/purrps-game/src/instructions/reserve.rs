@@ -2,7 +2,7 @@ use super::{house::assert_vault, session::validate_token};
 use crate::{
     constants::*,
     contracts::{snapshot_hash, CatSnapshot, RunSnapshot},
-    economy::{max_gross_reservation, required_vault_balance},
+    economy::{max_gross_reservation, required_vault_balance, valid_gross_cap},
     error::ErrorCode,
     instruction_args::ReserveRunArgs,
     protocol::{InputPermission, PROTOCOL_VERSION},
@@ -66,7 +66,11 @@ pub struct ReservationAllocation<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Result<()> {
+pub fn handle_reserve_run(
+    ctx: Context<ReserveRun>,
+    args: ReserveRunArgs,
+    quoted_cap: Option<u64>,
+) -> Result<()> {
     let a = ctx.accounts;
     require!(a.config.allow_reservations, ErrorCode::AdmissionClosed);
     let now = Clock::get()?.unix_timestamp;
@@ -135,9 +139,21 @@ pub fn handle_reserve_run(ctx: Context<ReserveRun>, args: ReserveRunArgs) -> Res
     );
     let stats = crate::catalog::cat_stats(args.cat, owned.level)
         .map_err(|_| error!(ErrorCode::InvalidInventory))?;
-    require!(args.stake_base_units > 0, ErrorCode::InvalidAmount);
-    let max_gross = max_gross_reservation(args.stake_base_units)
-        .map_err(|_| error!(ErrorCode::ArithmeticOverflow))?;
+    let max_gross = if let Some(cap) = quoted_cap {
+        require!(
+            a.player.next_run_nonce == a.player.settled_runs,
+            ErrorCode::UnsettledRun
+        );
+        require!(
+            valid_gross_cap(args.stake_base_units, cap, a.rules.rules.max_multiplier_bps),
+            ErrorCode::InvalidAmount
+        );
+        cap
+    } else {
+        require!(args.stake_base_units > 0, ErrorCode::InvalidAmount);
+        max_gross_reservation(args.stake_base_units)
+            .map_err(|_| error!(ErrorCode::ArithmeticOverflow))?
+    };
     assert_vault(a.house.key(), &a.house, &a.vault)?;
     let available = a
         .player

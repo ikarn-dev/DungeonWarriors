@@ -270,12 +270,20 @@ export function validateTransaction(
     throw new ApiError("INVALID_TRANSACTION", 400);
   }
   const message = tx.message;
+  const maxInstructions =
+    intent.operation === "game"
+      ? intent.action.kind === "reserveRun" &&
+        intent.action.expiresAtSeconds !== undefined
+        ? 5
+        : 4
+      : intent.sponsored
+        ? 3
+        : 1;
   if (
     message.version !== 0 ||
     message.addressTableLookups.length > 0 ||
     message.compiledInstructions.length === 0 ||
-    message.compiledInstructions.length >
-      (intent.sponsored ? 3 : intent.operation === "game" ? 4 : 1) ||
+    message.compiledInstructions.length > maxInstructions ||
     message.staticAccountKeys.length > 32
   )
     throw new ApiError("TRANSACTION_REJECTED", 400);

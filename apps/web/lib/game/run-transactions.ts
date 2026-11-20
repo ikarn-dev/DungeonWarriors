@@ -1,4 +1,4 @@
-import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
+import { BN, type IdlInstructionAccountItem } from "@anchor-lang/core";
 import {
   DELEGATION_PROGRAM_ID,
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -27,6 +27,8 @@ import {
 } from "../solana/addresses.ts";
 import {
   coder,
+  crankAddress,
+  hydraProgram,
   idl,
   nonceBytes,
   pda,
@@ -49,7 +51,7 @@ const action = z.discriminatedUnion("kind", [
     ...nonce,
     inputKey: publicKeySchema,
     expiresAtSeconds: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    allowance: positive,
+    allowance: u64Input,
   }),
   z.strictObject({ kind: z.literal("revokeSession"), ...nonce }),
   z.strictObject({
@@ -63,7 +65,14 @@ const action = z.discriminatedUnion("kind", [
     definingCatalogVersion: version,
     cat: catSchema,
     market: marketSchema,
-    stake: positive,
+    stake: u64Input,
+    maxGross: u64Input.optional(),
+    expiresAtSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
   }),
   z.strictObject({ kind: z.literal("delegateRun"), ...identity }),
   z.strictObject({
@@ -100,10 +109,6 @@ export type GameIntent = z.infer<typeof gameIntentSchema>;
 
 const sessionProgram = new PublicKey(
   "KeyspM2ssCJbqUhQ4k7sveSiY4WjnYsrXkC8oDbwde5",
-);
-// The pinned TS SDK exports the base Hydra address. Games use ER Hydra.
-const hydraProgram = new PublicKey(
-  "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf",
 );
 const mint = new PublicKey(DEVNET.usdcMint);
 
@@ -202,7 +207,14 @@ export function gameNetwork(action: GameIntent["action"]): "base" | "er" {
   }
 }
 
-export function gameInstructions(wallet: string, { action }: GameIntent) {
+export function gameInstructions(
+  wallet: string,
+  { action }: GameIntent,
+): {
+  instructions: TransactionInstruction[];
+  payer: PublicKey;
+  operationId: string;
+} {
   if (
     action.kind === "deposit" ||
     action.kind === "withdraw" ||
@@ -227,8 +239,12 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
     args: object = {},
     prefix: TransactionInstruction[] = [],
     operationId = `${action.kind}:${wallet}`,
+    instructionName: string = action.kind,
   ) => ({
-    instructions: [...prefix, programInstruction(action.kind, values, args)],
+    instructions: [
+      ...prefix,
+      programInstruction(instructionName, values, args),
+    ],
     payer: owner,
     operationId,
   });
@@ -296,6 +312,22 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
       definingCatalog: versionPda("catalog", action.definingCatalogVersion),
       policy: pda("sponsor-policy"),
     });
+    if (action.expiresAtSeconds !== undefined && action.maxGross === undefined)
+      throw new WebApiError("INVALID_REQUEST");
+    const authorization =
+      action.expiresAtSeconds === undefined
+        ? []
+        : gameInstructions(wallet, {
+            operation: "game",
+            sponsored: false,
+            action: {
+              kind: "authorizeSession",
+              nonce: action.sessionNonce,
+              inputKey: action.inputKey,
+              expiresAtSeconds: action.expiresAtSeconds,
+              allowance: action.stake,
+            },
+          }).instructions;
     return build(
       {
         args: {
@@ -308,9 +340,13 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
           market: { [action.market.toLowerCase()]: {} },
           stakeBaseUnits: new BN(action.stake),
         },
+        ...(action.maxGross === undefined
+          ? {}
+          : { maxGross: new BN(action.maxGross) }),
       },
-      [],
+      authorization,
       operationId,
+      action.maxGross === undefined ? "reserveRun" : "reserveQuotedRun",
     );
   }
   if (action.kind === "delegateRun") {
@@ -327,20 +363,8 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
     });
   }
   if (action.kind === "activateRun" || action.kind === "requestCompletion") {
-    // Anchor's pinned SHA-256 implementation also accepts Uint8Array.
-    const hashBytes = utils.sha256.hash as typeof utils.sha256.hash &
-      ((value: Uint8Array) => string);
-    const crankSeed = Buffer.from(
-      hashBytes(
-        Buffer.concat([Buffer.from("purrps:crank:v1"), run.toBuffer()]),
-      ),
-      "hex",
-    );
     Object.assign(values, {
-      crank: PublicKey.findProgramAddressSync(
-        [Buffer.from("crank"), run.toBytes(), crankSeed],
-        hydraProgram,
-      )[0],
+      crank: crankAddress(run),
       magicProgram: MAGIC_PROGRAM_ID,
       hydraProgram,
       rentVault: EPHEMERAL_VAULT_ID,
