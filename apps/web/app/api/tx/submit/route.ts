@@ -10,7 +10,7 @@ import {
 import { rateLimit } from "../../../../lib/server/runtime";
 import { submit, submitInput } from "../../../../lib/server/transactions";
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("tx.submit", async () => {
     assertOrigin(request);
     await rateLimit("submit", clientIp(request));
     const session = await authenticate(sessionToken(request));

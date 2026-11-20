@@ -9,6 +9,7 @@ import {
   rpcConfigSchema,
   sponsorConfigSchema,
 } from "../providers/config.ts";
+import { observeDuration } from "./telemetry";
 
 export class ApiError extends Error {
   constructor(
@@ -48,6 +49,19 @@ function makeRuntime() {
     token: config.UPSTASH_REDIS_REST_TOKEN,
     retry: false,
     signal: () => AbortSignal.timeout(5000),
+  });
+  redis.use(async (request, next) => {
+    const started = performance.now();
+    let ok = false;
+    try {
+      const result = await next(request);
+      ok = Array.isArray(result)
+        ? result.every((item) => item.error == null)
+        : result.error == null;
+      return result;
+    } finally {
+      observeDuration("redis", started, ok ? "ok" : "unavailable");
+    }
   });
   const prefix = `purrps:devnet:${digest(config.APP_ORIGIN).slice(0, 16)}`;
   const limiter = (limit: number) =>

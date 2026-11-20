@@ -22,6 +22,7 @@ import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
 import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig } from "./runtime";
+import { providerFetch } from "./telemetry";
 
 export const program = new PublicKey(DEVNET.program);
 export const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
@@ -45,12 +46,7 @@ export function connection() {
   return new Connection(baseRpcConfig().HELIUS_DEVNET_RPC_URL, {
     commitment: "finalized",
     disableRetryOnRateLimit: true,
-    fetch: (url, init) =>
-      fetch(url, {
-        ...init,
-        signal: AbortSignal.timeout(8000),
-        redirect: "error",
-      }),
+    fetch: providerFetch("solana"),
   });
 }
 export function account<T>(

@@ -20,7 +20,7 @@ const input = z
   })
   .strict();
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("rpc.devnet", async () => {
     assertOrigin(request);
     await rateLimit("rpc", clientIp(request));
     const session = await authenticate(sessionToken(request));

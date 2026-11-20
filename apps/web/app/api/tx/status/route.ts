@@ -10,6 +10,7 @@ import {
   sessionToken,
 } from "../../../../lib/server/http";
 import { ApiError, rateLimit } from "../../../../lib/server/runtime";
+import { observeTransactionStatus } from "../../../../lib/server/telemetry";
 import {
   checkedConnection,
   networkSchema,
@@ -26,7 +27,7 @@ const input = z
   })
   .strict();
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("tx.status", async () => {
     assertOrigin(request);
     await rateLimit("status", clientIp(request));
     const session = await authenticate(sessionToken(request));
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
             ? "finalized"
             : "failed"
           : "pending";
+    observeTransactionStatus(value.network, resolution);
     return json({
       slot: result.context.slot,
       network: value.network,

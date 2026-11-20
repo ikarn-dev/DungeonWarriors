@@ -8,7 +8,7 @@ import {
 } from "../../../../lib/server/http";
 import { rateLimit } from "../../../../lib/server/runtime";
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("auth.challenge", async () => {
     assertOrigin(request);
     await rateLimit("challenge", clientIp(request));
     const input = await body(request, challengeInput);

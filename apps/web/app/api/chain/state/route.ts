@@ -10,7 +10,7 @@ import {
 } from "../../../../lib/server/http";
 import { rateLimit } from "../../../../lib/server/runtime";
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("chain.state", async () => {
     assertOrigin(request);
     await rateLimit("state", clientIp(request));
     const session = await authenticate(sessionToken(request));

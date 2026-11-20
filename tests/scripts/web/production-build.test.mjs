@@ -47,7 +47,7 @@ test("server credential configuration is absent from browser chunks", () => {
   )) {
     const value = readFileSync(file, "utf8");
     assert.equal(
-      /HELIUS_DEVNET_RPC_URL|UPSTASH_REDIS_REST_TOKEN|SPONSOR_SECRET_KEY/.test(
+      /HELIUS_DEVNET_RPC_URL|UPSTASH_REDIS_REST_TOKEN|SPONSOR_SECRET_KEY|SENTRY_DSN/.test(
         value,
       ),
       false,

@@ -247,7 +247,7 @@ describe("wallet authentication", () => {
         challengeInput,
       ),
     ).rejects.toThrow("JSON_REQUIRED");
-    const failure = await route(async () => {
+    const failure = await route("auth.verify", async () => {
       throw new Error("secret provider URL");
     });
     expect(await failure.json()).toEqual({ error: "SERVICE_UNAVAILABLE" });

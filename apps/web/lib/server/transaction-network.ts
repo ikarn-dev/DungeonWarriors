@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DEVNET } from "../solana/addresses.ts";
 import { connection } from "./chain";
 import { ApiError, erRpcConfig } from "./runtime";
+import { providerFetch } from "./telemetry";
 
 export const networkSchema = z.enum(["base", "er"]);
 export type TransactionNetwork = z.infer<typeof networkSchema>;
@@ -24,12 +25,7 @@ export async function checkedConnection(
   } = erRpcConfig();
   if (pinnedValidator !== undefined && pinnedValidator !== expected)
     throw new ApiError("ER_VALIDATOR_MISMATCH", 503);
-  const timedFetch: typeof fetch = (input, init) =>
-    fetch(input, {
-      ...init,
-      signal: AbortSignal.timeout(8000),
-      redirect: "error",
-    });
+  const timedFetch = providerFetch("magicblock");
   const response = await timedFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

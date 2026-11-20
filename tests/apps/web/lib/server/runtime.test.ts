@@ -100,7 +100,7 @@ describe("configuration by API capability", () => {
     vi.stubEnv("APP_ORIGIN", "https://secret.example/private?token=secret");
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://secret.example/private");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", undefined);
-    const response = await route(async () => {
+    const response = await route("auth.session", async () => {
       serverConfig();
       return Response.json({});
     });

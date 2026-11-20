@@ -12,6 +12,7 @@
         "../apps/web/node_modules/@magicblock-labs/ephemeral-rollups-sdk"
       ],
       "@anchor-lang/core": ["../apps/web/node_modules/@anchor-lang/core"],
+      "@sentry/nextjs": ["../apps/web/node_modules/@sentry/nextjs"],
       "vitest": ["../apps/web/node_modules/vitest"],
       "@/*": ["../apps/web/*"]
     }

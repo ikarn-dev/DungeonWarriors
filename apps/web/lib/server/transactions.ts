@@ -22,6 +22,7 @@ import {
   programInstruction,
 } from "./game-transactions";
 import { ApiError, runtime, sponsorshipConfig } from "./runtime";
+import { observeSponsorReservation } from "./telemetry";
 import { checkedConnection } from "./transaction-network";
 
 export const intentSchema = z.discriminatedUnion("operation", [
@@ -428,6 +429,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
       [policy.SPONSOR_MAX_ATTEMPTS, cost.toString(), hourly],
     );
     if (admitted !== 1) throw new ApiError("SPONSOR_LIMITED", 429);
+    observeSponsorReservation(cost);
     tx.sign([key]);
   } else {
     const simulation = await rpc.simulateTransaction(tx, {

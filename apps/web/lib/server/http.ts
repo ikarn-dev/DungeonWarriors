@@ -1,7 +1,15 @@
 import "server-only";
 import { isIP } from "node:net";
+import { after } from "next/server";
 import type { z } from "zod";
 import { ApiError, serverConfig } from "./runtime";
+import {
+  flushTelemetry,
+  httpOutcome,
+  observeDuration,
+  type RouteOperation,
+  telemetryEnabled,
+} from "./telemetry";
 
 export const SESSION_COOKIE = "__Host-purrps-session";
 export const cookie = (token: string, maxAge = 43200) =>
@@ -91,14 +99,22 @@ export function json(
     },
   });
 }
-export async function route(work: () => Promise<Response>) {
+export async function route(
+  operation: RouteOperation,
+  work: () => Promise<Response>,
+) {
+  const started = performance.now();
+  let status = 503;
   try {
-    return await work();
+    const response = await work();
+    status = response.status;
+    return response;
   } catch (error) {
     const failure =
       error instanceof ApiError
         ? error
         : new ApiError("SERVICE_UNAVAILABLE", 503);
+    status = failure.status;
     return json(
       {
         error: failure.code,
@@ -110,5 +126,8 @@ export async function route(work: () => Promise<Response>) {
       failure.status,
       failure.status === 429 ? { "Retry-After": "60" } : {},
     );
+  } finally {
+    observeDuration(operation, started, httpOutcome(status));
+    if (telemetryEnabled()) after(flushTelemetry);
   }
 }

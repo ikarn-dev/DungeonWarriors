@@ -9,7 +9,7 @@ import {
 } from "../../../../lib/server/http";
 import { rateLimit } from "../../../../lib/server/runtime";
 export async function POST(request: Request) {
-  return route(async () => {
+  return route("auth.logout", async () => {
     assertOrigin(request);
     await rateLimit("logout", clientIp(request));
     await logout(sessionToken(request));
