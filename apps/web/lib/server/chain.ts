@@ -20,11 +20,12 @@ import {
   enumTag,
   runAddresses,
 } from "../game/run-accounts";
+import type { CompletionOffer } from "../game/run-transactions";
 import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
 import { coder, nonceBytes, pda, program, u64Input } from "../solana/program";
 import type { PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
-import { ApiError, baseRpcConfig } from "./runtime";
+import { ApiError, baseRpcConfig, sponsorshipConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
 import { readWalletFunds } from "./wallet-funds";
 
@@ -357,10 +358,9 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
     [pda("sponsor", run.toBytes()), houseAddress, vaultAddress, clockAddress],
     { commitment: "finalized", minContextSlot: state.context.slot },
   );
-  const budget = account<Accounts["sponsorBudget"]>(
-    "sponsorBudget",
-    budgetInfo ?? null,
-  );
+  const budget = uninitialized(budgetInfo ?? null)
+    ? null
+    : account<Accounts["sponsorBudget"]>("sponsorBudget", budgetInfo ?? null);
   if (
     !clock?.owner.equals(new PublicKey(DEVNET.sysvarOwner)) ||
     clock.executable ||
@@ -374,33 +374,63 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
   )
     throw invalidAccount();
   const balanceContext = stateContext(snapshot.slot);
-  if (budget === null || !budgetInfo)
-    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
-  const remaining =
-    BigInt(budget.limitLamports.toString()) -
-    BigInt(budget.spentLamports.toString());
-  if (
-    budget.schemaVersion !== 1 ||
-    !budget.operation.equals(run) ||
-    !budget.beneficiary.equals(owner) ||
-    !budget.authority.equals(policy.authority) ||
-    !budget.feePayer.equals(policy.authority) ||
-    enumTag(budget.purpose) !== "runCompletion" ||
-    budget.limitLamports.gt(policy.maxOperationLamports) ||
-    budget.reservedCompletionLamports.lt(policy.minCompletionLamports) ||
-    remaining < BigInt(budget.reservedCompletionLamports.toString()) ||
-    budget.maxAttempts > policy.maxAttempts ||
-    budget.attempts >= budget.maxAttempts ||
-    BigInt(budget.expiresAtSeconds.toString()) <
-      clockSeconds + BigInt(RULES_V1.activationTimeoutSeconds)
-  )
-    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
-  const rent = await rpc.getMinimumBalanceForRentExemption(
-    budgetInfo.data.length,
-    "finalized",
-  );
-  if (BigInt(budgetInfo.lamports) < BigInt(rent) + remaining)
-    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
+  const sponsor = policy.authority.toBase58();
+  const settings = sponsorshipConfig();
+  const spend = settings.SPONSOR_COMPLETION_RESERVE_LAMPORTS;
+  const attempts = Math.min(settings.SPONSOR_MAX_ATTEMPTS, policy.maxAttempts);
+  const unavailable = {
+    ...balanceContext,
+    entry: { status: "budgetUnavailable" },
+  };
+  if (settings.SPONSOR_PUBLIC_KEY !== sponsor || attempts < 1)
+    return unavailable;
+  let completionFunding: CompletionOffer | undefined;
+  const expired =
+    budget && BigInt(budget.expiresAtSeconds.toString()) <= clockSeconds;
+  if (budget && budgetInfo && !expired) {
+    const remaining =
+      BigInt(budget.limitLamports.toString()) -
+      BigInt(budget.spentLamports.toString());
+    if (
+      budget.schemaVersion !== 1 ||
+      !budget.operation.equals(run) ||
+      !budget.beneficiary.equals(owner) ||
+      !budget.authority.equals(policy.authority) ||
+      !budget.feePayer.equals(policy.authority) ||
+      enumTag(budget.purpose) !== "runCompletion" ||
+      budget.limitLamports.gt(policy.maxOperationLamports) ||
+      budget.reservedCompletionLamports.lt(policy.minCompletionLamports) ||
+      remaining < BigInt(budget.reservedCompletionLamports.toString()) ||
+      budget.maxAttempts > policy.maxAttempts ||
+      budget.attempts >= budget.maxAttempts ||
+      BigInt(budget.expiresAtSeconds.toString()) <
+        clockSeconds + BigInt(RULES_V1.activationTimeoutSeconds)
+    )
+      return unavailable;
+    const rent = await rpc.getMinimumBalanceForRentExemption(
+      budgetInfo.data.length,
+      "finalized",
+    );
+    if (BigInt(budgetInfo.lamports) < BigInt(rent) + remaining)
+      return unavailable;
+  } else {
+    const rent = await rpc.getMinimumBalanceForRentExemption(
+      coder.accounts.size("sponsorBudget"),
+      "finalized",
+    );
+    if (
+      spend < BigInt(policy.minCompletionLamports.toString()) ||
+      spend > BigInt(policy.maxOperationLamports.toString()) ||
+      spend + BigInt(rent) > settings.SPONSOR_OPERATION_LIMIT_LAMPORTS
+    )
+      return unavailable;
+    completionFunding = {
+      sponsor,
+      lamports: spend.toString(),
+      floor: settings.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
+      attempts,
+    };
+  }
   const house = account<Accounts["houseState"]>(
     "houseState",
     houseInfo ?? null,
@@ -448,6 +478,8 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
       nonce: player.nextRunNonce.toString(),
       sessionNonce: player.nextSessionNonce.toString(),
       clockSeconds: Number(clockSeconds),
+      completionSponsor: sponsor,
+      ...(completionFunding === undefined ? {} : { completionFunding }),
     },
   };
 }

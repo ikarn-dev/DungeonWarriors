@@ -434,7 +434,7 @@ describe("finalized wallet and receipt records", () => {
   });
 });
 
-it("requires a funded completion budget and caps entry by unencumbered vault credit", async () => {
+it("offers automatic budget funding while quoting against unencumbered vault credit", async () => {
   const fixture = coder.accounts.decode<Accounts["runGameState"]>(
     "runGameState",
     Buffer.from(
@@ -454,6 +454,11 @@ it("requires a funded completion budget and caps entry by unencumbered vault cre
   const tokenProgram = new PublicKey(DEVNET.tokenProgram);
   const vault = getAssociatedTokenAddressSync(mint, house, true, tokenProgram);
   const authority = Keypair.generate().publicKey;
+  vi.stubEnv("SPONSOR_PUBLIC_KEY", authority.toBase58());
+  vi.stubEnv("SPONSOR_MIN_BALANCE_LAMPORTS", "1000000000");
+  vi.stubEnv("SPONSOR_OPERATION_LIMIT_LAMPORTS", "2000000");
+  vi.stubEnv("SPONSOR_COMPLETION_RESERVE_LAMPORTS", "30000");
+  vi.stubEnv("SPONSOR_MAX_ATTEMPTS", "3");
   const run = runAddresses({ owner: wallet, nonce: 10n }).run[0];
   const account = async (
     name: string,
@@ -570,7 +575,15 @@ it("requires a funded completion budget and caps entry by unencumbered vault cre
     .mockResolvedValueOnce(initial)
     .mockResolvedValueOnce({ ...ready, value: [null, houseInfo, usdc, clock] });
   await expect(readState(wallet, input)).resolves.toMatchObject({
-    entry: { status: "budgetUnavailable" },
+    entry: {
+      status: "ready",
+      completionFunding: {
+        sponsor: authority.toBase58(),
+        lamports: "30000",
+        floor: "1000000000",
+        attempts: 2,
+      },
+    },
   });
   query.mockResolvedValueOnce(initial).mockResolvedValueOnce(ready);
   await expect(readState(wallet, input)).resolves.toMatchObject({
@@ -581,6 +594,15 @@ it("requires a funded completion budget and caps entry by unencumbered vault cre
       nonce: "10",
       sessionNonce: "0",
       clockSeconds: 1_700_000_000,
+      completionSponsor: authority.toBase58(),
+    },
+  });
+  clockData.writeBigInt64LE(1_700_000_301n, 32);
+  query.mockResolvedValueOnce(initial).mockResolvedValueOnce(ready);
+  await expect(readState(wallet, input)).resolves.toMatchObject({
+    entry: {
+      status: "ready",
+      completionFunding: { lamports: "30000" },
     },
   });
 });

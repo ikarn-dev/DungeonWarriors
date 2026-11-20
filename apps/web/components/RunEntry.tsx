@@ -25,6 +25,7 @@ type Launch = {
   nonce: string;
   key: Keypair;
   market: Market;
+  completionSponsor: string | undefined;
   reserve: Extract<GameIntent["action"], { kind: "reserveRun" }>;
   step: number;
   pending: GameSignature | null;
@@ -120,7 +121,7 @@ export default function RunEntry({
         setNotice(
           entry.status === "closed"
             ? "Runs are currently closed on Devnet."
-            : "This run is waiting for its completion budget.",
+            : "The app’s run sponsor is temporarily unavailable.",
         );
         return;
       }
@@ -179,6 +180,7 @@ export default function RunEntry({
         key,
         market,
         nonce: entry.nonce,
+        completionSponsor: entry.completionSponsor,
         step: 0,
         pending: null,
         reserve: {
@@ -195,6 +197,9 @@ export default function RunEntry({
           market,
           stake: stakeAmount,
           maxGross: quote.gross.toString(),
+          ...(entry.completionFunding === undefined
+            ? {}
+            : { completionFunding: entry.completionFunding }),
         },
       };
     }
@@ -223,7 +228,13 @@ export default function RunEntry({
           };
           action =
             setup.step === 1
-              ? { kind: "delegateRun", ...identity }
+              ? {
+                  kind: "delegateRun",
+                  ...identity,
+                  ...(setup.completionSponsor === undefined
+                    ? {}
+                    : { completionSponsor: setup.completionSponsor }),
+                }
               : {
                   kind: "activateRun",
                   ...identity,
@@ -280,6 +291,24 @@ export default function RunEntry({
           setQuote(null);
         }
         if (setup.step >= 1) setWatching(true);
+        if (
+          error instanceof WebApiError &&
+          error.code === "SPONSOR_RECLAIM_PENDING"
+        ) {
+          setNotice(
+            "The app is recovering its unused SOL. Review the run again shortly.",
+          );
+          return;
+        }
+        if (
+          error instanceof WebApiError &&
+          error.code === "SPONSOR_BUDGET_UNAVAILABLE"
+        ) {
+          setNotice(
+            "The app’s SOL sponsor is temporarily out of run capacity.",
+          );
+          return;
+        }
         setNotice(
           setup.pending === null
             ? setup.step === 0

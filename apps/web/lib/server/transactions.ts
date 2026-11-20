@@ -2,7 +2,6 @@ import "server-only";
 import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
 import {
   ComputeBudgetProgram,
-  Keypair,
   type MessageV0,
   PublicKey,
   SystemProgram,
@@ -12,6 +11,7 @@ import {
 } from "@solana/web3.js";
 import { z } from "zod";
 import { decodeEscrowAccount, runAddresses } from "../game/run-accounts";
+import { runSponsor } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses.ts";
 import { verifyWalletSignature } from "./auth";
 import { coder, idl, nonceBytes, pda, program, u64Input } from "./chain";
@@ -21,8 +21,14 @@ import {
   gameNetwork,
   programInstruction,
 } from "./game-transactions";
-import { ApiError, runtime, sponsorshipConfig } from "./runtime";
-import { observeSponsorReservation } from "./telemetry";
+import { ApiError, sponsorshipConfig } from "./runtime";
+import {
+  admitSponsorCost,
+  checkSponsorHeadroom,
+  dedicatedSponsor,
+  recycleRunBudget,
+  runSponsorCost,
+} from "./sponsorship";
 import { checkedConnection } from "./transaction-network";
 
 export const intentSchema = z.discriminatedUnion("operation", [
@@ -74,13 +80,6 @@ function starterSponsorLimit(operationLimit: bigint) {
   return operationLimit < STARTER_SPONSORED_LIMIT_LAMPORTS
     ? operationLimit
     : STARTER_SPONSORED_LIMIT_LAMPORTS;
-}
-
-function checkSponsorHeadroom(balance: number, floor: bigint, cost: bigint) {
-  if (!Number.isSafeInteger(balance) || balance < 0)
-    throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
-  if (BigInt(balance) - cost < floor)
-    throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
 }
 
 function reviewedInstructions(
@@ -191,7 +190,27 @@ export function instructionFor(
   };
 }
 function instructionsFor(wallet: string, intent: Intent) {
-  if (intent.operation === "game") return gameInstructions(wallet, intent);
+  if (intent.operation === "game") {
+    const sponsor = runSponsor(intent.action);
+    if (sponsor !== undefined) {
+      const settings = sponsorshipConfig();
+      const funding =
+        intent.action.kind === "reserveRun"
+          ? intent.action.completionFunding
+          : undefined;
+      if (
+        sponsor !== settings.SPONSOR_PUBLIC_KEY ||
+        sponsor === wallet ||
+        (funding &&
+          (BigInt(funding.lamports) !==
+            settings.SPONSOR_COMPLETION_RESERVE_LAMPORTS ||
+            BigInt(funding.floor) !== settings.SPONSOR_MIN_BALANCE_LAMPORTS ||
+            funding.attempts > settings.SPONSOR_MAX_ATTEMPTS))
+      )
+        throw new ApiError("INVALID_RUN_SPONSOR", 400);
+    }
+    return gameInstructions(wallet, intent);
+  }
   const { instruction, ...built } = instructionFor(wallet, intent);
   return { ...built, instructions: [instruction] };
 }
@@ -238,6 +257,13 @@ export async function prepare(wallet: string, intent: Intent) {
       starterSponsorLimit(policy.SPONSOR_OPERATION_LIMIT_LAMPORTS),
     );
   }
+  if (intent.operation === "game" && intent.action.kind === "reserveRun") {
+    const funding = intent.action.completionFunding;
+    if (funding) {
+      await recycleRunBudget(rpc, wallet, intent.action);
+      await runSponsorCost(rpc, funding);
+    }
+  }
   const block = await rpc.getLatestBlockhash(
     network === "er" ? "confirmed" : "finalized",
   );
@@ -246,10 +272,10 @@ export async function prepare(wallet: string, intent: Intent) {
     recentBlockhash: block.blockhash,
     instructions: built.instructions,
   }).compileToV0Message();
+  const bytes = new VersionedTransaction(message).serialize();
+  if (bytes.length > 1232) throw new ApiError("INVALID_TRANSACTION", 400);
   return {
-    transaction: Buffer.from(
-      new VersionedTransaction(message).serialize(),
-    ).toString("base64"),
+    transaction: Buffer.from(bytes).toString("base64"),
     ...block,
     network,
     operationId: built.operationId,
@@ -270,12 +296,21 @@ export function validateTransaction(
     throw new ApiError("INVALID_TRANSACTION", 400);
   }
   const message = tx.message;
+  const fundingInstructions =
+    intent.operation !== "game"
+      ? 0
+      : intent.action.kind === "reserveRun" && intent.action.completionFunding
+        ? 2
+        : intent.action.kind === "delegateRun" &&
+            intent.action.completionSponsor
+          ? 1
+          : 0;
   const maxInstructions =
     intent.operation === "game"
       ? intent.action.kind === "reserveRun" &&
         intent.action.expiresAtSeconds !== undefined
-        ? 5
-        : 4
+        ? 5 + fundingInstructions
+        : 4 + fundingInstructions
       : intent.sponsored
         ? 3
         : 1;
@@ -333,10 +368,13 @@ export function validateTransaction(
       throw new ApiError("TRANSACTION_REJECTED", 400);
   }
   const data = message.serialize();
+  const completionSponsor =
+    intent.operation === "game" ? runSponsor(intent.action) : undefined;
   for (let i = 0; i < signerCount; i++) {
     const key = message.staticAccountKeys[i];
     if (key === undefined) throw new ApiError("INVALID_SIGNATURE", 401);
-    if (intent.sponsored && i === 0) continue;
+    if ((intent.sponsored && i === 0) || key.toBase58() === completionSponsor)
+      continue;
     if (
       !verifyWalletSignature(
         key.toBase58(),
@@ -348,23 +386,6 @@ export function validateTransaction(
   }
   return tx;
 }
-function sponsorKey() {
-  const { SPONSOR_SECRET_KEY: value } = process.env;
-  if (value === undefined) throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
-  let key: Keypair;
-  try {
-    const bytes = Buffer.from(value, "base64");
-    if (bytes.length !== 64 || bytes.toString("base64") !== value)
-      throw new Error();
-    key = Keypair.fromSecretKey(bytes);
-  } catch {
-    throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
-  }
-  if (key.publicKey.toBase58() !== sponsorshipConfig().SPONSOR_PUBLIC_KEY)
-    throw new ApiError("SPONSOR_KEY_MISMATCH", 503);
-  return key;
-}
-const chargeBudget = `local n=tonumber(redis.call('GET',KEYS[1]) or '0'); local spent=tonumber(redis.call('GET',KEYS[2]) or '0'); if n>=tonumber(ARGV[1]) or spent+tonumber(ARGV[2])>tonumber(ARGV[3]) then return 0 end; redis.call('INCR',KEYS[1]); redis.call('EXPIRE',KEYS[1],3600); redis.call('INCRBY',KEYS[2],ARGV[2]); redis.call('EXPIRE',KEYS[2],3600); return 1`;
 export async function submit(wallet: string, intent: Intent, encoded: string) {
   const tx = validateTransaction(wallet, intent, encoded);
   const network = networkFor(intent);
@@ -378,28 +399,13 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     throw new ApiError("BLOCKHASH_EXPIRED", 409);
   if (fee !== null && (!Number.isSafeInteger(fee) || fee < 0))
     throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
+  const completionSponsor =
+    intent.operation === "game" ? runSponsor(intent.action) : undefined;
   if (intent.sponsored) {
     if (fee === null || BigInt(fee) > SPONSORED_FEE_LIMIT_LAMPORTS)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     const policy = sponsorshipConfig();
-    const key = sponsorKey();
-    const loader = PublicKey.findProgramAddressSync(
-      [program.toBytes()],
-      new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
-    )[0];
-    const programData = await rpc.getAccountInfo(loader, "finalized");
-    if (
-      programData === null ||
-      programData.data.length < 45 ||
-      programData.data.readUInt32LE(0) !== 3 ||
-      programData.data[12] !== 1 ||
-      !programData.owner.equals(
-        new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
-      )
-    )
-      throw new ApiError("INVALID_UPGRADE_AUTHORITY", 503);
-    if (new PublicKey(programData.data.subarray(13, 45)).equals(key.publicKey))
-      throw new ApiError("UPGRADE_KEY_CANNOT_SPONSOR", 503);
+    const key = await dedicatedSponsor(rpc);
     const balance = await rpc.getBalance(key.publicKey, "confirmed");
     const simulation = await rpc.simulateTransaction(tx, {
       sigVerify: false,
@@ -436,31 +442,16 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     // The simulated payer balance already reflects the network fee.
     if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
-    if (cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS)
-      throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     checkSponsorHeadroom(balance, policy.SPONSOR_MIN_BALANCE_LAMPORTS, cost);
-    const { SPONSOR_HOURLY_BUDGET_LAMPORTS: hourly } = process.env;
-    if (
-      hourly === undefined ||
-      !u64Input.safeParse(hourly).success ||
-      BigInt(hourly) === 0n ||
-      BigInt(hourly) > BigInt(Number.MAX_SAFE_INTEGER)
-    )
-      throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
-    const operation = instructionFor(wallet, intent).operationId;
-    const r = runtime();
-    const admitted = await r.redis.eval(
-      chargeBudget,
-      [
-        `${r.prefix}:sponsor:attempt:${operation}`,
-        `${r.prefix}:sponsor:cost:${Math.floor(Date.now() / 3600000)}`,
-      ],
-      [policy.SPONSOR_MAX_ATTEMPTS, cost.toString(), hourly],
-    );
-    if (admitted !== 1) throw new ApiError("SPONSOR_LIMITED", 429);
-    observeSponsorReservation(cost);
+    await admitSponsorCost(instructionFor(wallet, intent).operationId, cost);
     tx.sign([key]);
   } else {
+    if (completionSponsor !== undefined) tx.sign([await dedicatedSponsor(rpc)]);
+    const funding =
+      intent.operation === "game" && intent.action.kind === "reserveRun"
+        ? intent.action.completionFunding
+        : undefined;
+    const cost = funding ? await runSponsorCost(rpc, funding) : undefined;
     const simulation = await rpc.simulateTransaction(tx, {
       sigVerify: true,
       commitment: "confirmed",
@@ -469,6 +460,12 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
       throw new ApiError("BLOCKHASH_EXPIRED", 409);
     if (simulation.value.err !== null)
       throw new ApiError("SIMULATION_REJECTED", 409);
+    if (cost !== undefined)
+      await admitSponsorCost(
+        instructionsFor(wallet, intent).operationId,
+        cost,
+        utils.bytes.bs58.encode(tx.signatures[0] ?? new Uint8Array()),
+      );
   }
   const signature = utils.bytes.bs58.encode(
     Buffer.from(tx.signatures[0] ?? []),

@@ -1,8 +1,10 @@
 import { utils } from "@anchor-lang/core";
 import { type Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { z } from "zod";
+import { publicKeySchema } from "../solana/addresses";
 import { decodeEscrowAccount, runAddresses } from "./run-accounts";
 import {
+  completionOfferSchema,
   type GameIntent,
   gameNetwork,
   validatePreparedGame,
@@ -73,6 +75,8 @@ export const runEntrySchema = z.object({
         .int()
         .positive()
         .max(Number.MAX_SAFE_INTEGER - 1800),
+      completionSponsor: publicKeySchema.optional(),
+      completionFunding: completionOfferSchema.optional(),
     }),
   ]),
 });
@@ -158,6 +162,10 @@ export async function sendGameAction(
         "RUN_SCOPE_MISMATCH",
         "RATE_LIMITED",
         "AUTH_REQUIRED",
+        "SPONSOR_BUDGET_UNAVAILABLE",
+        "SPONSOR_LIMITED",
+        "SPONSOR_NOT_CONFIGURED",
+        "INVALID_RUN_SPONSOR",
       ].includes(error.code)
     )
       onSignature(null);

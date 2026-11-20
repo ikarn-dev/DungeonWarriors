@@ -44,6 +44,13 @@ const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
 const catSchema = z.enum(["collector", "acrobat", "guardian", "sprinter"]);
 const nonce = { nonce: u64Input };
 const identity = { ...nonce, delegationEpoch: positive };
+export const completionOfferSchema = z.strictObject({
+  sponsor: publicKeySchema,
+  lamports: positive,
+  floor: u64Input,
+  attempts: z.number().int().min(1).max(65_535),
+});
+export type CompletionOffer = z.infer<typeof completionOfferSchema>;
 const action = z.discriminatedUnion("kind", [
   ...playerActions,
   z.strictObject({
@@ -67,6 +74,7 @@ const action = z.discriminatedUnion("kind", [
     market: marketSchema,
     stake: u64Input,
     maxGross: u64Input.optional(),
+    completionFunding: completionOfferSchema.optional(),
     expiresAtSeconds: z
       .number()
       .int()
@@ -74,7 +82,11 @@ const action = z.discriminatedUnion("kind", [
       .max(Number.MAX_SAFE_INTEGER)
       .optional(),
   }),
-  z.strictObject({ kind: z.literal("delegateRun"), ...identity }),
+  z.strictObject({
+    kind: z.literal("delegateRun"),
+    ...identity,
+    completionSponsor: publicKeySchema.optional(),
+  }),
   z.strictObject({
     kind: z.literal("activateRun"),
     ...identity,
@@ -106,6 +118,12 @@ export const gameIntentSchema = z.strictObject({
   action,
 });
 export type GameIntent = z.infer<typeof gameIntentSchema>;
+
+export function runSponsor(action: GameIntent["action"]) {
+  if (action.kind === "reserveRun") return action.completionFunding?.sponsor;
+  if (action.kind === "delegateRun") return action.completionSponsor;
+  return undefined;
+}
 
 const sessionProgram = new PublicKey(
   "KeyspM2ssCJbqUhQ4k7sveSiY4WjnYsrXkC8oDbwde5",
@@ -314,6 +332,40 @@ export function gameInstructions(
     });
     if (action.expiresAtSeconds !== undefined && action.maxGross === undefined)
       throw new WebApiError("INVALID_REQUEST");
+    const funding = action.completionFunding;
+    const fundingInstructions: TransactionInstruction[] = [];
+    if (funding) {
+      const sponsor = new PublicKey(funding.sponsor);
+      if (
+        action.expiresAtSeconds === undefined ||
+        sponsor.equals(owner) ||
+        sponsor.equals(new PublicKey(action.inputKey))
+      )
+        throw new WebApiError("INVALID_REQUEST");
+      fundingInstructions.push(
+        programInstruction(
+          "fundSponsorship",
+          { ...values, funder: sponsor },
+          {
+            args: {
+              operation: run,
+              beneficiary: owner,
+              purpose: { runCompletion: {} },
+              limitLamports: new BN(funding.lamports),
+              reservedCompletionLamports: new BN(funding.lamports),
+              maxAttempts: funding.attempts,
+              expiresAtSeconds: new BN(action.expiresAtSeconds),
+            },
+          },
+        ),
+        // A self-transfer atomically checks the remaining SOL in the sponsor account.
+        SystemProgram.transfer({
+          fromPubkey: sponsor,
+          toPubkey: sponsor,
+          lamports: BigInt(funding.floor),
+        }),
+      );
+    }
     const authorization =
       action.expiresAtSeconds === undefined
         ? []
@@ -344,7 +396,7 @@ export function gameInstructions(
           ? {}
           : { maxGross: new BN(action.maxGross) }),
       },
-      authorization,
+      [...fundingInstructions, ...authorization],
       operationId,
       action.maxGross === undefined ? "reserveRun" : "reserveQuotedRun",
     );
@@ -376,6 +428,20 @@ export function gameInstructions(
     Object.assign(values, { playKey: playKey });
   }
   if ("delegationEpoch" in action) {
+    const funding =
+      action.kind === "delegateRun" && action.completionSponsor
+        ? [
+            programInstruction(
+              "fundRunCompletion",
+              {
+                ...values,
+                sponsor: new PublicKey(action.completionSponsor),
+                actionBalance: escrowPdaFromEscrowAuthority(run, 255),
+              },
+              {},
+            ),
+          ]
+        : [];
     return build(
       {
         args: {
@@ -383,7 +449,7 @@ export function gameInstructions(
           delegationEpoch: new BN(action.delegationEpoch),
         },
       },
-      [],
+      funding,
       operationId,
     );
   }
