@@ -62,15 +62,34 @@ async function fixture(work) {
     rmSync(root, { recursive: true, force: true });
   }
 }
-test("missing user media is an explicit pending result", async () => {
+test("a version without a manifest leaves the scene pending", async () => {
   const result = await checkGameAssets(
     fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    1,
+    2,
   );
   assert.equal(result.ready, false);
   assert.equal(result.reason, "USER_ASSETS_PENDING");
   assert.ok(result.missing.includes("coin-spin"));
 });
+test("all first scene SVGs are valid and bound by the bundled manifest", async () => {
+  const result = await checkGameAssets(
+    fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
+    1,
+  );
+  assert.equal(result.ready, true);
+  assert.equal(result.checkedFiles, 37);
+});
+test("active SVG content is rejected even when its digest matches", async () =>
+  fixture(async ({ root, folder, image, save }) => {
+    const vector =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" onload="alert(1)"><rect width="2" height="2"/></svg>';
+    image.path = "/game-assets/v1/sample.svg";
+    image.bytes = Buffer.byteLength(vector);
+    image.sha256 = createHash("sha256").update(vector).digest("hex");
+    save();
+    writeFileSync(join(folder, "sample.svg"), vector);
+    await assert.rejects(checkGameAssets(root, 1), /UNSAFE_ASSET_SVG/);
+  }));
 test("decodes real PNG bytes and returns a bound partial manifest without claiming ready", async () =>
   fixture(async ({ root }) => {
     const result = await checkGameAssets(root, 1);

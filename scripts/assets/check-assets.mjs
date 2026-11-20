@@ -44,19 +44,37 @@ export async function checkGameAssets(publicDirectory, version) {
     const data = readFileSync(path);
     if (hash(data) !== asset.sha256)
       throw new Error(`ASSET_HASH_MISMATCH:${asset.id}`);
+    const vector = path.endsWith(".svg");
+    if (vector) {
+      const svg = data.toString("utf8").trim();
+      const shape =
+        /<\/?(?:svg|g|path|rect|ellipse|circle|polygon|linearGradient|stop|defs)\b(?:\s+(?:[a-zA-Z][a-zA-Z-]*="[^"&<>]*"))*\s*\/?>/g;
+      const disallowed =
+        /\b(?:on[a-z]+|style|href)\s*=|url\((?!#[a-z][a-z0-9-]*\))|[&]/i;
+      if (
+        !svg.startsWith("<svg ") ||
+        !svg.endsWith("</svg>") ||
+        svg.replace(shape, "").trim() !== "" ||
+        disallowed.test(svg) ||
+        /\bxmlns="[^"]+"/.exec(svg)?.[0] !==
+          'xmlns="http://www.w3.org/2000/svg"'
+      )
+        throw new Error(`UNSAFE_ASSET_SVG:${asset.id}`);
+    }
     const image = sharp(data, {
       limitInputPixels: 4096 * 4096,
       failOn: "warning",
     });
     const metadata = await image.metadata();
     if (
-      metadata.format !== "png" ||
+      metadata.format !== (vector ? "svg" : "png") ||
       metadata.width !== asset.width ||
       metadata.height !== asset.height ||
-      metadata.isPalette ||
+      (!vector && metadata.isPalette) ||
       metadata.depth !== "uchar" ||
       (metadata.pages ?? 1) !== 1 ||
-      (metadata.channels !== 4 &&
+      (!vector &&
+        metadata.channels !== 4 &&
         !(asset.id === "background-sky" && metadata.channels === 3))
     )
       throw new Error(`ASSET_IMAGE_MISMATCH:${asset.id}`);

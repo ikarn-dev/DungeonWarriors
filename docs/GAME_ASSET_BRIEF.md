@@ -2,11 +2,11 @@
 
 ## Ownership and handoff
 
-**User decision — 2026-11-17:** The user supplies the game artwork manually. Coins must look like dimensional gold coins rotating on the ramp in a flat 2D side-view game. This brief specifies the delivery; it does not generate artwork or add gameplay features.
+**Art direction — 2026-11-20.** PURRPS uses original SVG artwork bundled with the app. The starter capsule and four cat portraits establish the style before the running scene. Coins use a shaded 16-frame vertical-axis turn to stay upright and look dimensional in the side view.
 
-**P1-06 foundation contracts are built; production artwork is pending.** The developer will explicitly flag the asset handoff before **P2-05 Phaser scene integration**. Pure simulation, prediction and contract work can continue while artwork is prepared. Final media/version validation is part of P5-03; do not leave the first playable scene waiting until P5 to request its core art.
+Version 1 includes the complete first-scene asset list, four portraits, capsule pieces and the upgrade icon. `node scripts/assets/build-scene-art.mjs --check` verifies that the retained files match their source. `pnpm check:assets` checks the manifest, SVG structure, dimensions, content hashes and full decoding. Future authored versions can still contain PNG files.
 
-Start with one cat's run cycle, the gold coin spin and one grass/stone ramp material set. Check their scale and readability together before producing every cat animation. Then deliver the remaining first-scene assets. No real game entry should depend on missing media or a locally invented cat.
+Catalog publication binds the versioned manifest onchain. The hosted build must serve that version so signed draws and run rendering can load their required art.
 
 ## Visual direction
 
@@ -19,7 +19,7 @@ Start with one cat's run cycle, the gold coin spin and one grass/stone ramp mate
 
 ## Delivery formats and scale
 
-These are **recommended authoring sizes**, chosen for the current 960 × 540 logical game view. They are presentation settings; they do not change the published physics. Confirm the first sample set before making all sheets.
+These are **recommended authoring sizes**, chosen for the current 960 × 540 logical game view. The bundled SVGs use the same native sizes, anchors and frame grids shown here.
 
 | Asset type | Delivery | Authoring rules |
 |---|---|---|
@@ -124,11 +124,11 @@ purrps-art-v1/
 
 `asset-notes.json` should describe each exported file's identifier, path, pixel dimensions, frame dimensions/count/order, clip names, playback timing, loop behavior, pivot/contact point and occupied bounds. Include seamless-repeat direction and audio loop points where relevant. A plain written sheet map is also acceptable for the initial sample; the developer converts it into the final versioned runtime manifest.
 
-The final runtime destination is `apps/web/public/game-assets/v1/`, with a manifest recording stable IDs, dimensions/frame/anchor metadata and content hashes. This folder and manifest are created during integration, not populated with dummy artwork now. Published versions must remain available; a later art revision gets a new version instead of silently overwriting files referenced by a published catalog. Editable sources are not shipped in the public website output. Verification fixtures/config remain only in root `tests/`.
+The runtime assets and manifest live in `apps/web/public/game-assets/v1/`. The manifest records stable IDs, dimensions, frame and anchor metadata, and content hashes. Keep each published version intact. A later art revision gets a new version. The artwork source lives in `scripts/assets/build-scene-art.mjs` and test fixtures live in root `tests/`.
 
 ## Handoff acceptance
 
-- The developer notifies the user before P2-05 needs real media, then checks the first cat + ramp + spinning coin together.
+- Check the first cat, ramp and spinning coin together with the renderer.
 - Sheets open at their declared size; transparency is clean, fixed-cell alignment/pivots match, loops wrap without jumps, and ramp/background seams join.
 - Cats, pickups and hazards remain distinct on the logical game view and supported landscape mobile screens; decoration does not hide collision surfaces.
 - All supplied names, powers, rarity grades and upgrade visuals match the existing four-cat catalog. There are no unnecessary per-level variants.
@@ -137,12 +137,12 @@ The final runtime destination is `apps/web/public/game-assets/v1/`, with a manif
 
 ## Runtime manifest and CLI validation
 
-The first-scene contract is implemented in `apps/web/lib/game/assets.mts`; it lists 30 stable sheet/material identifiers, including four cat sheets, separate ramp/bridge/water materials, the coin/shadow, pickups, shared effect sheets, three backgrounds and a HUD sheet. Audio, fonts and later shop/collection artwork remain separate delivery work for P5-03.
+The first-scene contract in `apps/web/lib/game/assets.ts` lists 30 stable sheet and material identifiers. The v1 manifest also includes four portraits, two capsule pieces and an upgrade icon.
 
 The runtime file is `apps/web/public/game-assets/v1/manifest.json`. It contains `schemaVersion: 1`, `version: 1` and an `assets` array sorted by `id`. Each entry records `id`, root-relative `path`, lowercase `sha256`, encoded `bytes`, image `width`/`height`, `frameWidth`/`frameHeight`, `frames`, pixel `anchor: {x, y}`, `repeat` (`none`, `x`, `xy`), `reducedMotionFrame`, and `clips`. Clips are sorted by name and contain `name`, zero-based `start`, `count`, `fps`, and `loop`. Runtime sheets use an untrimmed, equal-cell grid; packed authoring atlases must be converted before publication. The developer prepares this manifest from the supplied art and notes.
 
 Cat sheets expose `idle`, `run`, `jump`, `fall`, `dash`, `hit`, `defeat`. Shared action clips are `dash`, `hit`, `landing`, `pickup`; shared power clips are `double-jump`, `extra-dash`, `magnet`, `shield-active`, `shield-contact`. The HUD sheet exposes `boost`, `cash-out`, `dash`, `double-jump`, `extra-dash`, `jump`, `magnet`, `mute`, `pause`, `rotate-device`, `shield`, `sound`, `status`. These are named sheet regions, so static icons may use a one-frame clip.
 
-Run `pnpm check:assets` to validate version 1, or `pnpm check:assets 2` for a later version. It checks file containment, sizes, hashes, PNG dimensions/color channels and full decoding using Next's installed image decoder. Missing files, invalid metadata and missing first-scene IDs cannot report ready. The catalog binding hashes canonical UTF-8 JSON from `assetManifestBytes`, with strict field order and sorted IDs/clip names; it does not hash arbitrary pretty-printed JSON. Published versions must be retained intact.
+Run `pnpm check:assets` to validate version 1, or `pnpm check:assets 2` for a later version. It checks file containment, sizes, hashes, SVG structure, image dimensions and full decoding using Next's installed image decoder. The catalog binding hashes canonical UTF-8 JSON from `assetManifestBytes`, with strict field order and sorted IDs and clip names.
 
 `apps/web/lib/game/presentation.ts` defines the 960 × 540 viewport, nearest-neighbor rendering, physical-pixel alignment where the display fits, pointer mapping, portrait gameplay gating with emergency cash-out retained, 44 CSS-pixel touch targets and references to the existing UI colors/fonts. It also defines the upright 16 FPS coin loop and slope-aligned shadow. These tested contracts do not constitute a rendered Phaser scene or device visual review.

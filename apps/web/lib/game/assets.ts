@@ -55,7 +55,7 @@ export const imageAssetSchema = z
       .string()
       .max(200)
       .regex(
-        /^\/game-assets\/v[1-9][0-9]*\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.png$/,
+        /^\/game-assets\/v[1-9][0-9]*\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.(?:png|svg)$/,
       ),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     bytes: positive.max(8 * 1024 * 1024),
