@@ -292,11 +292,27 @@ impl Play {
             .unwrap();
     }
     pub fn admit_fixture(&mut self) {
-        // The real admission setter refuses reservations until ER execution/settlement exist.
-        let mut c: GameConfig = self.h.read(self.h.config);
-        c.allow_reservations = true;
         let config = self.h.config;
-        setup::put(&mut self.h, config, &c);
+        let admin = setup::admin(&self.h);
+        let state: GameConfig = self.h.read(config);
+        self.h
+            .send(
+                ix(
+                    purrps_game::instruction::SetAdmission {
+                        args: purrps_game::instruction_args::SetAdmissionArgs {
+                            starter: state.allow_starter,
+                            purchases: state.allow_purchases,
+                            reservations: true,
+                        },
+                    },
+                    purrps_game::accounts::SetAdmission {
+                        config,
+                        admin: admin.pubkey(),
+                    },
+                ),
+                &admin,
+            )
+            .unwrap();
     }
     pub fn args(&self, nonce: u64) -> ReserveRunArgs {
         ReserveRunArgs {

@@ -417,7 +417,7 @@ fn later_catalog_inventory_and_config_do_not_change_reserved_snapshot() {
 }
 
 #[test]
-fn deployed_admission_gate_remains_closed_and_fixed_buffer_layout_stays_strict() {
+fn reservation_requires_open_admission_and_the_fixed_buffer_layout_stays_strict() {
     let mut p = Play::new();
     p.authorize();
     p.fund(0);

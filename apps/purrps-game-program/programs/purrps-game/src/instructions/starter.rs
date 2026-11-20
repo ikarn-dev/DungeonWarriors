@@ -210,9 +210,7 @@ pub struct SetAdmission<'info> {
     pub admin: Signer<'info>,
 }
 pub fn handle_set_admission(ctx: Context<SetAdmission>, args: SetAdmissionArgs) -> Result<()> {
-    // Run admission remains closed until delegation and settlement exist.
-    require!(!args.reservations, ErrorCode::AdmissionClosed);
-    if args.starter || args.purchases {
+    if args.starter || args.purchases || args.reservations {
         require!(
             ctx.accounts.config.catalog.is_some() && ctx.accounts.config.rules.is_some(),
             ErrorCode::InvalidConfiguration
@@ -220,6 +218,6 @@ pub fn handle_set_admission(ctx: Context<SetAdmission>, args: SetAdmissionArgs) 
     }
     ctx.accounts.config.allow_starter = args.starter;
     ctx.accounts.config.allow_purchases = args.purchases;
-    ctx.accounts.config.allow_reservations = false;
+    ctx.accounts.config.allow_reservations = args.reservations;
     Ok(())
 }

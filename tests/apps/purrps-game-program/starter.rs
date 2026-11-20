@@ -269,10 +269,10 @@ fn queue_cpi_failure_rolls_back_claim_nonce_lock_and_draw_creation() {
     assert!(c.pending_draw.is_none());
 }
 #[test]
-fn purchase_admission_requires_publication_and_run_admission_stays_closed() {
-    let (mut h, _, _, _, _, _) = fixture();
+fn opening_admission_requires_admin_and_published_rules_and_catalog() {
+    let (mut h, other, _, _, _, _) = fixture();
     let a = setup::admin(&h);
-    let admission = |config, purchases, reservations| {
+    let admission = |config, admin, purchases, reservations| {
         Instruction::new_with_bytes(
             purrps_game::ID,
             &purrps_game::instruction::SetAdmission {
@@ -283,23 +283,41 @@ fn purchase_admission_requires_publication_and_run_admission_stays_closed() {
                 },
             }
             .data(),
-            purrps_game::accounts::SetAdmission {
-                config,
-                admin: a.pubkey(),
-            }
-            .to_account_metas(None),
+            purrps_game::accounts::SetAdmission { config, admin }.to_account_metas(None),
         )
     };
     let config = h.config;
     let mut cfg: GameConfig = h.read(config);
     let catalog = cfg.catalog.take();
     setup::put(&mut h, config, &cfg);
-    assert!(h.send(admission(config, true, false), &a).is_err());
+    assert!(h
+        .send(admission(config, a.pubkey(), true, false), &a)
+        .is_err());
+    assert!(h
+        .send(admission(config, a.pubkey(), false, true), &a)
+        .is_err());
     cfg.catalog = catalog;
+    let rules = cfg.rules.take();
     setup::put(&mut h, config, &cfg);
-    h.send(admission(config, true, false), &a).unwrap();
+    assert!(h
+        .send(admission(config, a.pubkey(), false, true), &a)
+        .is_err());
+    cfg.rules = rules;
+    setup::put(&mut h, config, &cfg);
+    assert!(h
+        .send(admission(config, other.pubkey(), false, true), &other)
+        .is_err());
+    h.send(admission(config, a.pubkey(), true, false), &a)
+        .unwrap();
     assert!(h.read::<GameConfig>(config).allow_purchases);
-    assert!(h.send(admission(config, false, true), &a).is_err());
+    h.send(admission(config, a.pubkey(), false, true), &a)
+        .unwrap();
+    let admitted: GameConfig = h.read(config);
+    assert!(admitted.allow_reservations);
+    assert!(!admitted.allow_purchases);
+    h.send(admission(config, a.pubkey(), false, false), &a)
+        .unwrap();
+    assert!(!h.read::<GameConfig>(config).allow_reservations);
 }
 
 #[test]
