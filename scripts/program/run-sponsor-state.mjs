@@ -129,6 +129,60 @@ function readRun(info, escrow, scope) {
   return data;
 }
 
+function readClock(clock, code) {
+  check(
+    clock?.owner.toBase58() === DEVNET.sysvarOwner &&
+      clock.data.length === 40 &&
+      !clock.executable,
+    code,
+  );
+  return clock.data.readBigInt64LE(32);
+}
+
+export function runProgress(run, now) {
+  const { observations, observationHead, observationCount } = run;
+  check(
+    observationHead < observations.length &&
+      observationCount <= observations.length &&
+      run.intentCount <= run.intents.length,
+    "INVALID_RUN_SCOPE",
+  );
+  const latest =
+    observationCount === 0
+      ? null
+      : observations[
+          (observationHead + observationCount - 1) % observations.length
+        ];
+  return {
+    phase: tag(run.phase),
+    activeTicks: run.activeTicks.toString(),
+    queuedInputs: run.intentCount,
+    lastCrankOrdinal: run.crank.lastExecutionOrdinal.toString(),
+    completionAttempts: run.crank.completionAttempts,
+    oracleAgeSeconds:
+      latest === null
+        ? null
+        : (now - amount(latest.publishedAtSeconds)).toString(),
+  };
+}
+
+export async function readErProgress(rpc, scope, escrow) {
+  const { value, context } = await rpc.getMultipleAccountsInfoAndContext(
+    [scope.run, new PublicKey(DEVNET.clock)],
+    "confirmed",
+  );
+  check(value.length === 2, "INVALID_ER_STATE");
+  const [run, clock] = value;
+  return {
+    network: "er",
+    slot: context.slot,
+    ...runProgress(
+      readRun(run, escrow, scope),
+      readClock(clock, "INVALID_ER_CLOCK"),
+    ),
+  };
+}
+
 export async function readBaseRun(rpc, scope) {
   const names = [
     "config",
@@ -202,12 +256,7 @@ export async function readBaseRun(rpc, scope) {
         Number.isSafeInteger(balanceInfo.lamports)),
     "INVALID_ACTION_BALANCE",
   );
-  check(
-    clock?.owner.toBase58() === DEVNET.sysvarOwner &&
-      clock.data.length === 40 &&
-      !clock.executable,
-    "INVALID_BASE_CLOCK",
-  );
+  const now = readClock(clock, "INVALID_BASE_CLOCK");
   check(!delegated || escrow?.delegationInitiated, "INVALID_RUN_SCOPE");
   return {
     config,
@@ -215,11 +264,12 @@ export async function readBaseRun(rpc, scope) {
     player,
     budget,
     escrow,
+    receipt,
     settled,
     delegated,
     run,
     slot: result.context.slot,
-    now: clock.data.readBigInt64LE(32),
+    now,
     budgetLamports: budgetInfo?.lamports ?? 0,
     budgetSize: budgetInfo?.data.length ?? 0,
     actionLamports: balanceInfo?.lamports ?? 0,

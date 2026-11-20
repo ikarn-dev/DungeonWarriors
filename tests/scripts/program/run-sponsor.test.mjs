@@ -11,6 +11,7 @@ import { execute } from "../../../scripts/program/run-sponsor.mjs";
 import {
   existingBudgetPlan,
   provisionPlan,
+  readErProgress,
   requireWeb,
   runScope,
   statusFor,
@@ -209,6 +210,32 @@ test("completion retry uses the terminal's own attempt and stops when it returns
     delegated: true,
   };
   const plan = existingBudgetPlan("retry", scope, state, info(1));
+  const clock = {
+    owner: new PublicKey(DEVNET.sysvarOwner),
+    data: Buffer.alloc(40),
+    executable: false,
+  };
+  clock.data.writeBigInt64LE(1_700_000_002n, 32);
+  const rpc = {
+    async getMultipleAccountsInfoAndContext(addresses, commitment) {
+      assert.equal(commitment, "confirmed");
+      assert.ok(addresses[0].equals(scope.run));
+      assert.ok(addresses[1].equals(new PublicKey(DEVNET.clock)));
+      return { context: { slot: 200 }, value: [info(1), clock] };
+    },
+  };
+  const progress = await readErProgress(rpc, scope, state.escrow);
+  assert.equal(progress.slot, 200);
+  assert.equal(progress.network, "er");
+  assert.equal(progress.completionAttempts, 1);
+  assert.equal(progress.activeTicks, original.activeTicks.toString());
+  await assert.rejects(
+    readErProgress(rpc, scope, {
+      ...state.escrow,
+      snapshotHash: Buffer.alloc(32),
+    }),
+    /INVALID_RUN_SCOPE/,
+  );
   assert.equal(plan.expectedAttempt, 1);
   assert.ok(plan.instruction.keys.some(({ pubkey }) => pubkey.equals(crank)));
   assert.equal(

@@ -11,7 +11,9 @@ import {
   existingBudgetPlan,
   provisionPlan,
   readBaseRun,
+  readErProgress,
   requireWeb,
+  runProgress,
   runScope,
   statusFor,
 } from "./run-sponsor-state.mjs";
@@ -241,12 +243,37 @@ export async function main(args, env) {
     actionLamports: state.actionLamports,
     maxAttempts: state.budget?.maxAttempts ?? null,
   };
-  return command === "status"
-    ? summary
-    : {
-        ...summary,
-        ...(await operate(command, scope, base, state, values, env)),
-      };
+  if (command !== "status")
+    return {
+      ...summary,
+      ...(await operate(command, scope, base, state, values, env)),
+    };
+  let progress = null;
+  if (state.delegated) {
+    try {
+      const er = await rollup(state.escrow.snapshot.oracle.validator, env);
+      progress = await readErProgress(er, scope, state.escrow);
+    } catch {
+      progress = { network: "er", status: "unavailable" };
+    }
+  } else if (state.run !== null) {
+    progress = {
+      network: "base",
+      slot: state.slot,
+      ...runProgress(state.run, state.now),
+    };
+  }
+  return {
+    ...summary,
+    progress,
+    settlement:
+      state.receipt === null
+        ? null
+        : {
+            slot: state.receipt.settledAtSlot.toString(),
+            unixSeconds: state.receipt.settledAtSeconds.toString(),
+          },
+  };
 }
 
 if (

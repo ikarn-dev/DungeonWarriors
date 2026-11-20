@@ -40,7 +40,11 @@ async function jsonRequest(url, body, headers = {}) {
   });
   if (!response.ok || response.body === null) {
     await response.body?.cancel();
-    throw new Error("PROVIDER_UNAVAILABLE");
+    throw new Error(
+      response.status === 429
+        ? "PROVIDER_RATE_LIMITED"
+        : "PROVIDER_UNAVAILABLE",
+    );
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -102,6 +106,10 @@ async function checkBase(config) {
   );
   if (BigInt(balance.value) < config.SPONSOR_MIN_BALANCE_LAMPORTS)
     throw new Error("SPONSOR_UNDERFUNDED");
+  return {
+    sponsorLamports: String(balance.value),
+    sponsorFloorLamports: config.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
+  };
 }
 
 async function checkEr(config) {
@@ -120,6 +128,7 @@ async function checkEr(config) {
   if (result.value.length !== 4 || clockAccount == null)
     throw new Error("MISSING_ER_ACCOUNT");
   const clock = decodeClock(clockAccount);
+  const oracles = [];
   for (const [index, market] of MARKETS.entries()) {
     const account = result.value[index + 1];
     if (
@@ -140,7 +149,13 @@ async function checkEr(config) {
       minExponent: config.ORACLE_MIN_EXPONENT,
       maxExponent: config.ORACLE_MAX_EXPONENT,
     });
+    oracles.push({
+      market: market.market,
+      ageSeconds: Number(clock.nowSeconds - quote.publishedAtSeconds),
+      postedSlot: quote.postedSlot.toString(),
+    });
   }
+  return { oracles };
 }
 
 async function checkErScheduler(config) {
@@ -187,6 +202,7 @@ const safeCodes = new Set([
   "CLOCK_MISMATCH",
   "MALFORMED_ACCOUNT",
   "RPC_REJECTED",
+  "PROVIDER_RATE_LIMITED",
   "RESPONSE_TOO_LARGE",
   "WEBSOCKET_TIMEOUT",
   "WEBSOCKET_UNAVAILABLE",
@@ -201,7 +217,7 @@ export async function runReadiness(environment) {
       fields: [
         ...new Set(parsed.error.issues.map((issue) => String(issue.path[0]))),
       ].sort(),
-      integrationGate: "not_built",
+      integrationGate: "requires_live_run",
     };
   const config = parsed.data;
   const checks = [
@@ -238,15 +254,26 @@ export async function runReadiness(environment) {
   ];
   const results = await Promise.all(
     checks.map(async ([name, check]) => {
+      const started = performance.now();
       try {
         const observed = await check();
-        return { name, status: "passed", ...(observed && { observed }) };
+        return {
+          name,
+          status: "passed",
+          durationMs: Math.round(performance.now() - started),
+          ...(observed && { observed }),
+        };
       } catch (error) {
         const code =
           error instanceof Error && safeCodes.has(error.message)
             ? error.message
             : "PROVIDER_UNAVAILABLE_OR_INVALID";
-        return { name, status: "failed", code };
+        return {
+          name,
+          status: "failed",
+          durationMs: Math.round(performance.now() - started),
+          code,
+        };
       }
     }),
   );
@@ -256,19 +283,15 @@ export async function runReadiness(environment) {
       : "provider_reads_failed",
     checks: results,
     vrfCallbackAuthority: vrfCallbackAuthority(DEVNET.program),
-    integrationGate: "not_built",
-    remainingBuildTasks: [
-      "er_runner_delegation_crank_liveness",
-      "commit_completion",
-    ],
+    integrationGate: "requires_live_run",
     liveChecksOutsideProbe: [
       "starter_vrf_fulfillment",
       "hosted_sponsored_transaction",
       "web_sessions_nonce_atomicity",
     ],
     unmeasured: [
-      "ER_authenticated_subsecond_timing",
-      "ER_compute_fees_capacity",
+      "purrps_live_crank_and_settlement_latency",
+      "purrps_live_compute_fees_capacity",
     ],
   };
 }

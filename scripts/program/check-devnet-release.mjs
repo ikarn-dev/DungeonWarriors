@@ -163,6 +163,7 @@ async function verifyRelease() {
     admission: "closed",
     vaultBaseUnits: vault.value.amount,
     obligationsWithBufferBaseUnits: liability.toString(),
+    vaultHeadroomBaseUnits: (BigInt(vault.value.amount) - liability).toString(),
     sponsorLamports: String(sponsor),
     upgradeAuthorityLamports: admin === null ? null : String(admin),
   };

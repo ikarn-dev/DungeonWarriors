@@ -157,22 +157,34 @@ test("readiness checks the deployed scheduler without passing the integration ga
   const requests = stubProviders(context);
   const report = await runReadiness(environment);
   assert.equal(report.status, "provider_reads_passed");
-  assert.equal(report.integrationGate, "not_built");
+  assert.equal(report.integrationGate, "requires_live_run");
   assert.equal(report.checks.length, 6);
   assert.equal(requests.length, 8);
-  assert.deepEqual(
-    report.checks.find(({ name }) => name === "er_hydra_and_clock"),
-    {
-      name: "er_hydra_and_clock",
-      status: "passed",
-      observed: { clockSlot: "123456790", clockUnixSeconds: "1700000002" },
-    },
+  assert.ok(
+    report.checks.every(
+      ({ durationMs }) => Number.isInteger(durationMs) && durationMs >= 0,
+    ),
   );
-  assert.ok(report.unmeasured.includes("ER_authenticated_subsecond_timing"));
-  assert.deepEqual(report.remainingBuildTasks, [
-    "er_runner_delegation_crank_liveness",
-    "commit_completion",
-  ]);
+  assert.deepEqual(
+    report.checks.find(({ name }) => name === "er_hydra_and_clock")?.observed,
+    { clockSlot: "123456790", clockUnixSeconds: "1700000002" },
+  );
+  const oracles = report.checks.find(
+    ({ name }) => name === "er_identity_and_oracles",
+  )?.observed?.oracles;
+  assert.deepEqual(
+    oracles?.map(({ market }) => market),
+    ["BTC", "ETH", "SOL"],
+  );
+  assert.ok(
+    oracles?.every(
+      ({ ageSeconds, postedSlot }) =>
+        Number.isInteger(ageSeconds) && /^\d+$/.test(postedSlot),
+    ),
+  );
+  assert.ok(
+    report.unmeasured.includes("purrps_live_crank_and_settlement_latency"),
+  );
   assert.ok(report.liveChecksOutsideProbe.includes("starter_vrf_fulfillment"));
   assert.ok(
     report.liveChecksOutsideProbe.includes("web_sessions_nonce_atomicity"),
@@ -186,14 +198,11 @@ test("missing ER Hydra fails the scheduler check", async (context) => {
   stubProviders(context, undefined, { hydraMissing: true });
   const report = await runReadiness(environment);
   assert.equal(report.status, "provider_reads_failed");
-  assert.deepEqual(
-    report.checks.find(({ name }) => name === "er_hydra_and_clock"),
-    {
-      name: "er_hydra_and_clock",
-      status: "failed",
-      code: "ER_HYDRA_UNAVAILABLE",
-    },
+  const scheduler = report.checks.find(
+    ({ name }) => name === "er_hydra_and_clock",
   );
+  assert.equal(scheduler.status, "failed");
+  assert.equal(scheduler.code, "ER_HYDRA_UNAVAILABLE");
 });
 
 test("bad configuration stops before contacting a provider", async (context) => {
