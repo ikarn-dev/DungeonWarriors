@@ -4,6 +4,10 @@ import { VersionedTransaction } from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
+import {
+  type PlayerIntent,
+  validatePreparedPlayerAction,
+} from "../lib/game/custody-client";
 import { decodeLobbyState, type LobbyState } from "../lib/game/lobby-state";
 import {
   type LobbyIntent,
@@ -17,7 +21,11 @@ import {
   webApi,
   webErrorMessage,
 } from "../lib/game/web-api";
+import AccountPanel from "./AccountPanel";
+import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
+import StarterCapsule from "./StarterCapsule";
+import style from "./StarterExperience.module.css";
 
 const button =
   "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -34,6 +42,7 @@ const preparedSchema = z
     blockhash: z.string(),
     lastValidBlockHeight: z.number().int(),
     operationId: z.string(),
+    network: z.literal("base").default("base"),
   })
   .strict();
 const submittedSchema = z
@@ -41,6 +50,7 @@ const submittedSchema = z
     status: z.literal("requested"),
     signature: z.string().min(64).max(88),
     unknownResponse: z.boolean(),
+    network: z.literal("base").default("base"),
   })
   .strict();
 export default function StarterPanel() {
@@ -166,10 +176,16 @@ export default function StarterPanel() {
       );
     }
   }
-  async function transact(intent: LobbyIntent, signal: AbortSignal) {
+  async function transact(
+    intent: LobbyIntent | PlayerIntent,
+    signal: AbortSignal,
+  ) {
     if (address === null || wallet.signTransaction === undefined)
       throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
-    if (intent.operation === "claimStarter") {
+    if (
+      intent.operation === "claimStarter" ||
+      (intent.operation === "game" && intent.action.kind === "purchaseCapsule")
+    ) {
       if (state?.assetBinding == null)
         throw new WebApiError("ASSETS_NOT_READY");
       const response = await fetch(
@@ -192,7 +208,9 @@ export default function StarterPanel() {
     const tx = VersionedTransaction.deserialize(
       decodeBase64(prepared.transaction),
     );
-    validatePreparedTransaction(tx, address, intent);
+    if (intent.operation === "game")
+      validatePreparedPlayerAction(tx, address, intent);
+    else validatePreparedTransaction(tx, address, intent);
     const signed = await wallet.signTransaction(tx);
     if (signal.aborted) return;
     const result = submittedSchema.parse(
@@ -207,7 +225,7 @@ export default function StarterPanel() {
     await reconcile(result.signature, signal);
   }
   useEffect(() => {
-    if (!authenticated || address === null || state?.starter !== "pending")
+    if (!authenticated || address === null || state?.pendingDraw == null)
       return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -223,257 +241,300 @@ export default function StarterPanel() {
         const next = decodeLobbyState(value, address);
         setState(next);
         attempts++;
-        if (next.starter === "pending" && attempts < 20)
-          timer = setTimeout(() => void poll(), 3000);
+        if (next.pendingDraw !== null && attempts < 12)
+          timer = setTimeout(() => void poll(), 6000);
         else
           setMessage(
-            next.starter === "fulfilled"
-              ? "Your starter cat is finalized."
+            next.pendingDraw === null
+              ? "The capsule result is finalized."
               : "Draw remains pending. Refresh to recover this same request.",
           );
       } catch {
         if (!controller.signal.aborted) setError("DRAW_STATUS_UNAVAILABLE");
       }
     };
-    timer = setTimeout(() => void poll(), 3000);
+    timer = setTimeout(() => void poll(), 6000);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [authenticated, address, state?.starter]);
+  }, [authenticated, address, state?.pendingDraw]);
   const blocked = busy || pending !== null;
   return (
-    <section
-      aria-label="Wallet and starter cat"
-      aria-busy={busy}
-      className="mx-auto flex w-full max-w-xl flex-col gap-6 rounded-md border border-current/30 p-6"
-    >
-      <div className="flex flex-col gap-3">
-        <label htmlFor="wallet-choice" className="text-sm font-medium">
-          Solana wallet
-        </label>
-        <select
-          id="wallet-choice"
-          className="min-h-11 rounded-md border border-current bg-background px-3"
-          value={wallet.wallet?.adapter.name ?? ""}
-          disabled={busy || wallet.connected}
-          onChange={(event) => {
-            const selected = wallet.wallets.find(
-              (value) => value.adapter.name === event.target.value,
-            );
-            if (selected !== undefined) wallet.select(selected.adapter.name);
-          }}
-        >
-          <option value="" disabled>
-            Select a wallet
-          </option>
-          {wallet.wallets.map((value) => (
-            <option key={value.adapter.name} value={value.adapter.name}>
-              {value.adapter.name}
-            </option>
-          ))}
-        </select>
-        {wallet.wallets.length === 0 && (
-          <p className="text-sm">
-            No compatible wallet detected in this browser.
-          </p>
-        )}
-        {!wallet.connected ? (
-          <button
-            type="button"
-            className={button}
-            disabled={wallet.wallet === null || wallet.connecting || busy}
-            onClick={() =>
-              void perform(async () => {
-                await wallet.connect();
-              })
-            }
+    <div className={style.grid}>
+      <StarterCapsule state={authenticated ? state : null} />
+      <section
+        aria-label="Wallet and starter cat"
+        aria-busy={busy}
+        className={style.controls}
+      >
+        <div className="flex flex-col gap-3">
+          <label htmlFor="wallet-choice" className="text-sm font-medium">
+            Solana wallet
+          </label>
+          <select
+            id="wallet-choice"
+            className="min-h-11 rounded-md border border-current bg-background px-3"
+            value={wallet.wallet?.adapter.name ?? ""}
+            disabled={busy || wallet.connected}
+            onChange={(event) => {
+              const selected = wallet.wallets.find(
+                (value) => value.adapter.name === event.target.value,
+              );
+              if (selected !== undefined) wallet.select(selected.adapter.name);
+            }}
           >
-            {wallet.connecting ? "Connecting…" : "Connect wallet"}
-          </button>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-sm tabular-nums">
-              {address?.slice(0, 4)}…{address?.slice(-4)}
-            </span>
+            <option value="" disabled>
+              Select a wallet
+            </option>
+            {wallet.wallets.map((value) => (
+              <option key={value.adapter.name} value={value.adapter.name}>
+                {value.adapter.name}
+              </option>
+            ))}
+          </select>
+          {wallet.wallets.length === 0 && (
+            <p className="text-sm">
+              No compatible wallet detected in this browser.
+            </p>
+          )}
+          {!wallet.connected ? (
             <button
               type="button"
               className={button}
+              data-primary
+              disabled={wallet.wallet === null || wallet.connecting || busy}
               onClick={() =>
                 void perform(async () => {
-                  if (address !== null)
-                    await navigator.clipboard.writeText(address);
-                  setMessage("Wallet address copied.");
+                  await wallet.connect();
                 })
               }
             >
-              Copy address
+              {wallet.connecting ? "Connecting…" : "Connect wallet"}
             </button>
-            <button
-              type="button"
-              className={button}
-              disabled={busy}
-              onClick={() =>
-                void perform(async (signal) => {
-                  if (authenticated)
-                    await webApi("/api/auth/logout", {}, signal);
-                  await wallet.disconnect();
-                })
-              }
-            >
-              Disconnect
-            </button>
-          </div>
-        )}
-        {wallet.connected && !authenticated && (
-          <button
-            type="button"
-            className={button}
-            disabled={busy || wallet.signMessage === undefined}
-            onClick={() => void perform(signIn)}
-          >
-            Sign in to PURRPS
-          </button>
-        )}
-      </div>
-      <output aria-live="polite" className="text-sm">
-        {busy ? "Waiting for wallet or chain response…" : message}
-      </output>
-      {error !== null && (
-        <p role="alert" className="break-words text-sm">
-          {webErrorMessage(error)}
-        </p>
-      )}
-      {authenticated && (
-        <>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className={button}
-              disabled={busy}
-              onClick={() => void perform((signal) => reload(signal))}
-            >
-              Refresh account
-            </button>
-            {pending !== null && (
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm tabular-nums">
+                {address?.slice(0, 4)}…{address?.slice(-4)}
+              </span>
+              <button
+                type="button"
+                className={button}
+                onClick={() =>
+                  void perform(async () => {
+                    if (address !== null)
+                      await navigator.clipboard.writeText(address);
+                    setMessage("Wallet address copied.");
+                  })
+                }
+              >
+                Copy address
+              </button>
               <button
                 type="button"
                 className={button}
                 disabled={busy}
                 onClick={() =>
-                  void perform((signal) => reconcile(pending, signal))
+                  void perform(async (signal) => {
+                    if (authenticated)
+                      await webApi("/api/auth/logout", {}, signal);
+                    await wallet.disconnect();
+                  })
                 }
               >
-                Check pending transaction
+                Disconnect
               </button>
-            )}
-          </div>
-          {state === null ? (
-            <p>Loading your finalized collection…</p>
-          ) : !state.configured ? (
-            <p>Devnet configuration has not been published yet.</p>
-          ) : !state.hasPlayer ? (
+            </div>
+          )}
+          {wallet.connected && !authenticated && (
             <button
               type="button"
               className={button}
-              disabled={blocked}
-              onClick={() =>
-                void perform((signal) =>
-                  transact(
-                    { operation: "createPlayer", sponsored: true },
-                    signal,
-                  ),
-                )
-              }
+              data-primary
+              disabled={busy || wallet.signMessage === undefined}
+              onClick={() => void perform(signIn)}
             >
-              Create player · sponsored Devnet fees
+              Sign in to PURRPS
             </button>
-          ) : (
-            <>
-              {state.starter === "unclaimed" && (
-                <div className="flex flex-col gap-3">
-                  <p>
-                    One starter cat per wallet. The item is free; the app
-                    sponsors bounded Devnet fees.
-                  </p>
-                  <button
-                    type="button"
-                    className={button}
-                    disabled={
-                      blocked ||
-                      !state.allowStarter ||
-                      state.catalogVersion === null
+          )}
+        </div>
+        <output aria-live="polite" className="text-sm">
+          {busy ? "Waiting for wallet or chain response…" : message}
+        </output>
+        {error !== null && (
+          <p role="alert" className="break-words text-sm">
+            {webErrorMessage(error)}
+          </p>
+        )}
+        {authenticated && (
+          <>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => void perform((signal) => reload(signal))}
+              >
+                Refresh account
+              </button>
+              {pending !== null && (
+                <button
+                  type="button"
+                  className={button}
+                  disabled={busy}
+                  onClick={() =>
+                    void perform((signal) => reconcile(pending, signal))
+                  }
+                >
+                  Check pending transaction
+                </button>
+              )}
+            </div>
+            {state === null ? (
+              <p>Loading your finalized collection…</p>
+            ) : !state.configured ? (
+              <p>Devnet configuration has not been published yet.</p>
+            ) : !state.hasPlayer ? (
+              <button
+                type="button"
+                className={button}
+                data-primary
+                disabled={blocked}
+                onClick={() =>
+                  void perform((signal) =>
+                    transact(
+                      { operation: "createPlayer", sponsored: true },
+                      signal,
+                    ),
+                  )
+                }
+              >
+                Create player · sponsored Devnet fees
+              </button>
+            ) : (
+              <>
+                {state.starter === "unclaimed" && (
+                  <div className="flex flex-col gap-3">
+                    <p>
+                      One starter cat per wallet. The item is free; the app
+                      sponsors bounded Devnet fees.
+                    </p>
+                    <button
+                      type="button"
+                      className={button}
+                      data-primary
+                      disabled={
+                        blocked ||
+                        !state.allowStarter ||
+                        state.catalogVersion === null
+                      }
+                      onClick={() =>
+                        void perform(async (signal) => {
+                          if (
+                            state.nonce === null ||
+                            state.inventoryVersion === null ||
+                            state.catalogVersion === null
+                          )
+                            return;
+                          await transact(
+                            {
+                              operation: "claimStarter",
+                              nonce: state.nonce.toString(),
+                              inventoryVersion:
+                                state.inventoryVersion.toString(),
+                              catalogVersion: state.catalogVersion,
+                              sponsored: true,
+                            },
+                            signal,
+                          );
+                        })
+                      }
+                    >
+                      Open starter capsule
+                    </button>
+                    {!state.allowStarter && (
+                      <p className="text-sm">
+                        Starter draws are currently paused.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {state.starter === "pending" && (
+                  <div>
+                    <p>
+                      Your original starter draw is pending. Refreshing will not
+                      reroll it.
+                    </p>
+                    {state.pendingDraw !== null && (
+                      <a
+                        className="inline-flex min-h-11 items-center underline focus-visible:outline-2"
+                        href={`https://explorer.solana.com/address/${state.pendingDraw}?cluster=devnet`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View pending draw
+                      </a>
+                    )}
+                  </div>
+                )}
+                <CatCollection
+                  state={state}
+                  blocked={blocked}
+                  onSelect={(cat) =>
+                    void perform(async (signal) => {
+                      if (state.inventoryVersion === null) return;
+                      await transact(
+                        {
+                          operation: "selectCat",
+                          inventoryVersion: state.inventoryVersion.toString(),
+                          cat,
+                          sponsored: false,
+                        },
+                        signal,
+                      );
+                    })
+                  }
+                />
+                {state.starter === "fulfilled" && address !== null && (
+                  <CapsuleShop
+                    key={address}
+                    state={state}
+                    wallet={address}
+                    blocked={blocked}
+                    action={(action) =>
+                      void perform((signal) =>
+                        transact(
+                          { operation: "game", sponsored: false, action },
+                          signal,
+                        ),
+                      )
                     }
-                    onClick={() =>
-                      void perform(async (signal) => {
-                        if (
-                          state.nonce === null ||
-                          state.inventoryVersion === null ||
-                          state.catalogVersion === null
-                        )
-                          return;
-                        await transact(
+                  />
+                )}
+                {address !== null && (
+                  <AccountPanel
+                    key={address}
+                    wallet={address}
+                    blocked={blocked}
+                    transfer={(kind, amount) =>
+                      perform((signal) =>
+                        transact(
                           {
-                            operation: "claimStarter",
-                            nonce: state.nonce.toString(),
-                            inventoryVersion: state.inventoryVersion.toString(),
-                            catalogVersion: state.catalogVersion,
-                            sponsored: true,
+                            operation: "game",
+                            sponsored: false,
+                            action: { kind, amount },
                           },
                           signal,
-                        );
-                      })
+                        ),
+                      )
                     }
-                  >
-                    Request starter cat
-                  </button>
-                  {!state.allowStarter && (
-                    <p className="text-sm">
-                      Starter draws are currently paused.
-                    </p>
-                  )}
-                </div>
-              )}
-              {state.starter === "pending" && (
-                <div>
-                  <p>
-                    Your original starter draw is pending. Refreshing will not
-                    reroll it.
-                  </p>
-                  {state.pendingDraw !== null && (
-                    <a
-                      className="inline-flex min-h-11 items-center underline focus-visible:outline-2"
-                      href={`https://explorer.solana.com/address/${state.pendingDraw}?cluster=devnet`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View pending draw
-                    </a>
-                  )}
-                </div>
-              )}
-              <CatCollection
-                state={state}
-                blocked={blocked}
-                onSelect={(cat) =>
-                  void perform(async (signal) => {
-                    if (state.inventoryVersion === null) return;
-                    await transact(
-                      {
-                        operation: "selectCat",
-                        inventoryVersion: state.inventoryVersion.toString(),
-                        cat,
-                        sponsored: false,
-                      },
-                      signal,
-                    );
-                  })
-                }
-              />
-            </>
-          )}
-        </>
-      )}
-    </section>
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </section>
+    </div>
   );
 }

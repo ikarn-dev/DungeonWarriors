@@ -11,16 +11,14 @@ import {
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
 } from "@magicblock-labs/ephemeral-rollups-sdk";
-import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import { z } from "zod";
+import { playerActions, playerInstructions } from "../game/custody-client";
 import {
   DEVNET,
   LEADERBOARD_SEED,
@@ -38,8 +36,7 @@ const catSchema = z.enum(["collector", "acrobat", "guardian", "sprinter"]);
 const nonce = { nonce: u64Input };
 const identity = { ...nonce, delegationEpoch: positive };
 const action = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("deposit"), amount: positive }),
-  z.strictObject({ kind: z.literal("withdraw"), amount: positive }),
+  ...playerActions,
   z.strictObject({
     kind: z.literal("authorizeSession"),
     ...nonce,
@@ -102,7 +99,6 @@ const hydraProgram = new PublicKey(
   "eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf",
 );
 const mint = new PublicKey(DEVNET.usdcMint);
-const tokenProgram = new PublicKey(DEVNET.tokenProgram);
 
 function accountMetas(
   items: IdlInstructionAccountItem[],
@@ -203,6 +199,14 @@ export function gameNetwork(action: GameIntent["action"]): "base" | "er" {
 }
 
 export function gameInstructions(wallet: string, { action }: GameIntent) {
+  if (
+    action.kind === "deposit" ||
+    action.kind === "withdraw" ||
+    action.kind === "purchaseCapsule" ||
+    action.kind === "refundCapsule" ||
+    action.kind === "applyUpgrade"
+  )
+    return playerInstructions(wallet, action);
   const owner = new PublicKey(wallet);
   const ownerBytes = owner.toBytes();
   const house = pda("house");
@@ -225,26 +229,6 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
     operationId,
   });
 
-  if (action.kind === "deposit" || action.kind === "withdraw") {
-    const ownerTokens = getAssociatedTokenAddressSync(mint, owner);
-    Object.assign(values, {
-      ownerTokens,
-      usdcMint: mint,
-      tokenProgram,
-    });
-    const prefix =
-      action.kind === "withdraw"
-        ? [
-            createAssociatedTokenAccountIdempotentInstruction(
-              owner,
-              ownerTokens,
-              owner,
-              mint,
-            ),
-          ]
-        : [];
-    return build({ args: { amountBaseUnits: new BN(action.amount) } }, prefix);
-  }
   if (action.kind === "authorizeSession" || action.kind === "revokeSession") {
     const authorization = pda("session", ownerBytes, nonceBytes(action.nonce));
     Object.assign(values, { authorization: authorization });

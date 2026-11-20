@@ -35,6 +35,16 @@ test("the prerendered page references emitted local CSS", () => {
       readFileSync(join(output, sheet[1].slice("/_next/".length))).length > 0,
     );
 });
+test("the initial starter route renders the bundled capsule before wallet hydration", () => {
+  const html = readFileSync(join(output, "server/app/starter.html"), "utf8");
+  assert.match(html, /Starter draw/);
+  assert.match(html, /\/game-assets\/v1\/capsule-lid\.svg/);
+  assert.match(html, /\/game-assets\/v1\/capsule-base\.svg/);
+  assert.doesNotMatch(
+    html,
+    /portrait-(collector|acrobat|guardian|sprinter)\.svg/,
+  );
+});
 test("server credential configuration is absent from browser chunks", () => {
   const visit = (directory) =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>

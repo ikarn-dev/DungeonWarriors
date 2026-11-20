@@ -44,7 +44,16 @@ export const CAT_NAMES: Record<CatId, string> = {
   sprinter: "Sprinter",
 };
 const ids = ["collector", "acrobat", "guardian", "sprinter"] as const;
+const grades = ["common", "rare", "epic"] as const;
 const tag = (value: object) => Object.keys(value)[0];
+function drawAddress(owner: PublicKey, nonce: bigint) {
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setBigUint64(0, nonce, true);
+  return PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode("draw"), owner.toBytes(), bytes],
+    new PublicKey(DEVNET.program),
+  );
+}
 export function decodeLobbyState(input: unknown, wallet: string) {
   const parsed = rawSchema.parse(input);
   const owner = new PublicKey(publicKeySchema.parse(wallet));
@@ -123,15 +132,10 @@ export function decodeLobbyState(input: unknown, wallet: string) {
   const starter = collection === null ? null : tag(collection.starter);
   const nonce =
     player === null ? null : BigInt(player.nextDrawNonce.toString());
-  if (starter === "pending") {
+  if (starter === "pending" || collection?.pendingDraw != null) {
     if (nonce === null || nonce === 0n || collection?.pendingDraw == null)
       throw new Error("INVALID_ACCOUNT_RESPONSE");
-    const bytes = new Uint8Array(8);
-    new DataView(bytes.buffer).setBigUint64(0, nonce - 1n, true);
-    const draw = PublicKey.findProgramAddressSync(
-      [new TextEncoder().encode("draw"), owner.toBytes(), bytes],
-      program,
-    )[0];
+    const [draw] = drawAddress(owner, nonce - 1n);
     if (!collection.pendingDraw.equals(draw))
       throw new Error("INVALID_ACCOUNT_RESPONSE");
   }
@@ -168,6 +172,20 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     configured: cfg !== null,
     hasPlayer: player !== null,
     allowStarter: cfg?.allowStarter ?? false,
+    allowPurchases: cfg?.allowPurchases ?? false,
+    available: player?.availableBaseUnits.toString() ?? "0",
+    upgrades: Object.fromEntries(
+      grades.map((grade, index) => [
+        grade,
+        collection?.upgradeQuantities[index]?.toString() ?? "0",
+      ]),
+    ),
+    definingCatalogs: Object.fromEntries(
+      ids.map((id, index) => [
+        id,
+        collection?.cats[index]?.definingCatalog.version,
+      ]),
+    ),
     catalogVersion,
     assetBinding,
     cats,
@@ -182,3 +200,50 @@ export function decodeLobbyState(input: unknown, wallet: string) {
   };
 }
 export type LobbyState = ReturnType<typeof decodeLobbyState>;
+
+export function decodePaidDraw(input: unknown, wallet: string, nonce: bigint) {
+  const [address, bump] = drawAddress(new PublicKey(wallet), nonce);
+  const { accounts } = rawSchema.parse(input);
+  const row = accounts[0];
+  if (
+    accounts.length !== 1 ||
+    !row ||
+    row.address !== address.toBase58() ||
+    row.account === null
+  )
+    throw new Error("INVALID_DRAW_ACCOUNT");
+  const draw = coder.decode<Accounts["capsuleDraw"]>(
+    "capsuleDraw",
+    utils.bytes.base64.decode(row.account.data),
+  );
+  const kind = tag(draw.kind);
+  const status = tag(draw.status);
+  if (
+    draw.schemaVersion !== 1 ||
+    draw.bump !== bump ||
+    draw.owner.toBase58() !== wallet ||
+    draw.nonce.toString() !== nonce.toString() ||
+    (kind !== "paidCat" && kind !== "upgrade") ||
+    draw.paidDeadlineSeconds === null ||
+    (status !== "pending" && status !== "fulfilled" && status !== "refunded")
+  )
+    throw new Error("INVALID_DRAW_ACCOUNT");
+  let reward: string | null = null;
+  if (status === "fulfilled") {
+    if (draw.result && "cat" in draw.result && kind === "paidCat") {
+      const cat = tag(draw.result.cat[0]);
+      if (ids.some((id) => id === cat)) reward = CAT_NAMES[cat as CatId];
+    } else if (draw.result && "upgrade" in draw.result && kind === "upgrade") {
+      const grade = tag(draw.result.upgrade[0]);
+      if (grades.some((item) => item === grade)) reward = `${grade} upgrade`;
+    }
+    if (reward === null) throw new Error("INVALID_DRAW_ACCOUNT");
+  }
+  return {
+    status,
+    kind,
+    reward,
+    deadline: draw.paidDeadlineSeconds.toString(),
+    cost: draw.priceBaseUnits.toString(),
+  };
+}

@@ -1,19 +1,22 @@
 import Link from "next/link";
+import style from "../../components/StarterExperience.module.css";
 import WalletShell from "../../components/WalletShell";
 export default function StarterPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
-      <Link
-        href="/"
-        className="inline-flex min-h-11 items-center self-start underline focus-visible:outline-2"
-      >
-        Back to PURRPS
-      </Link>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold">Wallet and starter cat</h1>
-        <p>Solana Devnet. Ownership comes from finalized onchain state.</p>
-      </header>
-      <WalletShell />
+    <main className={style.shell}>
+      <div className={style.layout}>
+        <Link
+          href="/"
+          className={`${style.nav} focus-visible:outline-2 focus-visible:outline-offset-2`}
+        >
+          ← PURRPS
+        </Link>
+        <header className={style.heading}>
+          <h1>Starter draw</h1>
+          <p>Solana Devnet</p>
+        </header>
+        <WalletShell />
+      </div>
     </main>
   );
 }

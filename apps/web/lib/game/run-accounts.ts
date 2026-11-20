@@ -19,6 +19,7 @@ const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
 const accounts = new BorshAccountsCoder(idl);
 const types = new BorshCoder(idl).types;
 type Accounts = IdlAccounts<PurrpsGame>;
+type GameAccount = Pick<AccountInfo<Buffer>, "owner" | "data" | "executable">;
 export type RunIdentity = { owner: string; nonce: bigint };
 export class RunAccountError extends Error {
   constructor(
@@ -62,11 +63,7 @@ function plain(value: unknown): unknown {
 }
 const fields = (value: object) => plain(value) as Record<string, unknown>;
 const big = (value: BN) => BigInt(value.toString());
-function checkAccount(
-  info: AccountInfo<Buffer>,
-  key: PublicKey,
-  expected: PublicKey,
-) {
+function checkAccount(info: GameAccount, key: PublicKey, expected: PublicKey) {
   if (
     !key.equals(expected) ||
     !info.owner.equals(program) ||
@@ -112,7 +109,7 @@ function checkVersion(s: Accounts["runGameState"]["snapshot"]) {
 export async function decodeRunAccount(
   identity: RunIdentity,
   key: PublicKey,
-  info: AccountInfo<Buffer>,
+  info: GameAccount,
 ) {
   const address = runAddresses(identity);
   checkAccount(info, key, address.run[0]);
@@ -238,6 +235,11 @@ export async function decodeRunAccount(
     observation,
     prediction,
     stats,
+    cat: enumTag(r.snapshot.cat.definition.id) as CatId,
+    assetBinding: {
+      version: r.snapshot.assetManifest.version,
+      contentHash: hex(r.snapshot.assetManifest.contentHash),
+    },
     snapshotHash: hex(r.snapshotHash),
     terminal: r.terminal === null ? null : fields(r.terminal),
   };
@@ -246,7 +248,7 @@ export async function decodeRunAccount(
 export async function decodeEscrowAccount(
   identity: RunIdentity,
   key: PublicKey,
-  info: AccountInfo<Buffer>,
+  info: GameAccount,
 ) {
   const address = runAddresses(identity);
   checkAccount(info, key, address.escrow[0]);

@@ -20,6 +20,11 @@ import {
 } from "@solana/web3.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  displayUsdc,
+  parseUsdc,
+  validatePreparedPlayerAction,
+} from "../../../../../apps/web/lib/game/custody-client";
+import {
   decodeEscrowAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
@@ -81,6 +86,31 @@ const runNonce = {
 } as const;
 
 describe("game transaction intents", () => {
+  it("validates wallet custody bytes on the client and preserves exact USDC amounts", () => {
+    const owner = Keypair.generate();
+    const wallet = owner.publicKey.toBase58();
+    const amount = parseUsdc("9007199254.740993").toString();
+    expect(amount).toBe("9007199254740993");
+    expect(displayUsdc(amount)).toBe("9,007,199,254.740993");
+    expect(() => parseUsdc("1.0000001")).toThrow();
+    for (const kind of ["deposit", "withdraw"] as const) {
+      const value = {
+        operation: "game",
+        sponsored: false,
+        action: { kind, amount },
+      } as const;
+      const { tx } = assemble(owner, Keypair.generate(), value);
+      expect(() =>
+        validatePreparedPlayerAction(tx, wallet, value),
+      ).not.toThrow();
+      expect(() =>
+        validatePreparedPlayerAction(tx, wallet, {
+          ...value,
+          action: { kind, amount: "1" },
+        }),
+      ).toThrow("UNEXPECTED_TRANSACTION");
+    }
+  });
   it("builds and checks all wallet-signed messages through the deployed IDL", () => {
     const owner = Keypair.generate();
     const play = Keypair.generate();
@@ -89,6 +119,22 @@ describe("game transaction intents", () => {
     const variants = [
       { kind: "deposit", amount: "1" },
       { kind: "withdraw", amount: "9007199254740993" },
+      {
+        kind: "purchaseCapsule",
+        capsule: "paidCat",
+        nonce: "2",
+        inventoryVersion: "3",
+        catalogVersion: 1,
+      },
+      { kind: "refundCapsule", nonce: "2" },
+      {
+        kind: "applyUpgrade",
+        cat: "collector",
+        grade: "epic",
+        level: 1,
+        definingCatalogVersion: 1,
+        inventoryVersion: "3",
+      },
       {
         kind: "authorizeSession",
         nonce: "1",

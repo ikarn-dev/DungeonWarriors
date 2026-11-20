@@ -21,14 +21,23 @@ export default function CatCollection({
               key={cat.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-current/30 p-4"
             >
-              <div>
-                <p className="font-medium">{CAT_NAMES[cat.id]}</p>
-                <p className="text-sm capitalize">
-                  {cat.rarity} · Level{" "}
-                  <span className="font-mono tabular-nums">
-                    {new Intl.NumberFormat("en-US").format(cat.level)}
-                  </span>
-                </p>
+              <div className="flex items-center gap-3">
+                <Image
+                  unoptimized
+                  src={`/game-assets/v1/portrait-${cat.id}.svg`}
+                  width={56}
+                  height={56}
+                  alt=""
+                />
+                <div>
+                  <p className="font-medium">{CAT_NAMES[cat.id]}</p>
+                  <p className="text-sm capitalize">
+                    {cat.rarity} · Level{" "}
+                    <span className="font-mono tabular-nums">
+                      {new Intl.NumberFormat("en-US").format(cat.level)}
+                    </span>
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -46,10 +55,8 @@ export default function CatCollection({
           ))}
         </ul>
       )}
-      <p className="text-sm">
-        Selection requires a wallet-signed Devnet transaction. Gameplay is not
-        available yet.
-      </p>
     </div>
   );
 }
+
+import Image from "next/image";
