@@ -26,6 +26,7 @@ import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
 import StarterCapsule from "./StarterCapsule";
 import style from "./StarterExperience.module.css";
+import WalletFunds from "./WalletFunds";
 
 const button =
   "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -58,6 +59,7 @@ export default function StarterPanel() {
   const address = wallet.publicKey?.toBase58() ?? null;
   const [authenticated, setAuthenticated] = useState(false);
   const [state, setState] = useState<LobbyState | null>(null);
+  const [walletFundsRevision, setWalletFundsRevision] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Connect a wallet to begin.");
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,7 @@ export default function StarterPanel() {
     setBusy(false);
     setAuthenticated(false);
     setState(null);
+    setWalletFundsRevision(undefined);
     setPending(null);
     setError(null);
     setMessage(
@@ -79,12 +82,17 @@ export default function StarterPanel() {
   }, [address]);
   async function reload(signal?: AbortSignal) {
     if (address === null) return;
-    const value = await webApi<unknown>(
-      "/api/chain/state",
-      { kind: "wallet" },
-      signal,
-    );
-    if (!signal?.aborted) setState(decodeLobbyState(value, address));
+    try {
+      const value = await webApi<unknown>(
+        "/api/chain/state",
+        { kind: "wallet" },
+        signal,
+      );
+      if (!signal?.aborted) setState(decodeLobbyState(value, address));
+    } finally {
+      if (!signal?.aborted)
+        setWalletFundsRevision((previous) => (previous ?? 0) + 1);
+    }
   }
   async function perform(action: (signal: AbortSignal) => Promise<void>) {
     work.current?.abort();
@@ -368,6 +376,9 @@ export default function StarterPanel() {
         )}
         {authenticated && (
           <>
+            {address !== null && (
+              <WalletFunds key={address} revision={walletFundsRevision} />
+            )}
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -452,9 +463,11 @@ export default function StarterPanel() {
                     >
                       Open starter capsule
                     </button>
-                    {!state.allowStarter && (
+                    {(!state.allowStarter || state.catalogVersion === null) && (
                       <p className="text-sm">
-                        Starter draws are currently paused.
+                        {state.catalogVersion === null
+                          ? "Starter draws open after the Devnet cat catalog is published."
+                          : "Starter draws are currently paused on Devnet."}
                       </p>
                     )}
                   </div>

@@ -23,6 +23,7 @@ import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
+import { readWalletFunds } from "./wallet-funds";
 
 export const program = new PublicKey(DEVNET.program);
 export const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
@@ -69,6 +70,7 @@ export function account<T>(
 export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wallet") }).strict(),
   z.object({ kind: z.literal("balances") }).strict(),
+  z.object({ kind: z.literal("walletFunds") }).strict(),
   z.object({ kind: z.literal("leaderboard") }).strict(),
   z.object({ kind: z.literal("draw"), nonce: u64Input }).strict(),
   z.object({ kind: z.literal("run"), nonce: u64Input }).strict(),
@@ -374,6 +376,10 @@ export async function readState(
   if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
     throw new ApiError("WRONG_NETWORK", 503);
   if (input.kind === "history") return readHistory(rpc, owner, input);
+  if (input.kind === "walletFunds") {
+    const { slot, ...walletFunds } = await readWalletFunds(rpc, owner);
+    return { ...stateContext(slot), walletFunds };
+  }
   if (input.kind === "leaderboard") {
     const [address, bump] = PublicKey.findProgramAddressSync(
       [Buffer.from(LEADERBOARD_SEED)],

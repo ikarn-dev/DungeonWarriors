@@ -77,11 +77,20 @@ export function parseUsdc(input: string) {
 }
 
 export function displayUsdc(raw: string) {
+  return displayUnits(raw, USDC_DECIMALS);
+}
+
+export function displaySol(raw: string) {
+  return displayUnits(raw, 9);
+}
+
+function displayUnits(raw: string, decimals: number) {
   const value = BigInt(raw);
-  const whole = number.format(value / scale);
-  const fraction = (value % scale)
+  const divisor = 10n ** BigInt(decimals);
+  const whole = number.format(value / divisor);
+  const fraction = (value % divisor)
     .toString()
-    .padStart(USDC_DECIMALS, "0")
+    .padStart(decimals, "0")
     .replace(/0+$/, "");
   return fraction === "" ? whole : `${whole}.${fraction}`;
 }

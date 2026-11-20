@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
 import { BN, type IdlAccounts } from "@anchor-lang/core";
+import {
+  AccountLayout,
+  AccountState,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  displaySol,
+  displayUsdc,
+} from "../../../../../apps/web/lib/game/custody-client";
 import { runAddresses } from "../../../../../apps/web/lib/game/run-accounts";
 import {
   coder,
@@ -114,6 +123,63 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+});
+
+it("reads the wallet SOL and official USDC account at the same finalized slot", async () => {
+  const mint = new PublicKey(DEVNET.usdcMint);
+  const tokenProgram = new PublicKey(DEVNET.tokenProgram);
+  const data = Buffer.alloc(AccountLayout.span);
+  AccountLayout.encode(
+    {
+      mint,
+      owner,
+      amount: 9007199254740993n,
+      state: AccountState.Initialized,
+      delegateOption: 0,
+      delegate: PublicKey.default,
+      isNativeOption: 0,
+      isNative: 0n,
+      delegatedAmount: 0n,
+      closeAuthorityOption: 0,
+      closeAuthority: PublicKey.default,
+    },
+    data,
+  );
+  const usdc = { ...noData, owner: tokenProgram, data };
+  const query = vi.spyOn(
+    Connection.prototype,
+    "getMultipleAccountsInfoAndContext",
+  );
+  query.mockResolvedValueOnce({
+    context: { slot },
+    value: [{ ...noData, lamports: 1_000_000_001 }, usdc],
+  });
+  query.mockResolvedValueOnce({ context: { slot }, value: [null, noData] });
+  query.mockResolvedValueOnce({
+    context: { slot },
+    value: [null, { ...usdc, owner: program }],
+  });
+  const input = stateInput.parse({ kind: "walletFunds" });
+  await expect(readState(wallet, input)).resolves.toMatchObject({
+    slot,
+    commitment: "finalized",
+    walletFunds: {
+      solLamports: "1000000001",
+      usdcBaseUnits: "9007199254740993",
+    },
+  });
+  await expect(readState(wallet, input)).resolves.toMatchObject({
+    walletFunds: { solLamports: "0", usdcBaseUnits: "0" },
+  });
+  await expect(readState(wallet, input)).rejects.toThrow(
+    "INVALID_CHAIN_ACCOUNT",
+  );
+  expect(query).toHaveBeenCalledWith(
+    [owner, getAssociatedTokenAddressSync(mint, owner)],
+    { commitment: "finalized" },
+  );
+  expect(displaySol("1000000001")).toBe("1.000000001");
+  expect(displayUsdc("9007199254740993")).toBe("9,007,199,254.740993");
 });
 
 describe("finalized shared leaderboard", () => {

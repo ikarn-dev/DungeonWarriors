@@ -51,7 +51,7 @@ const button =
 const sectionTitle = "text-lg font-semibold";
 const count = (value: string) =>
   new Intl.NumberFormat("en-US").format(BigInt(value));
-const labels = ["Available", "Wagers in play", "Pending purchases"];
+const labels = ["Available in PURRPS", "Wagers in play", "Pending purchases"];
 
 export default function AccountPanel({
   wallet,

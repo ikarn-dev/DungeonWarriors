@@ -61,7 +61,7 @@ export function deployedBytes(entry, data, dataAddress, artifact) {
   };
 }
 
-async function verifyRelease() {
+async function verifyRelease(starterOpen) {
   const [artifact, idl, buildId] = await Promise.all([
     readFile(new URL("deploy/purrps_game.so", target)),
     readFile(new URL("idl/purrps_game.json", target), "utf8"),
@@ -105,9 +105,15 @@ async function verifyRelease() {
   const c = coder.decode("GameConfig", configAccount.data);
   const h = coder.decode("HouseState", houseAccount.data);
   const policy = coder.decode("SponsorPolicy", policyAccount.data);
-  const paused =
-    !c.allow_starter && !c.allow_purchases && !c.allow_reservations;
-  check(paused && policy.paused, "ADMISSION_ENABLED");
+  check(
+    (starterOpen
+      ? c.allow_starter && c.catalog?.version > 0
+      : !c.allow_starter) &&
+      !c.allow_purchases &&
+      !c.allow_reservations &&
+      policy.paused,
+    starterOpen ? "UNEXPECTED_ADMISSION_STATE" : "ADMISSION_ENABLED",
+  );
   check(
     c.schema_version === 1 &&
       c.rules?.version > 0 &&
@@ -160,7 +166,7 @@ async function verifyRelease() {
     localWebBuildId: buildId.trim(),
     rules: c.rules.version,
     catalog: c.catalog?.version ?? null,
-    admission: "closed",
+    admission: starterOpen ? "starter_only" : "closed",
     vaultBaseUnits: vault.value.amount,
     obligationsWithBufferBaseUnits: liability.toString(),
     vaultHeadroomBaseUnits: (BigInt(vault.value.amount) - liability).toString(),
@@ -171,7 +177,10 @@ async function verifyRelease() {
 
 if (import.meta.main) {
   try {
-    process.stdout.write(`${JSON.stringify(await verifyRelease(), null, 2)}\n`);
+    const release = await verifyRelease(
+      process.argv.includes("--starter-open"),
+    );
+    process.stdout.write(`${JSON.stringify(release, null, 2)}\n`);
   } catch (error) {
     const code =
       error instanceof Error && /^[A-Z_]+$/.test(error.message)

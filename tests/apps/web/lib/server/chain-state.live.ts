@@ -33,6 +33,17 @@ it("reads the single shared board from finalized Devnet", async () => {
   });
 });
 
+it("reads Devnet wallet funds at finalized commitment without requiring a game account", async () => {
+  const wallet = Keypair.generate().publicKey.toBase58();
+  await expect(
+    readState(wallet, stateInput.parse({ kind: "walletFunds" })),
+  ).resolves.toMatchObject({
+    commitment: "finalized",
+    slot: expect.any(Number),
+    walletFunds: { solLamports: "0", usdcBaseUnits: "0" },
+  });
+});
+
 it.skipIf(testWallet === undefined)(
   "decodes a registered player's actual finalized balance accounts",
   async () => {
