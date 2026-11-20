@@ -14,13 +14,23 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { enumTag, runAddresses } from "../game/run-accounts";
-import type { CompletionOffer } from "../game/run-transactions";
+import {
+  type CompletionOffer,
+  sessionToken,
+  sessionTokenSpace,
+} from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses";
 import type { PurrpsGame } from "../solana/purrps-game";
 import { account, coder, pda, program, u64Input } from "./chain";
-import { type GameIntent, programInstruction } from "./game-transactions";
+import {
+  type GameIntent,
+  gameInstructions,
+  gameNetwork,
+  programInstruction,
+} from "./game-transactions";
 import { ApiError, runtime, sponsorshipConfig } from "./runtime";
 import { observeSponsorReservation } from "./telemetry";
+import { checkedConnection } from "./transaction-network";
 
 export function checkSponsorHeadroom(
   balance: number,
@@ -126,6 +136,89 @@ export async function dedicatedSponsor(rpc: Connection) {
 
 type Accounts = IdlAccounts<PurrpsGame>;
 type Reserve = Extract<GameIntent["action"], { kind: "reserveRun" }>;
+
+export async function playSessionRent(
+  rpc: Connection,
+  owner: PublicKey,
+  key: PublicKey,
+  nonce: string,
+) {
+  const bytes = Buffer.alloc(8);
+  bytes.writeBigUInt64LE(BigInt(nonce));
+  const [states, tokenRent, authorizationRent] = await Promise.all([
+    rpc.getMultipleAccountsInfo(
+      [sessionToken(owner, key), pda("session", owner.toBytes(), bytes)],
+      "confirmed",
+    ),
+    rpc.getMinimumBalanceForRentExemption(sessionTokenSpace, "confirmed"),
+    rpc.getMinimumBalanceForRentExemption(
+      coder.accounts.size("sessionAuthorization"),
+      "confirmed",
+    ),
+  ]);
+  const rent = (minimum: number, balance: number) => {
+    if (![minimum, balance].every((n) => Number.isSafeInteger(n) && n >= 0))
+      throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
+    return String(Math.max(0, minimum - balance));
+  };
+  return {
+    token: rent(tokenRent, states[0]?.lamports ?? 0),
+    authorization: rent(authorizationRent, states[1]?.lamports ?? 0),
+  };
+}
+
+export async function checkPlaySpend(
+  rpc: Connection,
+  tx: VersionedTransaction,
+  sponsor: PublicKey,
+  network: "base" | "er",
+  verify: boolean,
+) {
+  const balance =
+    network === "base"
+      ? await rpc.getBalanceAndContext(sponsor, "confirmed")
+      : null;
+  const preview = await rpc.simulateTransaction(tx, {
+    sigVerify: verify,
+    commitment: "confirmed",
+    ...(balance
+      ? {
+          minContextSlot: balance.context.slot,
+          accounts: {
+            encoding: "base64" as const,
+            addresses: [sponsor.toBase58()],
+          },
+        }
+      : {}),
+  });
+  if (preview.value.err === "BlockhashNotFound")
+    throw new ApiError("BLOCKHASH_EXPIRED", 409);
+  if (preview.value.err !== null)
+    throw new ApiError("SIMULATION_REJECTED", 409);
+  if (!balance) return 0n;
+  const current = await rpc.getBalance(sponsor, {
+    commitment: "confirmed",
+    minContextSlot: preview.context.slot,
+  });
+  if (balance.value !== current) throw new ApiError("RUN_BUDGET_CHANGED", 409);
+  const after = preview.value.accounts?.[0]?.lamports;
+  if (
+    after === undefined ||
+    ![balance.value, after].every((n) => Number.isSafeInteger(n) && n >= 0) ||
+    after > balance.value
+  )
+    throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
+  const policy = sponsorshipConfig();
+  const cost = BigInt(balance.value - after);
+  checkSponsorHeadroom(
+    balance.value,
+    policy.SPONSOR_MIN_BALANCE_LAMPORTS,
+    cost,
+  );
+  if (cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS)
+    throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
+  return cost;
+}
 
 // Return SOL left by the previous settled run, or close an unused legacy budget.
 export async function recycleRunBudget(
@@ -291,4 +384,79 @@ export async function recycleRunBudget(
       throw new ApiError("SPONSOR_RECLAIM_PENDING", 409);
     });
   if (result.value.err !== null) throw new ApiError("RUN_BUDGET_CHANGED", 409);
+}
+
+export async function verifyPlayAuthorization(
+  wallet: string,
+  action: GameIntent["action"],
+  rpc: Connection,
+) {
+  if (action.kind === "authorizeSession") {
+    const { nonce, inputKey, rent, expiresAtSeconds } = action;
+    const expected = await playSessionRent(
+      rpc,
+      new PublicKey(wallet),
+      new PublicKey(inputKey),
+      nonce,
+    );
+    if (
+      rent?.token !== expected.token ||
+      rent.authorization !== expected.authorization ||
+      expiresAtSeconds > Math.floor(Date.now() / 1000) + 30 * 60 + 60
+    )
+      throw new ApiError("RUN_BUDGET_CHANGED", 409);
+  }
+}
+
+export async function submitPlay(
+  wallet: string,
+  intent: GameIntent,
+  tx: VersionedTransaction,
+  verifyScope: () => Promise<Connection>,
+) {
+  const network = gameNetwork(intent.action);
+  const operationId = gameInstructions(wallet, intent).operationId;
+  const rpc = await checkedConnection(network);
+  const sponsor = await dedicatedSponsor(
+    network === "base" ? rpc : await checkedConnection("base"),
+  );
+  tx.sign([sponsor]);
+  const signature = utils.bytes.bs58.encode(
+    tx.signatures[0] ?? new Uint8Array(),
+  );
+  const prior = (
+    await rpc.getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    })
+  ).value[0];
+  if (prior)
+    return {
+      status: "requested",
+      signature,
+      network,
+      unknownResponse: false,
+    };
+  if (network === "er") await verifyScope();
+  await verifyPlayAuthorization(wallet, intent.action, rpc);
+  const cost = await checkPlaySpend(rpc, tx, sponsor.publicKey, network, true);
+  if (cost > 0n) await admitSponsorCost(operationId, cost, signature);
+  return sendReviewed(rpc, tx, network, signature);
+}
+
+export async function sendReviewed(
+  rpc: Connection,
+  tx: VersionedTransaction,
+  network: "base" | "er",
+  signature: string,
+) {
+  try {
+    await rpc.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+      maxRetries: 2,
+    });
+    return { status: "requested", signature, network, unknownResponse: false };
+  } catch {
+    return { status: "requested", signature, network, unknownResponse: true };
+  }
 }

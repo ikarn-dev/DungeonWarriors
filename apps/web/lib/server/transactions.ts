@@ -24,10 +24,14 @@ import {
 import { ApiError, sponsorshipConfig } from "./runtime";
 import {
   admitSponsorCost,
+  checkPlaySpend,
   checkSponsorHeadroom,
   dedicatedSponsor,
   recycleRunBudget,
   runSponsorCost,
+  sendReviewed,
+  submitPlay,
+  verifyPlayAuthorization,
 } from "./sponsorship";
 import { checkedConnection } from "./transaction-network";
 
@@ -191,7 +195,7 @@ export function instructionFor(
 }
 function instructionsFor(wallet: string, intent: Intent) {
   if (intent.operation === "game") {
-    const sponsor = runSponsor(intent.action);
+    const sponsor = intent.playSponsor?.sponsor ?? runSponsor(intent.action);
     if (sponsor !== undefined) {
       const settings = sponsorshipConfig();
       const funding =
@@ -201,6 +205,22 @@ function instructionsFor(wallet: string, intent: Intent) {
       if (
         sponsor !== settings.SPONSOR_PUBLIC_KEY ||
         sponsor === wallet ||
+        ("inputKey" in intent.action && intent.action.inputKey === sponsor) ||
+        (intent.playSponsor &&
+          (BigInt(intent.playSponsor.floor) !==
+            settings.SPONSOR_MIN_BALANCE_LAMPORTS ||
+            ![
+              "authorizeSession",
+              "reserveRun",
+              "activateRun",
+              "requestCompletion",
+              "suspendOrResumeRun",
+              "expireDelegatedActivation",
+              "abortUndelegatedReservation",
+              "settleReturnedRun",
+            ].includes(intent.action.kind) ||
+            (runSponsor(intent.action) !== undefined &&
+              runSponsor(intent.action) !== sponsor))) ||
         (funding &&
           (BigInt(funding.lamports) !==
             settings.SPONSOR_COMPLETION_RESERVE_LAMPORTS ||
@@ -257,6 +277,8 @@ export async function prepare(wallet: string, intent: Intent) {
       starterSponsorLimit(policy.SPONSOR_OPERATION_LIMIT_LAMPORTS),
     );
   }
+  if (intent.operation === "game" && intent.playSponsor)
+    await verifyPlayAuthorization(wallet, intent.action, rpc);
   if (intent.operation === "game" && intent.action.kind === "reserveRun") {
     const funding = intent.action.completionFunding;
     if (funding) {
@@ -272,7 +294,10 @@ export async function prepare(wallet: string, intent: Intent) {
     recentBlockhash: block.blockhash,
     instructions: built.instructions,
   }).compileToV0Message();
-  const bytes = new VersionedTransaction(message).serialize();
+  const tx = new VersionedTransaction(message);
+  if (intent.operation === "game" && intent.playSponsor)
+    await checkPlaySpend(rpc, tx, built.payer, network, false);
+  const bytes = tx.serialize();
   if (bytes.length > 1232) throw new ApiError("INVALID_TRANSACTION", 400);
   return {
     transaction: Buffer.from(bytes).toString("base64"),
@@ -307,10 +332,12 @@ export function validateTransaction(
           : 0;
   const maxInstructions =
     intent.operation === "game"
-      ? intent.action.kind === "reserveRun" &&
-        intent.action.expiresAtSeconds !== undefined
-        ? 5 + fundingInstructions
-        : 4 + fundingInstructions
+      ? intent.playSponsor
+        ? 7
+        : intent.action.kind === "reserveRun" &&
+            intent.action.expiresAtSeconds !== undefined
+          ? 5 + fundingInstructions
+          : 4 + fundingInstructions
       : intent.sponsored
         ? 3
         : 1;
@@ -369,7 +396,9 @@ export function validateTransaction(
   }
   const data = message.serialize();
   const completionSponsor =
-    intent.operation === "game" ? runSponsor(intent.action) : undefined;
+    intent.operation === "game"
+      ? (intent.playSponsor?.sponsor ?? runSponsor(intent.action))
+      : undefined;
   for (let i = 0; i < signerCount; i++) {
     const key = message.staticAccountKeys[i];
     if (key === undefined) throw new ApiError("INVALID_SIGNATURE", 401);
@@ -389,6 +418,8 @@ export function validateTransaction(
 export async function submit(wallet: string, intent: Intent, encoded: string) {
   const tx = validateTransaction(wallet, intent, encoded);
   const network = networkFor(intent);
+  if (intent.operation === "game" && intent.playSponsor)
+    return submitPlay(wallet, intent, tx, () => connectionFor(wallet, intent));
   const rpc = await connectionFor(wallet, intent);
   // The ER simulates v0 transactions, but its fee RPC cannot load v0 messages.
   const fee =
@@ -470,14 +501,5 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
   const signature = utils.bytes.bs58.encode(
     Buffer.from(tx.signatures[0] ?? []),
   );
-  try {
-    await rpc.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-      maxRetries: 2,
-    });
-    return { status: "requested", signature, network, unknownResponse: false };
-  } catch {
-    return { status: "requested", signature, network, unknownResponse: true };
-  }
+  return sendReviewed(rpc, tx, network, signature);
 }

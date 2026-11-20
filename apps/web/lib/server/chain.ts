@@ -468,6 +468,10 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
     ...balanceContext,
     entry: {
       status: "ready",
+      playSponsor: {
+        sponsor,
+        floor: settings.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
+      },
       maxStake: maxStake.toString(),
       available: player.availableBaseUnits.toString(),
       houseHeadroom: (vault.amount > obligations

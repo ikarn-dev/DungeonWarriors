@@ -246,3 +246,69 @@ it("omits the writable Hydra accounts when settling a run that never activated",
     })),
   );
 });
+
+it("launches atomically with the scoped play key and the sponsor as the sole SOL payer", async () => {
+  const { owner, play, sponsor, wallet, intent } = launch();
+  const { sponsor: address, floor } = intent.action.completionFunding;
+  const value = { ...intent, playSponsor: { sponsor: address, floor } };
+  const built = gameInstructions(wallet, value);
+  const msg = new TransactionMessage({
+    payerKey: built.payer,
+    recentBlockhash: PublicKey.default.toBase58(),
+    instructions: built.instructions,
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(msg);
+  expect(instructionNames(tx)).toEqual([
+    "fundSponsorship",
+    "reserveQuotedRun",
+    "fundRunCompletion",
+    "delegateRun",
+    SystemProgram.programId.toBase58(),
+  ]);
+  expect(tx.serialize().length).toBeLessThanOrEqual(1232);
+  expect(
+    msg.staticAccountKeys.slice(0, msg.header.numRequiredSignatures),
+  ).toEqual([sponsor.publicKey, play.publicKey]);
+  const encoded = () => Buffer.from(tx.serialize()).toString("base64");
+  expect(() => validateTransaction(wallet, value, encoded())).toThrow(
+    "INVALID_SIGNATURE",
+  );
+  tx.sign([play]);
+  const programData = Buffer.alloc(45);
+  programData.writeUInt32LE(3);
+  programData[12] = 1;
+  owner.publicKey.toBuffer().copy(programData, 13);
+  const send = vi.fn().mockResolvedValue("sent");
+  const simulate = vi.fn().mockResolvedValue({
+    context: { slot: 30 },
+    value: { err: null, accounts: [{ lamports: 1_100_000_000 }] },
+  });
+  mock.rpc.mockResolvedValue({
+    getAccountInfo: async () => ({
+      owner: new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
+      data: programData,
+    }),
+    getSignatureStatuses: async () => ({ value: [null] }),
+    getBalanceAndContext: async () => ({
+      context: { slot: 30 },
+      value: 1_195_000_000,
+    }),
+    getBalance: async () => 1_195_000_000,
+    simulateTransaction: simulate,
+    sendRawTransaction: send,
+  });
+  mock.admit.mockResolvedValue(1);
+  await expect(submit(wallet, value, encoded())).resolves.toMatchObject({
+    network: "base",
+  });
+  expect(
+    VersionedTransaction.deserialize(send.mock.calls[0]?.[0]).signatures.every(
+      (sig) => sig.some(Boolean),
+    ),
+  ).toBe(true);
+  expect(mock.admit).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(Array),
+    [3, "95000000", "100000000"],
+  );
+});

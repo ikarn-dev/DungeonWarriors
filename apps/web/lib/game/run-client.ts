@@ -7,6 +7,7 @@ import {
   completionOfferSchema,
   type GameIntent,
   gameNetwork,
+  playSponsorSchema,
   validatePreparedGame,
 } from "./run-transactions";
 import { decodeBase64, encodeBase64, WebApiError, webApi } from "./web-api";
@@ -77,6 +78,7 @@ export const runEntrySchema = z.object({
         .max(Number.MAX_SAFE_INTEGER - 1800),
       completionSponsor: publicKeySchema.optional(),
       completionFunding: completionOfferSchema.optional(),
+      playSponsor: playSponsorSchema.optional(),
     }),
   ]),
 });
@@ -97,6 +99,55 @@ export type GameSignature = {
   network: "base" | "er";
   lastValidBlockHeight: number;
 };
+export type SponsoredPlayTransaction = {
+  intent: GameIntent;
+  transaction: string;
+  network: GameSignature["network"];
+  lastValidBlockHeight: number;
+};
+export async function prepareSponsoredPlay(
+  wallet: string,
+  intent: GameIntent,
+  signal: AbortSignal,
+  key?: Keypair,
+  sign?: (tx: VersionedTransaction) => Promise<VersionedTransaction>,
+): Promise<SponsoredPlayTransaction> {
+  const prepared = preparedSchema.parse(
+    await webApi("/api/tx/prepare", intent, signal),
+  );
+  let tx = VersionedTransaction.deserialize(decodeBase64(prepared.transaction));
+  validatePreparedGame(tx, wallet, intent, prepared);
+  if (sign) tx = await sign(tx);
+  signal.throwIfAborted();
+  if (key) tx.sign([key]);
+  return {
+    intent,
+    transaction: encodeBase64(tx.serialize()),
+    network: prepared.network,
+    lastValidBlockHeight: prepared.lastValidBlockHeight,
+  };
+}
+
+export async function submitSponsoredPlay(
+  pending: SponsoredPlayTransaction,
+  signal: AbortSignal,
+): Promise<GameSignature> {
+  const result = z
+    .object({
+      signature: z.string().min(64).max(88),
+      network: z.enum(["base", "er"]),
+    })
+    .parse(
+      await webApi(
+        "/api/tx/submit",
+        { intent: pending.intent, transaction: pending.transaction },
+        signal,
+      ),
+    );
+  if (result.network !== pending.network)
+    throw new WebApiError("UNEXPECTED_TRANSACTION");
+  return { ...result, lastValidBlockHeight: pending.lastValidBlockHeight };
+}
 export type RunActionSubmitter = (
   action: GameIntent["action"],
   onSignature: (value: GameSignature | null) => void,

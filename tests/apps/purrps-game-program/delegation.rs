@@ -198,6 +198,65 @@ fn returning_a_run_checks_exact_provider_buffer_signature_and_seeds() {
 
 #[test]
 #[ignore = "requires the Devnet Delegation Program and fee-vault snapshots"]
+fn sponsor_reserves_funds_and_delegates_without_the_owner_signing_or_paying() {
+    let mut p = Play::new();
+    let owner = p.owner.pubkey();
+    let sponsor = p.sponsor.pubkey();
+    let play = p.key.pubkey();
+    let run = pda(purrps_game::RUN_GAME_SEED, owner, 0);
+    let escrow = pda(purrps_game::RUN_ESCROW_SEED, owner, 0);
+    let action = ephemeral_rollups_sdk::pda::ephemeral_balance_pda_from_payer(&run, 255);
+    let config_key = p.h.config;
+    let mut config: GameConfig = p.h.read(config_key);
+    config.oracle_bindings[2].validator = DEFAULT_VALIDATOR_IDENTITY;
+    setup::put(&mut p.h, config_key, &config);
+    p.authorize();
+    p.admit_fixture();
+    let dlp = DelegationProgram::id();
+    let provider = std::fs::read(std::env::var("PURRPS_DLP_PROGRAM_SNAPSHOT").unwrap()).unwrap();
+    p.h.svm.add_program(dlp, &provider).unwrap();
+    let args = p.args(0);
+    let mut reserve = p.reserve_ix(args.clone(), play);
+    reserve.accounts[2].pubkey = sponsor;
+    reserve.data = instruction::ReserveQuotedRun {
+        args,
+        max_gross: 2_000_000,
+    }
+    .data();
+    let mut delegate = delegation(&p, play, 0, 1);
+    delegate.accounts[4].pubkey = sponsor;
+    let fund_completion = ix(
+        instruction::FundRunCompletion {},
+        accounts::FundRunCompletion {
+            run_escrow: escrow,
+            budget: p.budget(0),
+            sponsor,
+            action_balance: action,
+        },
+    );
+    let before = p.h.svm.get_balance(&owner).unwrap();
+    let message = Message::new_with_blockhash(
+        &[
+            p.fund_ix(p.fund_args(0)),
+            reserve,
+            fund_completion,
+            delegate,
+        ],
+        Some(&sponsor),
+        &p.h.svm.latest_blockhash(),
+    );
+    let tx =
+        VersionedTransaction::try_new(VersionedMessage::Legacy(message), &[&p.sponsor, &p.key])
+            .unwrap();
+    p.h.svm.send_transaction(tx).unwrap();
+    assert_eq!(p.h.svm.get_balance(&owner), Some(before));
+    assert_eq!(p.h.svm.get_account(&run).unwrap().owner, dlp);
+    assert!(p.h.read::<RunEscrow>(escrow).delegation_initiated);
+    assert_eq!(p.h.svm.get_balance(&action), Some(1_000_000));
+}
+
+#[test]
+#[ignore = "requires the Devnet Delegation Program and fee-vault snapshots"]
 fn deployed_provider_round_trips_only_the_run_and_refunds_the_same_stake() {
     let mut p = Play::new();
     let mut config: GameConfig = p.h.read(p.h.config);

@@ -41,6 +41,8 @@ import { WebApiError } from "./web-api";
 const positive = u64Input.refine((n) => n !== "0");
 const version = z.number().int().min(1).max(0xffffffff);
 const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
+// New reservations in the current program start at delegation epoch 1.
+const initialDelegationEpoch = "1";
 const catSchema = z.enum(["collector", "acrobat", "guardian", "sprinter"]);
 const nonce = { nonce: u64Input };
 const identity = { ...nonce, delegationEpoch: positive };
@@ -51,6 +53,12 @@ export const completionOfferSchema = z.strictObject({
   attempts: z.number().int().min(1).max(65_535),
 });
 export type CompletionOffer = z.infer<typeof completionOfferSchema>;
+export const playSponsorSchema = completionOfferSchema.pick({
+  sponsor: true,
+  floor: true,
+});
+export type PlaySponsor = z.infer<typeof playSponsorSchema>;
+export const sessionTokenSpace = 8 + 3 * 32 + 8;
 const action = z.discriminatedUnion("kind", [
   ...playerActions,
   z.strictObject({
@@ -59,6 +67,9 @@ const action = z.discriminatedUnion("kind", [
     inputKey: publicKeySchema,
     expiresAtSeconds: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     allowance: u64Input,
+    rent: z
+      .strictObject({ token: u64Input, authorization: u64Input })
+      .optional(),
   }),
   z.strictObject({ kind: z.literal("revokeSession"), ...nonce }),
   z.strictObject({
@@ -86,6 +97,7 @@ const action = z.discriminatedUnion("kind", [
     kind: z.literal("delegateRun"),
     ...identity,
     completionSponsor: publicKeySchema.optional(),
+    inputKey: publicKeySchema.optional(),
   }),
   z.strictObject({
     kind: z.literal("activateRun"),
@@ -116,6 +128,7 @@ const action = z.discriminatedUnion("kind", [
 export const gameIntentSchema = z.strictObject({
   operation: z.literal("game"),
   sponsored: z.literal(false),
+  playSponsor: playSponsorSchema.optional(),
   action,
 });
 export type GameIntent = z.infer<typeof gameIntentSchema>;
@@ -169,7 +182,7 @@ export function programInstruction(
   });
 }
 
-function sessionToken(owner: PublicKey, inputKey: PublicKey) {
+export function sessionToken(owner: PublicKey, inputKey: PublicKey) {
   if (owner.equals(inputKey) || !PublicKey.isOnCurve(inputKey.toBytes()))
     throw new WebApiError("INVALID_PLAY_KEY");
   return PublicKey.findProgramAddressSync(
@@ -231,7 +244,7 @@ export function gameNetwork(action: GameIntent["action"]): "base" | "er" {
 
 export function gameInstructions(
   wallet: string,
-  { action }: GameIntent,
+  { action, playSponsor }: GameIntent,
 ): {
   instructions: TransactionInstruction[];
   payer: PublicKey;
@@ -246,11 +259,14 @@ export function gameInstructions(
   )
     return playerInstructions(wallet, action);
   const owner = new PublicKey(wallet);
+  const payer = playSponsor ? new PublicKey(playSponsor.sponsor) : owner;
+  if (playSponsor && payer.equals(owner))
+    throw new WebApiError("INVALID_RUN_SPONSOR");
   const ownerBytes = owner.toBytes();
   const house = pda("house");
   const values: Record<string, PublicKey> = {
     owner,
-    payer: owner,
+    payer,
     config: pda("game-config"),
     player: pda("player", ownerBytes),
     house,
@@ -266,8 +282,17 @@ export function gameInstructions(
     instructions: [
       ...prefix,
       programInstruction(instructionName, values, args),
+      ...(playSponsor && gameNetwork(action) === "base"
+        ? [
+            SystemProgram.transfer({
+              fromPubkey: payer,
+              toPubkey: payer,
+              lamports: BigInt(playSponsor.floor),
+            }),
+          ]
+        : []),
     ],
-    payer: owner,
+    payer,
     operationId,
   });
 
@@ -278,6 +303,11 @@ export function gameInstructions(
       return build({}, [], authorization.toBase58());
     const inputKey = new PublicKey(action.inputKey);
     const token = sessionToken(owner, inputKey);
+    if (
+      playSponsor &&
+      (!action.rent || action.allowance === "0" || inputKey.equals(payer))
+    )
+      throw new WebApiError("INVALID_REQUEST");
     Object.assign(values, { sessionToken: token });
     return build(
       {
@@ -289,7 +319,27 @@ export function gameInstructions(
           allowanceBaseUnits: new BN(action.allowance),
         },
       },
-      [createSession(owner, inputKey, token, action.expiresAtSeconds)],
+      [
+        ...(playSponsor && action.rent
+          ? [
+              [token, action.rent.token],
+              [authorization, action.rent.authorization],
+            ].flatMap(([address, lamports]) =>
+              address instanceof PublicKey &&
+              typeof lamports === "string" &&
+              lamports !== "0"
+                ? [
+                    SystemProgram.transfer({
+                      fromPubkey: payer,
+                      toPubkey: address,
+                      lamports: BigInt(lamports),
+                    }),
+                  ]
+                : [],
+            )
+          : []),
+        createSession(owner, inputKey, token, action.expiresAtSeconds),
+      ],
       authorization.toBase58(),
     );
   }
@@ -321,7 +371,7 @@ export function gameInstructions(
   const operationId = run.toBase58();
   if (action.kind === "reserveRun") {
     Object.assign(values, {
-      authority: owner,
+      authority: playSponsor ? new PublicKey(action.inputKey) : owner,
       authorization: pda(
         "session",
         ownerBytes,
@@ -335,6 +385,8 @@ export function gameInstructions(
       policy: pda("sponsor-policy"),
     });
     if (action.expiresAtSeconds !== undefined && action.maxGross === undefined)
+      throw new WebApiError("INVALID_REQUEST");
+    if (playSponsor && (action.stake === "0" || action.maxGross === undefined))
       throw new WebApiError("INVALID_REQUEST");
     const funding = action.completionFunding;
     const fundingInstructions: TransactionInstruction[] = [];
@@ -362,16 +414,18 @@ export function gameInstructions(
             },
           },
         ),
-        // A self-transfer atomically checks the remaining SOL in the sponsor account.
-        SystemProgram.transfer({
-          fromPubkey: sponsor,
-          toPubkey: sponsor,
-          lamports: BigInt(funding.floor),
-        }),
       );
+      if (!playSponsor)
+        fundingInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: sponsor,
+            toPubkey: sponsor,
+            lamports: BigInt(funding.floor),
+          }),
+        );
     }
     const authorization =
-      action.expiresAtSeconds === undefined
+      action.expiresAtSeconds === undefined || playSponsor
         ? []
         : gameInstructions(wallet, {
             operation: "game",
@@ -384,7 +438,7 @@ export function gameInstructions(
               allowance: action.stake,
             },
           }).instructions;
-    return build(
+    const reserved = build(
       {
         args: {
           expectedRunNonce: new BN(action.nonce),
@@ -404,10 +458,34 @@ export function gameInstructions(
       operationId,
       action.maxGross === undefined ? "reserveRun" : "reserveQuotedRun",
     );
+    if (!playSponsor) return reserved;
+    const delegated = gameInstructions(wallet, {
+      operation: "game",
+      sponsored: false,
+      playSponsor,
+      action: {
+        kind: "delegateRun",
+        nonce: action.nonce,
+        delegationEpoch: initialDelegationEpoch,
+        inputKey: action.inputKey,
+        completionSponsor: playSponsor.sponsor,
+      },
+    });
+    return {
+      ...reserved,
+      // Check the floor once, after the final debit.
+      instructions: [
+        ...reserved.instructions.slice(0, -1),
+        ...delegated.instructions,
+      ],
+    };
   }
   if (action.kind === "delegateRun") {
+    if (playSponsor && !action.inputKey)
+      throw new WebApiError("INVALID_PLAY_KEY");
     Object.assign(values, {
-      authority: owner,
+      authority:
+        playSponsor && action.inputKey ? new PublicKey(action.inputKey) : owner,
       ownerProgram: program,
       buffer: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
         run,
