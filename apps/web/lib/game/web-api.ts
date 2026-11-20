@@ -10,6 +10,8 @@ export function webErrorMessage(code: string) {
     return "Sign-in could not start on this site address. Please contact the PURRPS team.";
   if (code === "SERVICE_NOT_CONFIGURED")
     return "PURRPS is temporarily unavailable. Please try again once service is restored.";
+  if (code === "SPONSOR_BUDGET_UNAVAILABLE")
+    return "PURRPS cannot cover the Devnet fees right now. Try again when sponsorship is available.";
   return `Request could not finish: ${code.replaceAll("_", " ").toLowerCase()}. You can refresh and retry.`;
 }
 export async function readWebJson(response: Response): Promise<unknown> {

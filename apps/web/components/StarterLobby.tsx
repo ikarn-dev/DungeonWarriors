@@ -63,7 +63,10 @@ export default function StarterPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Connect a wallet to begin.");
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    signature: string;
+    starter: boolean;
+  } | null>(null);
   const work = useRef<AbortController | null>(null);
   useEffect(() => {
     work.current?.abort();
@@ -156,8 +159,11 @@ export default function StarterPanel() {
         status: { confirmationStatus: string; err: unknown } | null;
       }>("/api/tx/status", { signature }, signal);
       if (result.status?.confirmationStatus === "finalized") {
-        setPending(null);
-        await reload(signal);
+        try {
+          await reload(signal);
+        } finally {
+          if (!signal.aborted) setPending(null);
+        }
         if (result.status.err !== null)
           throw new WebApiError("TRANSACTION_FAILED");
         setMessage(
@@ -228,8 +234,11 @@ export default function StarterPanel() {
         signal,
       ),
     );
-    setPending(result.signature);
-    setMessage("Transaction requested; waiting for base-chain finality.");
+    setPending({
+      signature: result.signature,
+      starter: intent.operation === "claimStarter",
+    });
+    setMessage("Waiting for Solana Devnet confirmation.");
     await reconcile(result.signature, signal);
   }
   useEffect(() => {
@@ -270,7 +279,10 @@ export default function StarterPanel() {
   const blocked = busy || pending !== null;
   return (
     <div className={style.grid}>
-      <StarterCapsule state={authenticated ? state : null} />
+      <StarterCapsule
+        state={authenticated ? state : null}
+        submitting={authenticated && pending?.starter === true}
+      />
       <section
         aria-label="Wallet and starter cat"
         aria-busy={busy}
@@ -394,7 +406,9 @@ export default function StarterPanel() {
                   className={button}
                   disabled={busy}
                   onClick={() =>
-                    void perform((signal) => reconcile(pending, signal))
+                    void perform((signal) =>
+                      reconcile(pending.signature, signal),
+                    )
                   }
                 >
                   Check pending transaction
@@ -461,7 +475,9 @@ export default function StarterPanel() {
                         })
                       }
                     >
-                      Open starter capsule
+                      {pending?.starter
+                        ? "Opening capsule…"
+                        : "Open starter capsule"}
                     </button>
                     {(!state.allowStarter || state.catalogVersion === null) && (
                       <p className="text-sm">

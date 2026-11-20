@@ -41,6 +41,7 @@ vi.mock(
 import { coder, idl } from "../../../../../apps/web/lib/server/chain";
 import {
   instructionFor,
+  prepare,
   submit,
   validateTransaction,
 } from "../../../../../apps/web/lib/server/transactions";
@@ -129,6 +130,98 @@ function transaction(
   };
 }
 describe("complete transaction validation", () => {
+  it("prepares and submits the starter below the general sponsor cap without spending the reserve floor", async () => {
+    const owner = wallet();
+    const sponsor = Keypair.generate();
+    const programData = Buffer.alloc(45);
+    programData.writeUInt32LE(3);
+    programData[12] = 1;
+    owner.publicKey.toBuffer().copy(programData, 13);
+    let balance = 1_093_290_840;
+    const send = vi.fn().mockResolvedValue("sent");
+    const sponsorDebit = 2_537_080;
+    const fee = 10_000;
+    sponsorTest.connection.mockReturnValue({
+      getGenesisHash: async () => DEVNET.genesisHash,
+      getLatestBlockhash: async () => ({
+        blockhash: PublicKey.default.toBase58(),
+        lastValidBlockHeight: 100,
+      }),
+      getFeeForMessage: async () => ({ value: fee }),
+      getAccountInfo: async () => ({
+        owner: new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
+        data: programData,
+      }),
+      getBalance: async () => balance,
+      simulateTransaction: async () => ({
+        value: {
+          err: null,
+          accounts: [{ lamports: balance - sponsorDebit - fee }],
+        },
+      }),
+      sendRawTransaction: send,
+    });
+    sponsorTest.sponsor.mockReturnValue({
+      ...config,
+      SPONSOR_PUBLIC_KEY: sponsor.publicKey.toBase58(),
+    });
+    sponsorTest.admit.mockResolvedValue(1);
+    vi.stubEnv(
+      "SPONSOR_SECRET_KEY",
+      Buffer.from(sponsor.secretKey).toString("base64"),
+    );
+    vi.stubEnv("SPONSOR_HOURLY_BUDGET_LAMPORTS", "1000000000");
+    const intent = {
+      operation: "claimStarter",
+      nonce: "0",
+      inventoryVersion: "0",
+      catalogVersion: 1,
+      sponsored: true,
+    } as const;
+    try {
+      const prepared = await prepare(owner.address, intent);
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(prepared.transaction, "base64"),
+      );
+      const [claim] = TransactionMessage.decompile(tx.message).instructions;
+      expect(Buffer.from(claim?.data ?? [])).toEqual(
+        coder.instruction.encode("claimStarter", {
+          args: {
+            expectedDrawNonce: new BN(0),
+            expectedInventoryVersion: new BN(0),
+            expectedCatalogVersion: 1,
+            kind: { starterCat: {} },
+            maxPayerDebitLamports: new BN(4_900_000),
+          },
+        }),
+      );
+      tx.signatures[1] = owner.sign(tx.message.serialize());
+      const encoded = Buffer.from(tx.serialize()).toString("base64");
+      await expect(
+        submit(owner.address, intent, encoded),
+      ).resolves.toMatchObject({ status: "requested", network: "base" });
+      expect(sponsorTest.admit).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        [config.SPONSOR_MAX_ATTEMPTS, "4910000", "1000000000"],
+      );
+      balance = 1_004_000_000;
+      await expect(prepare(owner.address, intent)).rejects.toThrow(
+        "SPONSOR_BUDGET_UNAVAILABLE",
+      );
+      await expect(submit(owner.address, intent, encoded)).rejects.toThrow(
+        "SPONSOR_BUDGET_UNAVAILABLE",
+      );
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(sponsorTest.admit).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+      sponsorTest.connection.mockReset();
+      sponsorTest.sponsor.mockReset();
+      sponsorTest.admit.mockReset();
+    }
+  });
+
   it("charges rent and the wallet's actual network fee once and rejects both fee and debit overages", async () => {
     const owner = wallet();
     const sponsor = Keypair.generate();

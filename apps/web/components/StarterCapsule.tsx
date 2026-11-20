@@ -6,17 +6,26 @@ const art = "/game-assets/v1";
 
 export default function StarterCapsule({
   state,
+  submitting = false,
 }: {
   state: LobbyState | null;
+  submitting?: boolean;
 }) {
-  const phase = state?.starter ?? "unclaimed";
+  const phase =
+    submitting && state?.starter === "unclaimed"
+      ? "submitting"
+      : (state?.starter ?? "unclaimed");
   const award =
     phase === "fulfilled" && state?.cats.length === 1 ? state.cats[0] : null;
   const title = award
     ? CAT_NAMES[award.id]
     : phase === "fulfilled"
       ? "Starter claimed"
-      : "Your first cat";
+      : phase === "submitting"
+        ? "Opening capsule"
+        : phase === "pending"
+          ? "Drawing your cat"
+          : "Your first cat";
 
   return (
     <section
@@ -62,8 +71,10 @@ export default function StarterCapsule({
             <span className={style.rarity}>{award.rarity}</span> · Level{" "}
             {award.level}
           </p>
+        ) : phase === "submitting" ? (
+          <p>Confirming your request on Solana Devnet.</p>
         ) : phase === "pending" ? (
-          <p>Draw pending on Devnet</p>
+          <p>Waiting for MagicBlock randomness.</p>
         ) : phase === "fulfilled" ? (
           <p>Choose a cat from your collection.</p>
         ) : (

@@ -68,6 +68,20 @@ export const submitInput = z
 type Intent = z.infer<typeof intentSchema>;
 const MAX_SPONSORED_COMPUTE_UNITS = 200_000;
 const SPONSORED_FEE_LIMIT_LAMPORTS = 100_000n;
+const STARTER_SPONSORED_LIMIT_LAMPORTS = 5_000_000n;
+
+function starterSponsorLimit(operationLimit: bigint) {
+  return operationLimit < STARTER_SPONSORED_LIMIT_LAMPORTS
+    ? operationLimit
+    : STARTER_SPONSORED_LIMIT_LAMPORTS;
+}
+
+function checkSponsorHeadroom(balance: number, floor: bigint, cost: bigint) {
+  if (!Number.isSafeInteger(balance) || balance < 0)
+    throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
+  if (BigInt(balance) - cost < floor)
+    throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
+}
 
 function reviewedInstructions(
   message: MessageV0,
@@ -138,8 +152,9 @@ export function instructionFor(
   let operationId = `${intent.operation}:${wallet}`;
   if (intent.operation === "claimStarter") {
     const budget =
-      sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS -
-      SPONSORED_FEE_LIMIT_LAMPORTS;
+      starterSponsorLimit(
+        sponsorshipConfig().SPONSOR_OPERATION_LIMIT_LAMPORTS,
+      ) - SPONSORED_FEE_LIMIT_LAMPORTS;
     if (budget <= 0n) throw new ApiError("SPONSOR_NOT_CONFIGURED", 503);
     const version = Buffer.alloc(4);
     version.writeUInt32LE(intent.catalogVersion);
@@ -215,6 +230,14 @@ export async function prepare(wallet: string, intent: Intent) {
   const built = instructionsFor(wallet, intent);
   const network = networkFor(intent);
   const rpc = await connectionFor(wallet, intent);
+  if (intent.operation === "claimStarter") {
+    const policy = sponsorshipConfig();
+    checkSponsorHeadroom(
+      await rpc.getBalance(built.payer, "confirmed"),
+      policy.SPONSOR_MIN_BALANCE_LAMPORTS,
+      starterSponsorLimit(policy.SPONSOR_OPERATION_LIMIT_LAMPORTS),
+    );
+  }
   const block = await rpc.getLatestBlockhash(
     network === "er" ? "confirmed" : "finalized",
   );
@@ -400,16 +423,14 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     const cost =
       (intent.operation === "createPlayer"
         ? rent.reduce((total, n) => total + BigInt(n), 0n)
-        : policy.SPONSOR_OPERATION_LIMIT_LAMPORTS -
+        : starterSponsorLimit(policy.SPONSOR_OPERATION_LIMIT_LAMPORTS) -
           SPONSORED_FEE_LIMIT_LAMPORTS) + BigInt(fee);
     // The simulated payer balance already reflects the network fee.
     if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
-    if (
-      cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS ||
-      BigInt(balance) - cost < policy.SPONSOR_MIN_BALANCE_LAMPORTS
-    )
+    if (cost > policy.SPONSOR_OPERATION_LIMIT_LAMPORTS)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
+    checkSponsorHeadroom(balance, policy.SPONSOR_MIN_BALANCE_LAMPORTS, cost);
     const { SPONSOR_HOURLY_BUDGET_LAMPORTS: hourly } = process.env;
     if (
       hourly === undefined ||
