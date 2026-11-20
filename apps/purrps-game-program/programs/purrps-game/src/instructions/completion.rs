@@ -47,8 +47,8 @@ pub struct RequestCompletion<'info> {
     pub budget: Box<Account<'info, SponsorBudget>>,
     #[account(address=completion_balance(run.key()) @ ErrorCode::InvalidSponsorBudget)]
     pub action_balance: SystemAccount<'info>,
-    /// CHECK: The canonical per-market leaderboard may be uninitialized.
-    #[account(seeds=[LEADERBOARD_SEED,&[run_escrow.snapshot.market as u8]],bump)]
+    /// CHECK: The canonical leaderboard may be uninitialized.
+    #[account(seeds=[LEADERBOARD_SEED],bump)]
     pub leaderboard: UncheckedAccount<'info>,
     #[account(mut, owner=system_program::ID)]
     pub payer: Signer<'info>,
@@ -237,7 +237,7 @@ fn schedule_completion(a: &RequestCompletion<'_>, seeds: &[&[u8]], funded: bool)
 pub struct SettleRunAction<'info> {
     pub settlement: AbortUndelegatedReservation<'info>,
     #[account(init_if_needed, payer=settlement.payer, space=8+Leaderboard::INIT_SPACE,
-        seeds=[LEADERBOARD_SEED, &[settlement.escrow.snapshot.market as u8]], bump)]
+        seeds=[LEADERBOARD_SEED], bump)]
     pub leaderboard: Box<Account<'info, Leaderboard>>,
     pub system_program: Program<'info, System>,
     /// CHECK: Use the genuine Instructions sysvar to pin the dispatching validator.

@@ -173,6 +173,7 @@ fn devnet_dlp_executes_pinned_actions_and_reclaims_unused_sol() {
         let mut result = settlement(&p, 0);
         result.settlement.payer = action_balance;
         let receipt = result.settlement.receipt;
+        let board_key = result.leaderboard;
         let mut metas = result.to_account_metas(Some(false));
         metas.push(AccountMeta::new_readonly(
             solana_instructions_sysvar::ID,
@@ -216,6 +217,12 @@ fn devnet_dlp_executes_pinned_actions_and_reclaims_unused_sol() {
         let landed: ResultReceipt = p.h.read(receipt);
         assert_eq!(landed.terminal.reason, reason);
         assert_eq!(landed.owner, p.owner.pubkey());
+        let board: purrps_game::state::records::Leaderboard = p.h.read(board_key);
+        assert_eq!(board.count, 1);
+        let entry = board.entries[0].unwrap();
+        assert_eq!(entry.run, landed.run);
+        assert_eq!(entry.owner, landed.owner);
+        assert_eq!(entry.score, landed.terminal.score);
         let player: PlayerAccount = p.h.read(p.player);
         assert_eq!(player.settled_runs, 1);
         assert_eq!(

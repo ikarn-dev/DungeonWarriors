@@ -20,6 +20,19 @@ it("reads a fresh wallet without creating a player or requesting receipt pages",
 });
 
 const { PURRPS_DEVNET_ACCOUNT_WALLET: testWallet } = process.env;
+
+it("reads the single shared board from finalized Devnet", async () => {
+  const result = await readState(
+    Keypair.generate().publicKey.toBase58(),
+    stateInput.parse({ kind: "leaderboard" }),
+  );
+  expect(result).toMatchObject({
+    commitment: "finalized",
+    slot: expect.any(Number),
+    leaderboard: expect.any(Array),
+  });
+});
+
 it.skipIf(testWallet === undefined)(
   "decodes a registered player's actual finalized balance accounts",
   async () => {

@@ -9,7 +9,10 @@ import {
   readState,
   stateInput,
 } from "../../../../../apps/web/lib/server/chain";
-import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
+import {
+  DEVNET,
+  LEADERBOARD_SEED,
+} from "../../../../../apps/web/lib/solana/addresses";
 import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game";
 
 const owner = Keypair.generate().publicKey;
@@ -111,6 +114,86 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+});
+
+describe("finalized shared leaderboard", () => {
+  const [address, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from(LEADERBOARD_SEED)],
+    program,
+  );
+  const input = stateInput.parse({ kind: "leaderboard" });
+
+  it("returns an empty board before the first settlement", async () => {
+    const base = vi.spyOn(Connection.prototype, "getAccountInfoAndContext");
+    for (const value of [null, noData]) {
+      base.mockResolvedValueOnce({ context: { slot }, value });
+      await expect(readState(wallet, input)).resolves.toMatchObject({
+        commitment: "finalized",
+        slot,
+        leaderboard: [],
+      });
+    }
+    expect(base).toHaveBeenCalledWith(address, "finalized");
+    expect(stateInput.safeParse({ ...input, market: "SOL" }).success).toBe(
+      false,
+    );
+  });
+
+  it("preserves score precision and rejects duplicate wallets and wrong tie order", async () => {
+    const score = new BN("9007199254740993");
+    const entries = [owner, Keypair.generate().publicKey]
+      .map((owner) => ({
+        owner,
+        nonce: new BN(0),
+        run: runAddresses({ owner: owner.toBase58(), nonce: 0n }).run[0],
+        score,
+      }))
+      .sort((a, b) => Buffer.compare(a.run.toBuffer(), b.run.toBuffer()));
+    const base = vi.spyOn(Connection.prototype, "getAccountInfoAndContext");
+    async function setBoard(rows: typeof entries) {
+      const value = {
+        ...noData,
+        owner: program,
+        data: await coder.accounts.encode("leaderboard", {
+          schemaVersion: 1,
+          bump,
+          count: rows.length,
+          entries: [...rows, ...Array(20 - rows.length).fill(null)],
+        }),
+      };
+      base.mockResolvedValueOnce({ context: { slot }, value });
+    }
+    await setBoard(entries);
+    await expect(
+      readState(Keypair.generate().publicKey.toBase58(), input),
+    ).resolves.toMatchObject({
+      commitment: "finalized",
+      slot,
+      leaderboard: entries.map((entry, i) => ({
+        rank: i + 1,
+        wallet: entry.owner.toBase58(),
+        score: score.toString(),
+      })),
+    });
+    const [first] = entries;
+    if (first === undefined) throw new Error("Missing leaderboard fixture.");
+    await setBoard([
+      first,
+      {
+        ...first,
+        nonce: new BN(1),
+        run: runAddresses({ owner: first.owner.toBase58(), nonce: 1n }).run[0],
+        score: new BN(0),
+      },
+    ]);
+    await expect(readState(wallet, input)).rejects.toThrow(
+      "INVALID_CHAIN_ACCOUNT",
+    );
+    await setBoard(entries.slice().reverse());
+    await expect(readState(wallet, input)).rejects.toThrow(
+      "INVALID_CHAIN_ACCOUNT",
+    );
+  });
 });
 
 describe("finalized wallet and receipt records", () => {

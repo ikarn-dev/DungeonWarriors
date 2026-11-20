@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { guardRunLayout } from "../../apps/web/lib/game/run-layout.ts";
-import { DEVNET, MARKETS } from "../../apps/web/lib/solana/addresses.ts";
+import {
+  DEVNET,
+  LEADERBOARD_SEED,
+} from "../../apps/web/lib/solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
 
 export const requireWeb = createRequire(
@@ -384,7 +387,7 @@ export function existingBudgetPlan(command, scope, state, erInfo = null) {
         house,
         true,
       ),
-      leaderboard: leaderboard(escrow),
+      leaderboard: pda(LEADERBOARD_SEED),
     });
     return build("settleReturnedRun");
   }
@@ -410,7 +413,7 @@ export function existingBudgetPlan(command, scope, state, erInfo = null) {
     "INVALID_HYDRA_TASK",
   );
   Object.assign(keys, {
-    leaderboard: leaderboard(escrow),
+    leaderboard: pda(LEADERBOARD_SEED),
     magicContext: MAGIC_CONTEXT_ID,
     magicProgram: MAGIC_PROGRAM_ID,
     crank,
@@ -421,12 +424,4 @@ export function existingBudgetPlan(command, scope, state, erInfo = null) {
     ...build("requestCompletion", { expectedAttempt }),
     expectedAttempt,
   };
-}
-
-function leaderboard(escrow) {
-  const market = MARKETS.findIndex(
-    (entry) => entry.market.toLowerCase() === tag(escrow.snapshot.market),
-  );
-  check(market >= 0, "INVALID_RUN_MARKET");
-  return pda("leaderboard", Buffer.from([market]));
 }

@@ -18,8 +18,9 @@ import {
   enumTag,
   runAddresses,
 } from "../game/run-accounts";
-import { DEVNET } from "../solana/addresses.ts";
+import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
 import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
+import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig } from "./runtime";
 
 export const program = new PublicKey(DEVNET.program);
@@ -72,6 +73,7 @@ export function account<T>(
 export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wallet") }).strict(),
   z.object({ kind: z.literal("balances") }).strict(),
+  z.object({ kind: z.literal("leaderboard") }).strict(),
   z.object({ kind: z.literal("draw"), nonce: u64Input }).strict(),
   z.object({ kind: z.literal("run"), nonce: u64Input }).strict(),
   z
@@ -376,6 +378,25 @@ export async function readState(
   if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
     throw new ApiError("WRONG_NETWORK", 503);
   if (input.kind === "history") return readHistory(rpc, owner, input);
+  if (input.kind === "leaderboard") {
+    const [address, bump] = PublicKey.findProgramAddressSync(
+      [Buffer.from(LEADERBOARD_SEED)],
+      program,
+    );
+    const { value, context } = await rpc.getAccountInfoAndContext(
+      address,
+      "finalized",
+    );
+    const isEmpty =
+      value?.owner.equals(SystemProgram.programId) &&
+      !value.executable &&
+      value.data.length === 0;
+    const board = account<Leaderboard>("leaderboard", isEmpty ? null : value);
+    return {
+      ...stateContext(context.slot),
+      leaderboard: leaderboardView(board, bump),
+    };
+  }
   if (input.kind === "balances") {
     const { player, context } = await readFinalizedPlayer(rpc, owner);
     return { ...stateContext(context.slot), balances: walletView(player) };

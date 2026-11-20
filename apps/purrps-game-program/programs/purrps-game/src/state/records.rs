@@ -37,13 +37,12 @@ pub struct LeaderboardEntry {
     pub score: u64,
 }
 
-// Base-only [LEADERBOARD_SEED, [market as u8]]. At most 20 settled win/loss
-// entries, score descending then raw run Pubkey bytes ascending; refunds excluded.
+// Base-only [LEADERBOARD_SEED]. Each wallet contributes its best settled win/loss,
+// ordered by descending score then ascending raw run Pubkey bytes.
 #[account]
 pub struct Leaderboard {
     pub schema_version: u16,
     pub bump: u8,
-    pub market: Market,
     pub count: u8,
     // Keep the fixed array's wire layout while leaving room on the SBF stack.
     #[borsh(deserialize_with = "read_leaderboard_entries")]
@@ -51,7 +50,7 @@ pub struct Leaderboard {
 }
 
 impl Space for Leaderboard {
-    const INIT_SPACE: usize = 5 + 20 * (1 + LeaderboardEntry::INIT_SPACE);
+    const INIT_SPACE: usize = 4 + 20 * (1 + LeaderboardEntry::INIT_SPACE);
 }
 
 fn read_leaderboard_entries<R: Read>(

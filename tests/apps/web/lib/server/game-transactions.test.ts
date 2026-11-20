@@ -23,7 +23,10 @@ import {
   decodeEscrowAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
-import { DEVNET } from "../../../../../apps/web/lib/solana/addresses.ts";
+import {
+  DEVNET,
+  LEADERBOARD_SEED,
+} from "../../../../../apps/web/lib/solana/addresses.ts";
 import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game.ts";
 
 const rpc = vi.hoisted(() => ({
@@ -146,6 +149,18 @@ describe("game transaction intents", () => {
             key.pubkey.equals(EPHEMERAL_VAULT_ID),
           ),
         ).toBe(true);
+      if (
+        action.kind === "requestCompletion" ||
+        action.kind === "settleReturnedRun"
+      ) {
+        const [board] = PublicKey.findProgramAddressSync(
+          [Buffer.from(LEADERBOARD_SEED)],
+          new PublicKey(DEVNET.program),
+        );
+        expect(
+          programInstruction?.keys.some((key) => key.pubkey.equals(board)),
+        ).toBe(true);
+      }
       if (action.kind === "withdraw") {
         expect(
           built.instructions[0]?.programId.equals(ASSOCIATED_TOKEN_PROGRAM_ID),

@@ -28,10 +28,14 @@ const expectedSponsor = process.env.SPONSOR_PUBLIC_KEY;
 let cookie;
 
 async function verifyAccounts() {
-  const [{ value: balances }, { value: history }] = await Promise.all([
-    call("/api/chain/state", { kind: "balances" }, 200),
-    call("/api/chain/state", { kind: "history" }, 200),
-  ]);
+  const [{ value: balances }, { value: history }, { value: ranking }] =
+    await Promise.all([
+      call("/api/chain/state", { kind: "balances" }, 200),
+      call("/api/chain/state", { kind: "history" }, 200),
+      ...(process.argv.includes("--leaderboard")
+        ? [call("/api/chain/state", { kind: "leaderboard" }, 200)]
+        : [Promise.resolve({ value: null })]),
+    ]);
   if (
     balances.commitment !== "finalized" ||
     balances.balances !== null ||
@@ -42,7 +46,28 @@ async function verifyAccounts() {
     history.history.entries.length !== 0
   )
     throw new Error("Incorrect hosted empty wallet records.");
-  return { balances: "uninitialized", history: "empty" };
+  if (
+    ranking !== null &&
+    (ranking.commitment !== "finalized" ||
+      !Array.isArray(ranking.leaderboard) ||
+      ranking.leaderboard.length > 20 ||
+      ranking.leaderboard.some(
+        (row, i) =>
+          row.rank !== i + 1 ||
+          typeof row.wallet !== "string" ||
+          !/^\d+$/.test(row.score),
+      ) ||
+      new Set(ranking.leaderboard.map((row) => row.wallet)).size !==
+        ranking.leaderboard.length)
+  )
+    throw new Error("Incorrect hosted shared leaderboard.");
+  return {
+    balances: "uninitialized",
+    history: "empty",
+    ...(ranking === null
+      ? {}
+      : { leaderboardRows: ranking.leaderboard.length }),
+  };
 }
 
 async function verifyGame(owner, program) {
@@ -249,9 +274,11 @@ async function verify() {
     const game = process.argv.includes("--game")
       ? await verifyGame(owner, program)
       : undefined;
-    const accounts = process.argv.includes("--accounts")
-      ? await verifyAccounts()
-      : undefined;
+    const accounts =
+      process.argv.includes("--accounts") ||
+      process.argv.includes("--leaderboard")
+        ? await verifyAccounts()
+        : undefined;
     return {
       status: sponsor === expectedSponsor ? "passed" : "sponsor_mismatch",
       origin: target,

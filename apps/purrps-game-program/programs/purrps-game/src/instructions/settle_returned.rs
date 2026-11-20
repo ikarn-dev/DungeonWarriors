@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use std::cmp::Reverse;
 
 use super::abort_reservation::*;
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
 pub struct SettleReturnedRun<'info> {
     pub settlement: AbortUndelegatedReservation<'info>,
     #[account(init_if_needed, payer=settlement.payer, space=8+Leaderboard::INIT_SPACE,
-        seeds=[LEADERBOARD_SEED, &[settlement.escrow.snapshot.market as u8]], bump)]
+        seeds=[LEADERBOARD_SEED], bump)]
     pub leaderboard: Box<Account<'info, Leaderboard>>,
     pub system_program: Program<'info, System>,
 }
@@ -55,15 +56,12 @@ pub(super) fn settle_returned(
         board.set_inner(Leaderboard {
             schema_version: SCHEMA_VERSION,
             bump: board_bump,
-            market: snapshot.market,
             count: 0,
             entries: Box::new([None; 20]),
         });
     }
     require!(
-        board.schema_version == SCHEMA_VERSION
-            && board.market == snapshot.market
-            && board.bump == board_bump,
+        board.schema_version == SCHEMA_VERSION && board.bump == board_bump,
         ErrorCode::InvalidRun
     );
     if status != EscrowStatus::RefundedTechnical {
@@ -146,22 +144,30 @@ pub(super) fn validate_terminal(
 fn insert_score(board: &mut Leaderboard, entry: LeaderboardEntry) -> Result<()> {
     let count = usize::from(board.count);
     require!(count <= board.entries.len(), ErrorCode::InvalidRun);
+    let rank = (Reverse(entry.score), entry.run.to_bytes());
     let mut index = count;
+    let mut replaced = None;
     for (i, current) in board.entries[..count].iter().enumerate() {
         let current = current.ok_or(ErrorCode::InvalidRun)?;
         require!(current.run != entry.run, ErrorCode::InvalidRun);
-        if index == count
-            && (entry.score > current.score
-                || (entry.score == current.score && entry.run.to_bytes() < current.run.to_bytes()))
-        {
+        let ahead = rank < (Reverse(current.score), current.run.to_bytes());
+        if index == count && ahead {
             index = i;
+        }
+        if current.owner == entry.owner {
+            if !ahead {
+                return Ok(());
+            }
+            replaced = Some(i);
         }
     }
     if index < board.entries.len() {
-        let limit = (count + 1).min(board.entries.len());
-        board.entries.copy_within(index..limit - 1, index + 1);
+        let last = replaced.unwrap_or(count.min(board.entries.len() - 1));
+        board.entries.copy_within(index..last, index + 1);
         board.entries[index] = Some(entry);
-        board.count = limit as u8;
+        if replaced.is_none() {
+            board.count = (last + 1) as u8;
+        }
     }
     Ok(())
 }

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import {
+  DEVNET,
+  LEADERBOARD_SEED,
+} from "../../../apps/web/lib/solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
 import { execute } from "../../../scripts/program/run-sponsor.mjs";
 import {
@@ -220,6 +224,20 @@ test("completion retry uses the terminal's own attempt and stops when it returns
     ...state,
     run: original,
   });
+  const [leaderboard] = PublicKey.findProgramAddressSync(
+    [Buffer.from(LEADERBOARD_SEED)],
+    new PublicKey(DEVNET.program),
+  );
+  assert.equal(
+    plan.instruction.keys.find(({ pubkey }) => pubkey.equals(leaderboard))
+      ?.isWritable,
+    false,
+  );
+  assert.equal(
+    settle.instruction.keys.find(({ pubkey }) => pubkey.equals(leaderboard))
+      ?.isWritable,
+    true,
+  );
   assert.equal(
     coder.instruction.decode(settle.instruction.data).name,
     "settleReturnedRun",

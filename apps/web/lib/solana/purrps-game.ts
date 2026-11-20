@@ -2277,6 +2277,14 @@ export type PurrpsGame = {
         },
         {
           name: "leaderboard";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100];
+              },
+            ];
+          };
         },
         {
           name: "payer";
@@ -2875,6 +2883,14 @@ export type PurrpsGame = {
         {
           name: "leaderboard";
           writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100];
+              },
+            ];
+          };
         },
         {
           name: "systemProgram";
@@ -3002,6 +3018,14 @@ export type PurrpsGame = {
         {
           name: "leaderboard";
           writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100];
+              },
+            ];
+          };
         },
         {
           name: "systemProgram";
@@ -4873,14 +4897,6 @@ export type PurrpsGame = {
           {
             name: "bump";
             type: "u8";
-          },
-          {
-            name: "market";
-            type: {
-              defined: {
-                name: "market";
-              };
-            };
           },
           {
             name: "count";
@@ -8786,6 +8802,14 @@ export const PURRPS_GAME_IDL = {
         },
         {
           name: "leaderboard",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100],
+              },
+            ],
+          },
         },
         {
           name: "payer",
@@ -9372,6 +9396,14 @@ export const PURRPS_GAME_IDL = {
         {
           name: "leaderboard",
           writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100],
+              },
+            ],
+          },
         },
         {
           name: "system_program",
@@ -9499,6 +9531,14 @@ export const PURRPS_GAME_IDL = {
         {
           name: "leaderboard",
           writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [108, 101, 97, 100, 101, 114, 98, 111, 97, 114, 100],
+              },
+            ],
+          },
         },
         {
           name: "system_program",
@@ -11198,14 +11238,6 @@ export const PURRPS_GAME_IDL = {
           {
             name: "bump",
             type: "u8",
-          },
-          {
-            name: "market",
-            type: {
-              defined: {
-                name: "Market",
-              },
-            },
           },
           {
             name: "count",

@@ -23,6 +23,7 @@ import {
 import { z } from "zod";
 import {
   DEVNET,
+  LEADERBOARD_SEED,
   MARKETS,
   oracleAddress,
   publicKeySchema,
@@ -282,15 +283,13 @@ export function gameInstructions(wallet: string, { action }: GameIntent) {
     runEscrow: escrow,
     magicContext: MAGIC_CONTEXT_ID,
     authority: owner,
+    leaderboard: pda(LEADERBOARD_SEED),
   });
   if (market >= 0) {
     const marketEntry = MARKETS[market];
     if (marketEntry === undefined) throw new ApiError("INVALID_MARKET", 400);
     Object.assign(values, {
       priceUpdate: new PublicKey(oracleAddress(marketEntry.feedId)),
-    });
-    Object.assign(values, {
-      leaderboard: pda("leaderboard", Buffer.from([market])),
     });
   }
   const operationId = run.toBase58();

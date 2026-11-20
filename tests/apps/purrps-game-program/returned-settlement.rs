@@ -62,13 +62,7 @@ pub(super) fn terminal_fixture(
 }
 
 fn leaderboard_key() -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[
-            purrps_game::LEADERBOARD_SEED,
-            &[purrps_game::contracts::Market::Sol as u8],
-        ],
-        &purrps_game::ID,
-    )
+    Pubkey::find_program_address(&[purrps_game::LEADERBOARD_SEED], &purrps_game::ID)
 }
 
 pub(super) fn settlement(p: &Play, nonce: u64) -> accounts::SettleReturnedRun {
@@ -218,7 +212,7 @@ fn a_full_board_breaks_ties_by_run_key_and_keeps_only_twenty_scores() {
         rank_key[31] = index as u8;
         *slot = Some(LeaderboardEntry {
             run: Pubkey::new_from_array(rank_key),
-            owner: p.owner.pubkey(),
+            owner: Pubkey::new_unique(),
             nonce: index as u64 + 1,
             score: if index == 0 { 301 } else { 300 },
         });
@@ -229,7 +223,6 @@ fn a_full_board_breaks_ties_by_run_key_and_keeps_only_twenty_scores() {
         &Leaderboard {
             schema_version: purrps_game::SCHEMA_VERSION,
             bump,
-            market: purrps_game::contracts::Market::Sol,
             count: 20,
             entries,
         },
@@ -242,4 +235,46 @@ fn a_full_board_breaks_ties_by_run_key_and_keeps_only_twenty_scores() {
     assert_eq!(board.entries[0].unwrap().score, 301);
     assert_eq!(board.entries[1].unwrap().run, run);
     assert_eq!(board.entries[19].unwrap().nonce, 19);
+}
+
+#[test]
+fn a_wallet_keeps_its_best_score_across_three_markets() {
+    use purrps_game::contracts::Market;
+
+    let mut p = Play::new();
+    let mut auth = p.auth_args();
+    auth.allowance_base_units = 3_000_000;
+    p.h.send(p.auth_ix(auth), &p.owner).unwrap();
+    p.admit_fixture();
+
+    for (nonce, market, score, best_nonce, best_score) in [
+        (0, Market::Sol, 300, 0, 300),
+        (1, Market::Btc, 299, 0, 300),
+        (2, Market::Eth, 301, 2, 301),
+    ] {
+        p.fund(nonce);
+        let mut args = p.args(nonce);
+        args.market = market;
+        p.h.send(p.reserve_ix(args, p.key.pubkey()), &p.key)
+            .unwrap();
+        let (run_key, _) = terminal_fixture(&mut p, TerminalReason::Crash, nonce);
+        let mut run: RunGameState = p.h.read(run_key);
+        run.score = score;
+        run.terminal.as_mut().unwrap().score = score;
+        setup::put(&mut p.h, run_key, &run);
+
+        let accounts = settlement(&p, nonce);
+        let receipt_key = accounts.settlement.receipt;
+        p.h.send(ix(instruction::SettleReturnedRun {}, accounts), &p.key)
+            .unwrap();
+        let receipt: ResultReceipt = p.h.read(receipt_key);
+        assert_eq!(receipt.market, market);
+        assert_eq!(receipt.terminal.score, score);
+        let board: Leaderboard = p.h.read(leaderboard_key().0);
+        assert_eq!(board.count, 1);
+        let entry = board.entries[0].unwrap();
+        assert_eq!(entry.owner, p.owner.pubkey());
+        assert_eq!((entry.nonce, entry.score), (best_nonce, best_score));
+        assert!(board.entries[1..].iter().all(Option::is_none));
+    }
 }

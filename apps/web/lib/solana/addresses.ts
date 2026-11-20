@@ -27,6 +27,8 @@ export const DEVNET = {
   sysvarOwner: "Sysvar1111111111111111111111111111111111111",
 } as const;
 
+export const LEADERBOARD_SEED = "leaderboard";
+
 export const MARKETS = [
   {
     market: "BTC",
