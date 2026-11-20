@@ -6,6 +6,7 @@ import {
   decodeRunAccount,
   runAddresses,
 } from "../game/run-accounts";
+import { DEVNET } from "../solana/addresses";
 import { readState } from "./chain";
 import { ApiError } from "./runtime";
 import { checkedConnection } from "./transaction-network";
@@ -42,6 +43,22 @@ export async function readLiveRun(wallet: string, nonce: string) {
   });
   if (snapshot.snapshotHash !== escrow.snapshotHash)
     throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+  let activationExpired = false;
+  if (snapshot.observation.phase === "ready") {
+    const clock = await er.getAccountInfo(
+      new PublicKey(DEVNET.clock),
+      "confirmed",
+    );
+    if (
+      !clock ||
+      clock.executable ||
+      clock.owner.toBase58() !== DEVNET.sysvarOwner ||
+      clock.data.length !== 40
+    )
+      throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
+    activationExpired =
+      clock.data.readBigInt64LE(32) >= BigInt(escrow.activationDeadlineSeconds);
+  }
   return {
     run: base.run,
     er: {
@@ -49,6 +66,9 @@ export async function readLiveRun(wallet: string, nonce: string) {
       data: value.data.toString("base64"),
       owner: value.owner.toBase58(),
       market: escrow.market,
+      endpoint: er.rpcEndpoint,
+      inputKey: escrow.inputKey,
+      activationExpired,
     },
   };
 }

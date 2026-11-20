@@ -21,6 +21,7 @@ export type RouteOperation = (typeof routes)[number];
 const providers = ["solana", "magicblock", "redis"] as const;
 type Provider = (typeof providers)[number];
 const transactionStates = [
+  "expired",
   "finalized",
   "failed",
   "pending",

@@ -173,6 +173,8 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     hasPlayer: player !== null,
     allowStarter: cfg?.allowStarter ?? false,
     allowPurchases: cfg?.allowPurchases ?? false,
+    allowReservations: cfg?.allowReservations ?? false,
+    rulesVersion: cfg?.rules?.version ?? null,
     available: player?.availableBaseUnits.toString() ?? "0",
     upgrades: Object.fromEntries(
       grades.map((grade, index) => [

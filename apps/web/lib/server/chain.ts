@@ -1,10 +1,10 @@
 import "server-only";
-import {
-  BorshCoder,
-  convertIdlToCamelCase,
-  type IdlAccounts,
-} from "@anchor-lang/core";
+import type { IdlAccounts } from "@anchor-lang/core";
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
+import {
+  getAssociatedTokenAddressSync,
+  unpackAccount,
+} from "@solana/spl-token";
 import {
   type AccountInfo,
   Connection,
@@ -12,6 +12,8 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { z } from "zod";
+import { requiredVaultBalance } from "../game/economy";
+import { RULES_V1, U64_MAX } from "../game/rules";
 import {
   decodeEscrowAccount,
   decodeRunAccount,
@@ -19,30 +21,21 @@ import {
   runAddresses,
 } from "../game/run-accounts";
 import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
-import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
+import { coder, nonceBytes, pda, program, u64Input } from "../solana/program";
+import type { PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
 import { readWalletFunds } from "./wallet-funds";
 
-export const program = new PublicKey(DEVNET.program);
-export const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
-export const coder = new BorshCoder(idl);
-export const u64Input = z
-  .string()
-  .regex(/^(0|[1-9][0-9]{0,19})$/)
-  .pipe(z.string().refine((n) => BigInt(n) <= 0xffffffffffffffffn));
-export function nonceBytes(value: string | bigint) {
-  const b = Buffer.alloc(8);
-  b.writeBigUInt64LE(BigInt(value));
-  return b;
-}
-export function pda(seed: string, ...parts: Uint8Array[]) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(seed), ...parts],
-    program,
-  )[0];
-}
+export {
+  coder,
+  idl,
+  nonceBytes,
+  pda,
+  program,
+  u64Input,
+} from "../solana/program";
 export function connection() {
   return new Connection(baseRpcConfig().HELIUS_DEVNET_RPC_URL, {
     commitment: "finalized",
@@ -71,6 +64,7 @@ export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wallet") }).strict(),
   z.object({ kind: z.literal("balances") }).strict(),
   z.object({ kind: z.literal("walletFunds") }).strict(),
+  z.object({ kind: z.literal("runEntry") }).strict(),
   z.object({ kind: z.literal("leaderboard") }).strict(),
   z.object({ kind: z.literal("draw"), nonce: u64Input }).strict(),
   z.object({ kind: z.literal("run"), nonce: u64Input }).strict(),
@@ -237,6 +231,7 @@ export async function finalizedRunState(
       throw invalidAccount();
     return {
       status: "settlementReady" as const,
+      market: escrow.market,
       pending: {
         grossPayoutBaseUnits: gross.toString(),
         refundBaseUnits: refund.toString(),
@@ -304,6 +299,146 @@ async function readFinalizedPlayer(rpc: Connection, owner: PublicKey) {
   return {
     context,
     player: readPlayer(owner, uninitialized(value) ? null : value),
+  };
+}
+
+async function readRunEntry(rpc: Connection, owner: PublicKey) {
+  const configAddress = pda("game-config");
+  const houseAddress = pda("house");
+  const clockAddress = new PublicKey(DEVNET.clock);
+  const ownerAddress = pda("player", owner.toBytes());
+  const mint = new PublicKey(DEVNET.usdcMint);
+  const tokenProgram = new PublicKey(DEVNET.tokenProgram);
+  const vaultAddress = getAssociatedTokenAddressSync(
+    mint,
+    houseAddress,
+    true,
+    tokenProgram,
+  );
+  const policyAddress = pda("sponsor-policy");
+  const state = await rpc.getMultipleAccountsInfoAndContext(
+    [configAddress, ownerAddress, policyAddress],
+    { commitment: "finalized" },
+  );
+  const [configInfo, playerInfo, policyInfo] = state.value;
+  const context = stateContext(state.context.slot);
+  const config = account<Accounts["gameConfig"]>(
+    "gameConfig",
+    configInfo ?? null,
+  );
+  if (!config?.allowReservations)
+    return { ...context, entry: { status: "closed" } };
+  if (
+    config.schemaVersion !== 1 ||
+    config.rules?.version !== RULES_V1.rulesVersion
+  )
+    throw invalidAccount();
+  const player = readPlayer(owner, playerInfo ?? null);
+  const policy = account<Accounts["sponsorPolicy"]>(
+    "sponsorPolicy",
+    policyInfo ?? null,
+  );
+  if (player === null || policy === null || policy.paused)
+    return { ...context, entry: { status: "budgetUnavailable" } };
+  if (policy.schemaVersion !== 1 || !policy.config.equals(configAddress))
+    throw invalidAccount();
+  const run = runAddresses({
+    owner: owner.toBase58(),
+    nonce: BigInt(player.nextRunNonce.toString()),
+  }).run[0];
+  const {
+    context: snapshot,
+    value: [budgetInfo, houseInfo, vaultInfo, clock],
+  } = await rpc.getMultipleAccountsInfoAndContext(
+    [pda("sponsor", run.toBytes()), houseAddress, vaultAddress, clockAddress],
+    { commitment: "finalized", minContextSlot: state.context.slot },
+  );
+  const budget = account<Accounts["sponsorBudget"]>(
+    "sponsorBudget",
+    budgetInfo ?? null,
+  );
+  if (
+    !clock?.owner.equals(new PublicKey(DEVNET.sysvarOwner)) ||
+    clock.executable ||
+    clock.data.length !== 40
+  )
+    throw invalidAccount();
+  const clockSeconds = clock.data.readBigInt64LE(32);
+  if (
+    clockSeconds <= 0n ||
+    clockSeconds > BigInt(Number.MAX_SAFE_INTEGER - 1800)
+  )
+    throw invalidAccount();
+  const balanceContext = stateContext(snapshot.slot);
+  if (budget === null || !budgetInfo)
+    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
+  const remaining =
+    BigInt(budget.limitLamports.toString()) -
+    BigInt(budget.spentLamports.toString());
+  if (
+    budget.schemaVersion !== 1 ||
+    !budget.operation.equals(run) ||
+    !budget.beneficiary.equals(owner) ||
+    !budget.authority.equals(policy.authority) ||
+    !budget.feePayer.equals(policy.authority) ||
+    enumTag(budget.purpose) !== "runCompletion" ||
+    budget.limitLamports.gt(policy.maxOperationLamports) ||
+    budget.reservedCompletionLamports.lt(policy.minCompletionLamports) ||
+    remaining < BigInt(budget.reservedCompletionLamports.toString()) ||
+    budget.maxAttempts > policy.maxAttempts ||
+    budget.attempts >= budget.maxAttempts ||
+    BigInt(budget.expiresAtSeconds.toString()) <
+      clockSeconds + BigInt(RULES_V1.activationTimeoutSeconds)
+  )
+    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
+  const rent = await rpc.getMinimumBalanceForRentExemption(
+    budgetInfo.data.length,
+    "finalized",
+  );
+  if (BigInt(budgetInfo.lamports) < BigInt(rent) + remaining)
+    return { ...balanceContext, entry: { status: "budgetUnavailable" } };
+  const house = account<Accounts["houseState"]>(
+    "houseState",
+    houseInfo ?? null,
+  );
+  const vault = unpackAccount(vaultAddress, vaultInfo ?? null, tokenProgram);
+  if (
+    !house ||
+    house.schemaVersion !== 1 ||
+    !house.config.equals(configAddress) ||
+    !house.usdcMint.equals(mint) ||
+    !house.vault.equals(vaultAddress) ||
+    !vault.mint.equals(mint) ||
+    !vault.owner.equals(houseAddress) ||
+    !vault.isInitialized ||
+    vault.isFrozen
+  )
+    throw invalidAccount();
+  const obligations = requiredVaultBalance(
+    BigInt(house.totalAvailableBaseUnits.toString()),
+    BigInt(house.totalPurchaseEscrowBaseUnits.toString()),
+    BigInt(house.totalMaxGrossBaseUnits.toString()),
+    BigInt(house.bufferBaseUnits.toString()),
+  );
+  const maxMultiplier = BigInt(RULES_V1.maxMultiplierBps) / 10_000n;
+  const headroom =
+    vault.amount > obligations
+      ? (vault.amount - obligations) / (maxMultiplier - 1n)
+      : 0n;
+  const maxStake = [
+    BigInt(player.availableBaseUnits.toString()),
+    headroom,
+    U64_MAX / maxMultiplier,
+  ].reduce((available, limit) => (available < limit ? available : limit));
+  return {
+    ...balanceContext,
+    entry: {
+      status: "ready",
+      maxStake: maxStake.toString(),
+      nonce: player.nextRunNonce.toString(),
+      sessionNonce: player.nextSessionNonce.toString(),
+      clockSeconds: Number(clockSeconds),
+    },
   };
 }
 
@@ -376,6 +511,7 @@ export async function readState(
   if ((await rpc.getGenesisHash()) !== DEVNET.genesisHash)
     throw new ApiError("WRONG_NETWORK", 503);
   if (input.kind === "history") return readHistory(rpc, owner, input);
+  if (input.kind === "runEntry") return readRunEntry(rpc, owner);
   if (input.kind === "walletFunds") {
     const { slot, ...walletFunds } = await readWalletFunds(rpc, owner);
     return { ...stateContext(slot), walletFunds };

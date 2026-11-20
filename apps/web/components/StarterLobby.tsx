@@ -10,6 +10,10 @@ import {
 } from "../lib/game/custody-client";
 import { decodeLobbyState, type LobbyState } from "../lib/game/lobby-state";
 import {
+  type RunActionSubmitter,
+  sendGameAction,
+} from "../lib/game/run-client";
+import {
   type LobbyIntent,
   validatePreparedTransaction,
 } from "../lib/game/transaction-intents";
@@ -24,6 +28,7 @@ import {
 import AccountPanel from "./AccountPanel";
 import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
+import RunEntry from "./RunEntry";
 import StarterCapsule from "./StarterCapsule";
 import style from "./StarterExperience.module.css";
 import WalletFunds from "./WalletFunds";
@@ -277,6 +282,12 @@ export default function StarterPanel() {
     };
   }, [authenticated, address, state?.pendingDraw]);
   const blocked = busy || pending !== null;
+  const sign = wallet.signTransaction;
+  const submitRunAction: RunActionSubmitter | undefined =
+    address !== null && sign !== undefined
+      ? (action, onSignature, signal) =>
+          sendGameAction(address, sign, action, null, onSignature, signal)
+      : undefined;
   return (
     <div className={style.grid}>
       <StarterCapsule
@@ -525,6 +536,17 @@ export default function StarterPanel() {
                   }
                 />
                 {state.starter === "fulfilled" && address !== null && (
+                  <RunEntry
+                    key={address}
+                    state={state}
+                    wallet={address}
+                    blocked={blocked}
+                    sign={wallet.signTransaction}
+                    work={perform}
+                    refresh={reload}
+                  />
+                )}
+                {state.starter === "fulfilled" && address !== null && (
                   <CapsuleShop
                     key={address}
                     state={state}
@@ -545,6 +567,7 @@ export default function StarterPanel() {
                     key={address}
                     wallet={address}
                     blocked={blocked}
+                    submitRunAction={submitRunAction}
                     transfer={(kind, amount) =>
                       perform((signal) =>
                         transact(

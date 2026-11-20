@@ -44,6 +44,17 @@ it("reads Devnet wallet funds at finalized commitment without requiring a game a
   });
 });
 
+it("reads the live finalized run-admission status for a fresh wallet", async () => {
+  const wallet = Keypair.generate().publicKey.toBase58();
+  await expect(
+    readState(wallet, stateInput.parse({ kind: "runEntry" })),
+  ).resolves.toMatchObject({
+    commitment: "finalized",
+    slot: expect.any(Number),
+    entry: { status: expect.stringMatching(/^(closed|budgetUnavailable)$/) },
+  });
+});
+
 it.skipIf(testWallet === undefined)(
   "decodes a registered player's actual finalized balance accounts",
   async () => {

@@ -28,6 +28,7 @@ import {
   decodeEscrowAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
+import { validatePreparedGame } from "../../../../../apps/web/lib/game/run-transactions";
 import {
   DEVNET,
   LEADERBOARD_SEED,
@@ -170,8 +171,9 @@ describe("game transaction intents", () => {
       nonce: BigInt(runNonce.nonce),
     });
     for (const action of variants) {
-      const value = intentSchema.parse(intent(action));
-      const { built, encoded, tx } = assemble(owner, play, intent(action));
+      const reviewed = intent(action);
+      const value = intentSchema.parse(reviewed);
+      const { built, encoded, tx } = assemble(owner, play, reviewed);
       const programInstruction = built.instructions.at(-1);
       expect(programInstruction).toBeDefined();
       expect(
@@ -181,6 +183,21 @@ describe("game transaction intents", () => {
       expect(
         validateTransaction(wallet, value, encoded).serialize().length,
       ).toBeLessThan(1232);
+      const prepared = {
+        operationId: built.operationId,
+        blockhash: tx.message.recentBlockhash,
+        network: gameNetwork(action),
+      };
+      const unsigned = new VersionedTransaction(tx.message);
+      expect(() =>
+        validatePreparedGame(unsigned, wallet, reviewed, prepared),
+      ).not.toThrow();
+      expect(() =>
+        validatePreparedGame(unsigned, wallet, reviewed, {
+          ...prepared,
+          network: prepared.network === "base" ? "er" : "base",
+        }),
+      ).toThrow("UNEXPECTED_TRANSACTION");
       if ("nonce" in action && action.nonce === runNonce.nonce)
         expect(built.operationId).toBe(addresses.run[0].toBase58());
       if (gameNetwork(action) === "er")
@@ -436,6 +453,7 @@ describe("recovery from finalized base state", () => {
     ).resolves.toEqual({ status: "recoveryPending" });
     await expect(check(fixture("terminal"))).resolves.toEqual({
       status: "settlementReady",
+      market: "BTC",
       pending: { grossPayoutBaseUnits: "0", refundBaseUnits: "1" },
     });
     await expect(

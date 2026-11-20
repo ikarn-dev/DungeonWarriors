@@ -19,6 +19,12 @@ import {
 const input = z
   .object({
     network: networkSchema.default("base"),
+    lastValidBlockHeight: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
     signature: z
       .string()
       .min(64)
@@ -40,9 +46,15 @@ export async function POST(request: Request) {
       searchTransactionHistory: true,
     });
     const status = result.value[0] ?? null;
+    const expired =
+      status === null &&
+      value.lastValidBlockHeight !== undefined &&
+      (await rpc.getBlockHeight("finalized")) > value.lastValidBlockHeight;
     const resolution =
       status === null
-        ? "unknown"
+        ? expired
+          ? "expired"
+          : "unknown"
         : status.confirmationStatus === "finalized"
           ? status.err === null
             ? "finalized"

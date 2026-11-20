@@ -235,6 +235,7 @@ export async function decodeRunAccount(
     observation,
     prediction,
     stats,
+    stake: big(r.snapshot.stakeBaseUnits),
     cat: enumTag(r.snapshot.cat.definition.id) as CatId,
     assetBinding: {
       version: r.snapshot.assetManifest.version,

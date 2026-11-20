@@ -1,19 +1,33 @@
 "use client";
 
 import { utils } from "@anchor-lang/core";
-import { PublicKey } from "@solana/web3.js";
+import {
+  type AccountInfo,
+  Connection,
+  type Keypair,
+  PublicKey,
+} from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
 import { displayUsdc } from "../lib/game/custody-client";
+import { grossPayout } from "../lib/game/economy";
 import { Predictor } from "../lib/game/predictor";
-import { RULES_V1 } from "../lib/game/rules";
+import { earnedMultiplierBps, RULES_V1, runLevel } from "../lib/game/rules";
 import { decodeRunAccount, runAddresses } from "../lib/game/run-accounts";
+import {
+  confirmGameAction,
+  type GameSignature,
+  type RunActionSubmitter,
+} from "../lib/game/run-client";
 import { RunState } from "../lib/game/run-feed";
+import type { GameIntent } from "../lib/game/run-transactions";
 import { readWebJson, webApi } from "../lib/game/web-api";
-import { DEVNET } from "../lib/solana/addresses";
+import { DEVNET, publicKeySchema } from "../lib/solana/addresses";
+import RunControls from "./RunControls";
 
 const amount = z.string().regex(/^(0|[1-9][0-9]{0,19})$/);
+const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
 const payout = z.object({
   grossPayoutBaseUnits: amount,
   refundBaseUnits: amount,
@@ -29,6 +43,7 @@ const schema = z.object({
       "settled",
       "refunded",
     ]),
+    market: marketSchema.optional(),
     pending: payout.optional(),
     grossPayoutBaseUnits: amount.optional(),
     refundBaseUnits: amount.optional(),
@@ -38,7 +53,12 @@ const schema = z.object({
       slot: z.number().int().nonnegative(),
       owner: z.literal(DEVNET.program),
       data: z.string().min(12).max(14000),
-      market: z.enum(["BTC", "ETH", "SOL"]),
+      market: marketSchema,
+      endpoint: z
+        .string()
+        .regex(/^https:\/\/devnet-(us|eu|as)\.magicblock\.app\/?$/),
+      inputKey: publicKeySchema,
+      activationExpired: z.boolean(),
     })
     .nullable(),
 });
@@ -58,19 +78,42 @@ export default function RunStage({
   wallet,
   nonce,
   close,
+  playKey,
+  runSettled,
+  submitAction,
 }: {
   wallet: string;
   nonce: string;
   close: () => void;
+  playKey?: Keypair;
+  runSettled?: () => void;
+  submitAction?: RunActionSubmitter | undefined;
 }) {
   const [status, setStatus] = useState("Reading your run…");
-  const [visible, setVisible] = useState<{ run: Run; market: string } | null>(
-    null,
-  );
+  const [visible, setVisible] = useState<{
+    run: Run;
+    market: z.infer<typeof marketSchema>;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [artError, setArtError] = useState(false);
   const [settlement, setSettlement] = useState<string | null>(null);
   const mount = useRef<HTMLDivElement>(null);
+  const [control, setControl] = useState<{
+    rpc: Connection;
+    run: PublicKey;
+  } | null>(null);
+  const [base, setBase] = useState<z.infer<typeof schema>["run"] | null>(null);
+  const [activationExpired, setActivationExpired] = useState(false);
+  const [confirmedAction, setConfirmedAction] = useState<
+    GameIntent["action"]["kind"] | null
+  >(null);
+  const actionKind = useRef<GameIntent["action"]["kind"] | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const actionWork = useRef<AbortController | null>(null);
+  const actionSignature = useRef<GameSignature | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+  useEffect(() => () => actionWork.current?.abort(), []);
   const prediction = useRef<{
     engine: Predictor;
     extrapolate: boolean;
@@ -84,8 +127,83 @@ export default function RunStage({
     const identity = { owner: wallet, nonce: BigInt(nonce) };
     const addresses = runAddresses(identity);
     const feed = new RunState();
+    const run = addresses.run[0];
     let lastSlot = -1;
     let timer: ReturnType<typeof setTimeout>;
+    let erTimer: ReturnType<typeof setTimeout>;
+    let er: Connection | undefined;
+    let stopped = false;
+    async function apply(
+      info: Pick<AccountInfo<Buffer>, "owner" | "data" | "executable">,
+      slot: number,
+      market: z.infer<typeof marketSchema>,
+    ) {
+      if (controller.signal.aborted || slot < lastSlot) return;
+      const decoded = await decodeRunAccount(identity, run, info);
+      if (controller.signal.aborted || slot < lastSlot || stopped) return;
+      feed.applyRun(slot, decoded);
+      lastSlot = slot;
+      if (decoded.prediction !== null) {
+        const engine =
+          prediction.current?.engine ??
+          new Predictor(decoded.prediction, decoded.stats);
+        if (engine.reconcile(decoded.prediction))
+          prediction.current = {
+            engine,
+            extrapolate: decoded.prediction.frame.phase === "active",
+            sampledAt: performance.now(),
+            ticks: 0,
+            world: engine.predict(0),
+          };
+      }
+      setError(null);
+      setVisible({ run: decoded, market });
+      setStatus(
+        decoded.observation.phase === "active"
+          ? "Run active on MagicBlock"
+          : decoded.observation.phase === "suspended"
+            ? "Run suspended"
+            : decoded.observation.phase === "ready"
+              ? "Waiting for activation"
+              : "Waiting for settlement",
+      );
+      if (decoded.terminal !== null) {
+        const { grossPayoutBaseUnits: gross, refundBaseUnits: refund } =
+          decoded.terminal;
+        if (typeof gross === "bigint" && typeof refund === "bigint")
+          setSettlement(
+            refund > 0n
+              ? `Pending refund ${displayUsdc(refund.toString())} USDC`
+              : `Pending payout ${displayUsdc(gross.toString())} USDC`,
+          );
+      }
+    }
+    async function pollEr(
+      rpc: Connection,
+      market: z.infer<typeof marketSchema>,
+    ) {
+      try {
+        if (
+          document.hidden ||
+          stopped ||
+          er !== rpc ||
+          controller.signal.aborted
+        )
+          return;
+        const { value, context } = await rpc.getAccountInfoAndContext(
+          run,
+          "confirmed",
+        );
+        if (value !== null && er === rpc)
+          await apply(value, context.slot, market);
+      } catch {
+        if (!controller.signal.aborted && !stopped)
+          setError("Live run updates are delayed.");
+      } finally {
+        if (!controller.signal.aborted && !stopped && er === rpc)
+          erTimer = setTimeout(() => void pollEr(rpc, market), 500);
+      }
+    }
     const poll = async () => {
       try {
         if (document.hidden) return;
@@ -98,61 +216,56 @@ export default function RunStage({
         );
         if (controller.signal.aborted) return;
         setError(null);
-        setStatus(labels[response.run.status]);
+        setBase(response.run);
+        setActivationExpired(response.er?.activationExpired === true);
         const funds = response.run.pending ?? response.run;
         const gross = funds.grossPayoutBaseUnits;
         const refund = funds.refundBaseUnits;
-        setSettlement(
-          gross === undefined || refund === undefined
-            ? null
-            : `${response.run.pending ? "Pending" : "Finalized"} ${
-                refund !== "0"
-                  ? `refund ${displayUsdc(refund)}`
-                  : `payout ${displayUsdc(gross)}`
-              } USDC`,
-        );
+        if (gross !== undefined && refund !== undefined) {
+          setSettlement(
+            `${response.run.pending ? "Pending" : "Finalized"} ${
+              refund !== "0"
+                ? `refund ${displayUsdc(refund)}`
+                : `payout ${displayUsdc(gross)}`
+            } USDC`,
+          );
+        }
         if (response.er === null) {
-          setVisible(null);
-          if (
-            response.run.status === "settled" ||
-            response.run.status === "refunded" ||
-            response.run.status === "absent"
-          )
+          setStatus(labels[response.run.status]);
+          stopped = true;
+          clearTimeout(erTimer);
+          er = undefined;
+          setControl(null);
+          if (response.run.status !== "recoveryPending") setVisible(null);
+          if (["settled", "refunded", "absent"].includes(response.run.status))
             controller.abort();
           return;
         }
-        if (response.er.slot < lastSlot) return;
-        const decoded = await decodeRunAccount(identity, addresses.run[0], {
-          owner: new PublicKey(response.er.owner),
-          data: utils.bytes.base64.decode(response.er.data),
-          executable: false,
-        });
-        if (controller.signal.aborted) return;
-        feed.applyRun(response.er.slot, decoded);
-        lastSlot = response.er.slot;
-        if (decoded.prediction !== null) {
-          const engine =
-            prediction.current?.engine ??
-            new Predictor(decoded.prediction, decoded.stats);
-          if (engine.reconcile(decoded.prediction))
-            prediction.current = {
-              engine,
-              extrapolate: decoded.prediction.frame.phase === "active",
-              sampledAt: performance.now(),
-              ticks: 0,
-              world: engine.predict(0),
-            };
-        }
-        setVisible({ run: decoded, market: response.er.market });
-        setStatus(
-          decoded.observation.phase === "active"
-            ? "Run active on MagicBlock"
-            : decoded.observation.phase === "suspended"
-              ? "Run suspended"
-              : decoded.observation.phase === "ready"
-                ? "Waiting for activation"
-                : "Waiting for finalized settlement",
+        stopped = false;
+        await apply(
+          {
+            owner: new PublicKey(response.er.owner),
+            data: utils.bytes.base64.decode(response.er.data),
+            executable: false,
+          },
+          response.er.slot,
+          response.er.market,
         );
+        if (!er && playKey?.publicKey.toBase58() === response.er.inputKey) {
+          const rpc = new Connection(response.er.endpoint, {
+            commitment: "confirmed",
+            disableRetryOnRateLimit: true,
+            fetch: (url, options) =>
+              fetch(url, {
+                ...options,
+                redirect: "error",
+                signal: AbortSignal.timeout(8000),
+              }),
+          });
+          er = rpc;
+          setControl({ rpc, run });
+          void pollEr(rpc, response.er.market);
+        }
       } catch {
         if (!controller.signal.aborted)
           setError("Run data is temporarily unavailable.");
@@ -166,8 +279,9 @@ export default function RunStage({
     return () => {
       controller.abort();
       clearTimeout(timer);
+      clearTimeout(erTimer);
     };
-  }, [wallet, nonce]);
+  }, [wallet, nonce, playKey]);
 
   const cat = visible?.run.cat;
   const version = visible?.run.assetBinding.version;
@@ -249,6 +363,75 @@ export default function RunStage({
     };
   }, [cat, version, hash, hasWorld]);
 
+  const frame = visible?.run.prediction?.frame;
+  const terminal = base?.status === "settled" || base?.status === "refunded";
+  const finalizing = visible?.run.observation.phase === "completionRequested";
+  const market = visible?.market ?? base?.market;
+  const nextAction: GameIntent["action"] | null =
+    base?.status === "refundReady"
+      ? { kind: "abortUndelegatedReservation", nonce }
+      : base?.status === "settlementReady" && market
+        ? { kind: "settleReturnedRun", nonce, market }
+        : activationExpired && visible?.run.observation.phase === "ready"
+          ? { kind: "expireDelegatedActivation", nonce }
+          : !terminal &&
+              market &&
+              visible?.run.observation.phase === "terminalRecorded"
+            ? { kind: "requestCompletion", nonce, market }
+            : null;
+  async function settle() {
+    if (
+      !submitAction ||
+      (!nextAction && !actionSignature.current) ||
+      submitting
+    )
+      return;
+    const controller = new AbortController();
+    actionWork.current = controller;
+    setSubmitting(true);
+    setActionNotice("Waiting for confirmation…");
+    try {
+      if (!actionSignature.current && nextAction)
+        actionKind.current = nextAction.kind;
+      const signature =
+        actionSignature.current ??
+        (nextAction &&
+          (await submitAction(
+            nextAction,
+            (value) => {
+              actionSignature.current = value;
+              setActionPending(value !== null);
+            },
+            controller.signal,
+          )));
+      if (!signature) return;
+      const status = await confirmGameAction(signature, controller.signal);
+      if (status === "pending") {
+        setActionNotice(
+          "Confirmation is pending. Check the original signature.",
+        );
+        return;
+      }
+      actionSignature.current = null;
+      setActionPending(false);
+      if (status === "confirmed") setConfirmedAction(actionKind.current);
+      setActionNotice(
+        status === "confirmed"
+          ? "Confirmed. Waiting for finalized result."
+          : "Transaction failed. Check the run status and try again.",
+      );
+    } catch {
+      if (!controller.signal.aborted)
+        setActionNotice(
+          actionSignature.current
+            ? "Check the original transaction before retrying."
+            : "Could not submit. Check your wallet and try again.",
+        );
+    } finally {
+      if (!controller.signal.aborted) setSubmitting(false);
+    }
+  }
+
   return (
     <section
       className="grid gap-2 rounded-md border border-[#cbd3be] p-3"
@@ -262,9 +445,9 @@ export default function RunStage({
         <button
           type="button"
           className="min-h-11 px-2 text-sm underline"
-          onClick={close}
+          onClick={terminal && runSettled ? runSettled : close}
         >
-          Close viewer
+          {terminal ? "Done" : "Close viewer"}
         </button>
       </div>
       <output className="text-sm">{error ?? status}</output>
@@ -284,10 +467,82 @@ export default function RunStage({
           Run artwork is unavailable.
         </p>
       )}
-      {visible?.run.prediction && (
-        <p className="font-mono text-sm tabular-nums">
-          Score {formatNumber.format(visible.run.prediction.frame.score)}
+      {frame && (
+        <div className="flex flex-wrap gap-x-4 text-sm tabular-nums">
+          <span>Level {formatNumber.format(runLevel(frame.activeTicks))}</span>
+          <span>Score {formatNumber.format(frame.score)}</span>
+          <span>
+            Checkpoint{" "}
+            {formatNumber.format(
+              frame.activeTicks % BigInt(RULES_V1.checkpointTicks),
+            )}
+            /{RULES_V1.checkpointTicks}
+          </span>
+          {frame.qualifiedCheckpoints > 0n && (
+            <span>
+              {earnedMultiplierBps(frame.qualifiedCheckpoints) / 10000}× earned
+            </span>
+          )}
+          {visible &&
+            visible.run.observation.phase === "active" &&
+            frame.qualifiedCheckpoints > 0n && (
+              <span>
+                Cash-out value{" "}
+                {displayUsdc(
+                  grossPayout(
+                    visible.run.stake,
+                    frame.qualifiedCheckpoints,
+                  ).toString(),
+                )}{" "}
+                USDC
+              </span>
+            )}
+        </div>
+      )}
+      {!terminal &&
+        control &&
+        playKey &&
+        visible?.run.observation.phase === "active" &&
+        frame && (
+          <RunControls
+            rpc={control.rpc}
+            run={control.run}
+            playKey={playKey}
+            eligible={frame.qualifiedCheckpoints > 0n}
+            accepted={visible.run.observation.acceptedSequence}
+          />
+        )}
+      {!terminal && visible?.run.observation.phase === "active" && !playKey && (
+        <p className="text-sm">
+          Controls are available in the tab that authorized this run.
         </p>
+      )}
+      {!terminal && submitAction && (nextAction || actionPending) && (
+        <button
+          type="button"
+          className="min-h-11 rounded-md border px-3 text-sm"
+          disabled={
+            submitting ||
+            (!actionPending && confirmedAction === nextAction?.kind)
+          }
+          onClick={() => void settle()}
+        >
+          {actionPending
+            ? "Check submission"
+            : nextAction?.kind === "abortUndelegatedReservation"
+              ? "Refund expired reservation"
+              : nextAction?.kind === "expireDelegatedActivation"
+                ? "Recover expired run"
+                : nextAction?.kind === "settleReturnedRun"
+                  ? "Finalize result"
+                  : "Settle run"}
+        </button>
+      )}
+      {!terminal && finalizing && (
+        <p className="text-sm">Settling on Solana Devnet.</p>
+      )}
+      {actionNotice && !terminal && (
+        <output className="text-sm">{actionNotice}</output>
       )}
     </section>
   );
