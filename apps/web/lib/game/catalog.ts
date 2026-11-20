@@ -1,4 +1,4 @@
-import { RULES_V1 } from "./rules";
+import { RULES_V1 } from "./rules.ts";
 
 export type CatId = "collector" | "acrobat" | "guardian" | "sprinter";
 export type Rarity = "common" | "rare" | "epic";
