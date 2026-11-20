@@ -44,11 +44,16 @@ export function deployedBytes(entry, data, dataAddress, artifact) {
     "INVALID_PROGRAM_DATA",
   );
   const bytes = data.data.subarray(45);
-  check(bytes.equals(artifact), "DEPLOYED_BUILD_MISMATCH");
+  check(
+    bytes.subarray(0, artifact.length).equals(artifact) &&
+      bytes.subarray(artifact.length).every((byte) => byte === 0),
+    "DEPLOYED_BUILD_MISMATCH",
+  );
   return {
     slot: data.data.readBigUInt64LE(4).toString(),
-    bytes: bytes.length,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
+    bytes: artifact.length,
+    allocatedBytes: bytes.length,
+    sha256: createHash("sha256").update(artifact).digest("hex"),
     upgradeAuthority:
       data.data[12] === 1
         ? new PublicKey(data.data.subarray(13, 45)).toBase58()

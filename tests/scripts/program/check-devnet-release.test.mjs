@@ -30,6 +30,14 @@ test("release check binds executable, stored slot, authority and every deployed 
   assert.equal(release.slot, "451");
   assert.equal(release.bytes, bytes.length);
   assert.equal(release.upgradeAuthority, authority.toBase58());
+  const padded = { ...data, data: Buffer.concat([data.data, Buffer.alloc(8)]) };
+  const expanded = deployedBytes(entry, padded, dataAddress, bytes);
+  assert.deepEqual(expanded, { ...release, allocatedBytes: bytes.length + 8 });
+  padded.data[padded.data.length - 1] = 1;
+  assert.throws(
+    () => deployedBytes(entry, padded, dataAddress, bytes),
+    /DEPLOYED_BUILD_MISMATCH/,
+  );
   assert.throws(
     () =>
       deployedBytes({ ...entry, executable: false }, data, dataAddress, bytes),
