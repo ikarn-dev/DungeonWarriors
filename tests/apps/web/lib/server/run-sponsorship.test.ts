@@ -224,3 +224,25 @@ it("moves the existing budget into the action account before delegating the same
     ),
   ).not.toThrow();
 });
+
+it("omits the writable Hydra accounts when settling a run that never activated", () => {
+  const { wallet, intent } = launch();
+  const completion = {
+    operation: "game",
+    sponsored: false,
+    action: {
+      kind: "requestCompletion",
+      nonce: intent.action.nonce,
+      market: "SOL",
+      hasCrank: false,
+    },
+  } satisfies GameIntent;
+  const [ix] = gameInstructions(wallet, completion).instructions;
+  expect(ix?.keys.slice(-3)).toEqual(
+    Array.from({ length: 3 }, () => ({
+      pubkey: program,
+      isSigner: false,
+      isWritable: false,
+    })),
+  );
+});

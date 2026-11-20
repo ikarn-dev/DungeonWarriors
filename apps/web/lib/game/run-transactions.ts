@@ -105,6 +105,7 @@ const action = z.discriminatedUnion("kind", [
     kind: z.literal("requestCompletion"),
     ...nonce,
     market: marketSchema,
+    hasCrank: z.boolean().optional(),
   }),
   z.strictObject({
     kind: z.literal("settleReturnedRun"),
@@ -145,7 +146,10 @@ function accountMetas(
       {
         pubkey,
         isSigner: "signer" in meta && meta.signer === true,
-        isWritable: "writable" in meta && meta.writable === true,
+        isWritable:
+          "writable" in meta &&
+          meta.writable === true &&
+          !("optional" in meta && meta.optional && pubkey.equals(program)),
       },
     ];
   });
@@ -457,6 +461,9 @@ export function gameInstructions(
     // The on-chain budget authority owns retries beyond the permissionless first attempt.
     Object.assign(values, {
       actionBalance: escrowPdaFromEscrowAuthority(run, 255),
+      ...(action.hasCrank === false
+        ? { crank: program, rentVault: program, hydraProgram: program }
+        : {}),
     });
     return build({ expectedAttempt: 0 }, [], operationId);
   }

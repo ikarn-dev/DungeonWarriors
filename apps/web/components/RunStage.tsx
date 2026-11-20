@@ -472,7 +472,12 @@ export default function RunStage({
             : !terminal &&
                 market &&
                 visible?.run.observation.phase === "terminalRecorded"
-              ? { kind: "requestCompletion", nonce, market }
+              ? {
+                  kind: "requestCompletion",
+                  nonce,
+                  market,
+                  hasCrank: visible.run.crank.generation !== "0",
+                }
               : null;
   async function settle() {
     if (

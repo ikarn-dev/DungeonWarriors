@@ -314,7 +314,9 @@ function accountMetas(accounts, keys) {
       {
         pubkey,
         isSigner: account.signer === true,
-        isWritable: account.writable === true,
+        isWritable:
+          account.writable === true &&
+          !(account.optional && pubkey.equals(program)),
       },
     ];
   });
@@ -466,9 +468,9 @@ export function existingBudgetPlan(command, scope, state, erInfo = null) {
     leaderboard: pda(LEADERBOARD_SEED),
     magicContext: MAGIC_CONTEXT_ID,
     magicProgram: MAGIC_PROGRAM_ID,
-    crank,
-    rentVault: EPHEMERAL_VAULT_ID,
-    hydraProgram: hydra,
+    ...(run.crank.task.equals(PublicKey.default)
+      ? { crank: program, rentVault: program, hydraProgram: program }
+      : { crank, rentVault: EPHEMERAL_VAULT_ID, hydraProgram: hydra }),
   });
   return {
     ...build("requestCompletion", { expectedAttempt }),
