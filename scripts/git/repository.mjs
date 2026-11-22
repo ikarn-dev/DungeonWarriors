@@ -174,8 +174,8 @@ export function gitPath(name) {
 
 export function assertIdle() {
   const branch = run("git", ["symbolic-ref", "--quiet", "HEAD"]);
-  if (branch.status !== 0)
-    throw new Error("Automatic commits require a checked-out branch.");
+  if (branch.status !== 0 || branch.stdout.trim() !== "refs/heads/main")
+    throw new Error("PURRPS task commits require the local main branch.");
   for (const name of [
     "MERGE_HEAD",
     "CHERRY_PICK_HEAD",
