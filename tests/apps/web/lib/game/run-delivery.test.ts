@@ -16,6 +16,11 @@ import {
   ENTITY_VECTOR_OFFSET,
   guardRunLayout,
 } from "../../../../../apps/web/lib/game/run-layout";
+import {
+  formatRunPrice,
+  mergeRunPrices,
+  runPricePath,
+} from "../../../../../apps/web/lib/game/run-price";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses.ts";
 
 const identity = {
@@ -72,6 +77,46 @@ it("keeps checking the original bet signature when base finality is slow", async
     vi.unstubAllGlobals();
     vi.useRealTimers();
   }
+});
+
+it("advances play-key approval at confirmed but keeps finalized as the base default", async () => {
+  const request = {
+    signature: "2".repeat(87),
+    network: "base",
+    lastValidBlockHeight: 123,
+  } as const;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve(
+        Response.json({
+          status: { confirmationStatus: "confirmed", err: null },
+          resolution: "pending",
+        }),
+      ),
+    ),
+  );
+  try {
+    const { signal } = new AbortController();
+    await expect(
+      confirmGameAction(request, signal, 1, "confirmed"),
+    ).resolves.toBe("confirmed");
+    await expect(confirmGameAction(request, signal, 1)).resolves.toBe(
+      "pending",
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("plots only consumed price observations, retaining precision and showing gaps", () => {
+  const start = { sequence: 1n, price: 20_000_123n, exponent: -6 };
+  const later = { ...start, sequence: 2n, price: 20_010_123n };
+  const afterGap = { ...start, sequence: 5n, price: 20_020_123n };
+  const series = mergeRunPrices([start], [start, later, afterGap]);
+  expect(series).toEqual([start, later, afterGap]);
+  expect(runPricePath(series)).toBe("M2 34 L41 18 M158 2");
+  expect(formatRunPrice(start)).toBe("20.000123");
 });
 
 describe("Rust account delivery", () => {

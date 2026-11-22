@@ -71,6 +71,23 @@ export const RULES_V1 = {
   score: { coinPoints: 1, starPoints: 5 },
 } as const;
 
+export const RULES_V2 = {
+  ...RULES_V1,
+  rulesVersion: 2,
+  generation: {
+    ...RULES_V1.generation,
+    flatBandBps: 0,
+    sharpMoveBps: 5,
+    maxSampleChangeBps: 40,
+    boosterStrideSegments: 8,
+  },
+} as const;
+export const supportedRules = [RULES_V1, RULES_V2] as const;
+export type GameplayRules = (typeof supportedRules)[number];
+export function rulesForVersion(version: number) {
+  return supportedRules.find((rules) => rules.rulesVersion === version);
+}
+
 export function priceChangeBps(
   previousPrice: bigint,
   previousExponent: number,

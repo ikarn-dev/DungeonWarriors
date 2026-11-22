@@ -3,29 +3,27 @@
 import { Keypair, type VersionedTransaction } from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { verifyManifestBinding } from "../lib/game/assets";
 import { parseUsdc } from "../lib/game/custody-client";
 import { quotedGross } from "../lib/game/economy";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 import { RULES_V1 } from "../lib/game/rules";
+import { loadRunArtwork, type RunArtwork } from "../lib/game/run-artwork";
 import {
   confirmGameAction,
   type GameSignature,
   PLAY_SESSION_SECONDS,
   prepareSponsoredPlay,
-  readRunIdentity,
   readRunMedia,
   runEntrySchema,
   type SponsoredPlayTransaction,
   submitSponsoredPlay,
 } from "../lib/game/run-client";
-import type { GameIntent, PlaySponsor } from "../lib/game/run-transactions";
 import {
-  readWebJson,
-  WebApiError,
-  webApi,
-  webErrorMessage,
-} from "../lib/game/web-api";
+  type GameIntent,
+  initialDelegationEpoch,
+  type PlaySponsor,
+} from "../lib/game/run-transactions";
+import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
 import type { MARKETS } from "../lib/solana/addresses";
 import { u64Input } from "../lib/solana/program";
 import { RunBet, RunGameDialog } from "./RunScreen";
@@ -44,8 +42,10 @@ type Launch = {
     expiresAtSeconds: number;
   };
   sponsor: PlaySponsor;
-  step: "authorize" | "reserve" | "activate";
+  artwork: RunArtwork;
+  step: "authorize" | "reserve" | "activate" | "active";
   flight: Flight | null;
+  approval?: GameSignature;
 };
 const button =
   "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50";
@@ -87,7 +87,14 @@ function positiveAmount(value: string) {
 
 async function confirmFlight(flight: Flight, signal: AbortSignal) {
   flight.signature ??= await submitSponsoredPlay(flight.prepared, signal);
-  return confirmGameAction(flight.signature, signal, 18);
+  return confirmGameAction(
+    flight.signature,
+    signal,
+    18,
+    flight.prepared.intent.action.kind === "authorizeSession"
+      ? "confirmed"
+      : undefined,
+  );
 }
 
 export default function RunEntry({
@@ -115,16 +122,22 @@ export default function RunEntry({
   const [terms, setTerms] = useState<{ offer?: Offer; error?: string }>();
   const [quoteRequest, setQuoteRequest] = useState(0);
   const launch = useRef<Launch | null>(null);
-  const recovery = useRef<Flight | null>(null);
+  const warm = useRef<{ catalog: number; artwork: Promise<RunArtwork> } | null>(
+    null,
+  );
   const [runningNonce, setRunningNonce] = useState<string | null>(null);
   const cat = state.cats.find((owned) => owned.id === state.selected);
+  const selectedCat = cat?.id;
+  const definingCatalog = cat ? state.definingCatalogs[cat.id] : undefined;
+  const { assetBinding, catalogVersion } = state;
+  const mediaVersion = assetBinding?.version;
+  const mediaHash = assetBinding?.contentHash;
   const recovered =
     state.nextRunNonce !== state.settledRuns
       ? (BigInt(state.nextRunNonce) - 1n).toString()
       : null;
   const viewer = runningNonce ?? (launch.current === null ? recovered : null);
   const offer = terms?.offer;
-  const sponsor = launch.current?.sponsor ?? offer?.playSponsor;
   const available = BigInt(offer?.available ?? state.available);
   const stake = positiveAmount(amount);
   const cap =
@@ -139,6 +152,24 @@ export default function RunEntry({
     cap > stake &&
     stake <= available
   );
+  const starting = viewer !== null && launch.current?.step === "activate";
+
+  useEffect(() => {
+    if (!definingCatalog || !selectedCat) return;
+    const controller = new AbortController();
+    const binding =
+      definingCatalog === catalogVersion && mediaVersion && mediaHash
+        ? Promise.resolve({ version: mediaVersion, contentHash: mediaHash })
+        : readRunMedia(definingCatalog, controller.signal);
+    const artwork = binding.then((binding) =>
+      loadRunArtwork(binding, controller.signal, selectedCat),
+    );
+    warm.current = { catalog: definingCatalog, artwork };
+    void artwork.catch(() => {
+      if (warm.current?.artwork === artwork) warm.current = null;
+    });
+    return () => controller.abort();
+  }, [mediaVersion, mediaHash, catalogVersion, definingCatalog, selectedCat]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Wallet, finalized refreshes and manual retries invalidate the displayed quote.
   useEffect(() => {
@@ -205,8 +236,13 @@ export default function RunEntry({
         }
         const key = Keypair.generate();
         const inputKey = key.publicKey.toBase58();
-        const [binding, rent] = await Promise.all([
-          readRunMedia(definingCatalogVersion, signal),
+        const preloaded = warm.current;
+        const [artwork, rent] = await Promise.all([
+          preloaded && preloaded.catalog === definingCatalogVersion
+            ? preloaded.artwork
+            : readRunMedia(definingCatalogVersion, signal).then((binding) =>
+                loadRunArtwork(binding, signal, cat.id),
+              ),
           webApi(
             "/api/chain/state",
             {
@@ -219,22 +255,12 @@ export default function RunEntry({
             z.object({ token: u64Input, authorization: u64Input }).parse(value),
           ),
         ]);
-        const assets = await fetch(
-          `/game-assets/v${binding.version}/manifest.json`,
-          { signal },
-        );
-        if (!assets.ok) throw new WebApiError("ASSETS_NOT_READY");
-        await Promise.all([
-          readWebJson(assets).then((manifest) =>
-            verifyManifestBinding(manifest, binding),
-          ),
-          import("phaser"),
-        ]);
         signal.throwIfAborted();
         const expiresAtSeconds = next.clockSeconds + PLAY_SESSION_SECONDS;
         launch.current = {
           key,
           sponsor: next.playSponsor,
+          artwork,
           step: "authorize",
           flight: null,
           rent,
@@ -259,9 +285,12 @@ export default function RunEntry({
         };
       }
       const setup = launch.current;
+      let delegationWaits = 0;
+      let checkedFinalApproval = false;
       for (;;) {
         signal.throwIfAborted();
         const { step, reserve } = setup;
+        if (step === "active") return;
         if (setup.flight === null) {
           const now = Math.floor(Date.now() / 1000);
           if (
@@ -284,20 +313,11 @@ export default function RunEntry({
                 }
               : reserve;
           if (step === "activate") {
-            const run = await readRunIdentity(wallet, reserve.nonce, signal);
-            if (run.inputKey !== reserve.inputKey || !run.delegationInitiated)
-              throw new WebApiError("RUN_SCOPE_MISMATCH");
-            if (BigInt(run.activationDeadlineSeconds) <= BigInt(now)) {
-              setRunningNonce(reserve.nonce);
-              setOpen(true);
-              setNotice(null);
-              return;
-            }
             action = {
               kind: "activateRun",
               nonce: reserve.nonce,
-              delegationEpoch: run.delegationEpoch,
-              inputKey: run.inputKey,
+              delegationEpoch: initialDelegationEpoch,
+              inputKey: reserve.inputKey,
               market: reserve.market,
             };
           }
@@ -306,8 +326,8 @@ export default function RunEntry({
               ? "Approve your bet in your wallet."
               : "Starting your run…",
           );
-          setup.flight = {
-            prepared: await prepareSponsoredPlay(
+          try {
+            const prepared = await prepareSponsoredPlay(
               wallet,
               {
                 operation: "game",
@@ -318,27 +338,70 @@ export default function RunEntry({
               signal,
               setup.key,
               step === "authorize" ? sign : undefined,
-            ),
-          };
+            );
+            setup.flight = { prepared };
+          } catch (error) {
+            if (
+              error instanceof WebApiError &&
+              error.code === "RUN_DELEGATION_PENDING" &&
+              step === "activate" &&
+              delegationWaits < 6
+            ) {
+              setNotice("Waiting for MagicBlock to receive the run…");
+              await new Promise<void>((resolve) =>
+                setTimeout(
+                  resolve,
+                  Math.min(3200, 800 * 2 ** delegationWaits++),
+                ),
+              );
+              continue;
+            }
+            if (
+              error instanceof WebApiError &&
+              error.code === "SIMULATION_REJECTED" &&
+              step === "reserve" &&
+              setup.approval &&
+              !checkedFinalApproval
+            ) {
+              checkedFinalApproval = true;
+              const approval = await confirmGameAction(
+                setup.approval,
+                signal,
+                6,
+              );
+              if (approval === "confirmed") continue;
+              if (approval === "pending") {
+                setNotice("Still confirming your bet. Continue to check it.");
+                return;
+              }
+            }
+            throw error;
+          }
         }
         const status = await confirmFlight(setup.flight, signal);
         if (status === "pending") {
           setNotice("Still confirming. Continue to check the same bet.");
           return;
         }
+        const signature = setup.flight.signature;
         setup.flight = null;
         if (status === "failed") throw new WebApiError("TRANSACTION_FAILED");
         if (step === "activate") {
-          setRunningNonce(reserve.nonce);
-          setOpen(true);
+          setup.step = "active";
           setNotice(null);
           await refresh(signal);
           return;
         }
         setup.step = step === "authorize" ? "reserve" : "activate";
+        if (step === "authorize" && signature) setup.approval = signature;
+        if (step === "reserve") {
+          setRunningNonce(reserve.nonce);
+          setOpen(true);
+        }
       }
     } catch (error) {
       const setup = launch.current;
+      if (setup?.step === "active") return;
       if (
         setup &&
         (setup.flight === null ||
@@ -399,7 +462,7 @@ export default function RunEntry({
       {!open && notice && <output className="text-sm">{notice}</output>}
       <RunGameDialog
         dialog={dialog}
-        shown={open || runningNonce !== null}
+        shown={viewer !== null || open}
         busy={blocked}
         title={cat ? CAT_NAMES[cat.id] : "PURRPS"}
         onClose={() => setOpen(false)}
@@ -411,48 +474,38 @@ export default function RunEntry({
             wallet={wallet}
             nonce={viewer}
             playKey={runningNonce ? launch.current?.key : undefined}
+            artwork={launch.current?.artwork}
+            activating={starting}
+            autoDeliver
+            present={open}
+            onFinalized={() => {
+              if (dialog.current?.open) {
+                setRunningNonce(viewer);
+              } else {
+                launch.current = null;
+                setRunningNonce(null);
+                setAmount("");
+              }
+              void work(refresh);
+            }}
             runSettled={() => {
               launch.current = null;
-              recovery.current = null;
               setRunningNonce(null);
               setAmount("");
               close();
               void work(refresh);
             }}
-            submitAction={
-              sponsor
-                ? async (action, onSignature, signal) => {
-                    try {
-                      recovery.current ??= {
-                        prepared: await prepareSponsoredPlay(
-                          wallet,
-                          {
-                            operation: "game",
-                            sponsored: false,
-                            playSponsor: sponsor,
-                            action,
-                          },
-                          signal,
-                          action.kind === "resumeRun"
-                            ? launch.current?.key
-                            : undefined,
-                        ),
-                      };
-                      const pending = await submitSponsoredPlay(
-                        recovery.current.prepared,
-                        signal,
-                      );
-                      recovery.current = null;
-                      onSignature(pending);
-                      return pending;
-                    } catch (error) {
-                      if (knownFailure(error)) recovery.current = null;
-                      throw error;
-                    }
-                  }
-                : undefined
-            }
           />
+        )}
+        {starting && notice && <output className="run-notice">{notice}</output>}
+        {starting && !blocked && (
+          <button
+            type="button"
+            className="run-control"
+            onClick={() => void work(start)}
+          >
+            Continue run
+          </button>
         )}
       </RunGameDialog>
     </section>

@@ -2,10 +2,13 @@ use anchor_lang::AnchorSerialize;
 use purrps_game::{
     catalog::{cat_stats, CatId},
     protocol::{PlayerIntent, RunPhase},
-    rules::RULES_V1,
+    rules::{RULES_V1, RULES_V2},
     simulation::{
         collision::surface_at,
-        world::{initialize_world, step_world, PriceSample, WorldState},
+        world::{
+            initialize_world, initialize_world_for_rules, step_world, step_world_for_rules,
+            PriceSample, WorldState,
+        },
         SimulationError,
     },
     state::run::EntityKind,
@@ -42,6 +45,64 @@ fn controller(state: &WorldState) -> Vec<PlayerIntent> {
         vec![PlayerIntent::Jump]
     } else {
         vec![]
+    }
+}
+
+#[test]
+fn v2_quiet_and_moving_markets_have_reachable_obstacles_and_higher_speed() {
+    for cat in [
+        CatId::Collector,
+        CatId::Acrobat,
+        CatId::Guardian,
+        CatId::Sprinter,
+    ] {
+        for level in 1..=5 {
+            let stats = cat_stats(cat, level).unwrap();
+            for change in [0, 1, 5, -5, 40, -40] {
+                let mut state = initialize_world_for_rules(
+                    initial(cat, level, 0).frame,
+                    &stats,
+                    sample(change),
+                    &RULES_V2,
+                )
+                .unwrap();
+                assert_eq!(
+                    state
+                        .entities
+                        .iter()
+                        .filter(|entry| entry.kind == EntityKind::Hazard)
+                        .count(),
+                    1
+                );
+                assert_eq!(
+                    state
+                        .entities
+                        .iter()
+                        .any(|entry| matches!(entry.kind, EntityKind::Ramp(rise) if rise != 0)),
+                    change != 0
+                );
+                for _ in 0..1_200 {
+                    state = step_world_for_rules(
+                        &state,
+                        &stats,
+                        &controller(&state),
+                        sample(change),
+                        &RULES_V2,
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        state.frame.phase,
+                        RunPhase::Active,
+                        "{cat:?} {level} {change}"
+                    );
+                }
+                assert_eq!(state.frame.qualified_checkpoints, 2);
+                assert!(
+                    state.frame.runner.automatic_speed_subpixels_per_tick
+                        > RULES_V2.physics.runner_speed_subpixels_per_tick
+                );
+            }
+        }
     }
 }
 

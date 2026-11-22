@@ -6,7 +6,7 @@ use purrps_game::{
     publication::{
         catalog_binding, rules_binding, validate_catalog, validate_oracle_binding, validate_rules,
     },
-    rules::RULES_V1,
+    rules::{RULES_V1, RULES_V2},
 };
 
 #[path = "support/oracle-binding.rs"]
@@ -28,8 +28,7 @@ fn oracle_bytes() -> Vec<u8> {
 fn publication_preserves_reviewed_values_and_advances_versions_exactly_once() {
     assert!(validate_rules(&RULES_V1, 0, 0).is_ok());
     assert!(validate_rules(&RULES_V1, 1, 0).is_err());
-    let mut next = RULES_V1;
-    next.rules_version = 2;
+    let mut next = RULES_V2;
     assert!(validate_rules(&next, 1, 1).is_ok());
     next.max_multiplier_bps = 110_000;
     assert!(validate_rules(&next, 1, 1).is_err());

@@ -1,5 +1,6 @@
 import "server-only";
 import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
+import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import {
   ComputeBudgetProgram,
   type MessageV0,
@@ -221,7 +222,10 @@ function instructionsFor(wallet: string, intent: Intent) {
               "settleReturnedRun",
             ].includes(intent.action.kind) ||
             (runSponsor(intent.action) !== undefined &&
-              runSponsor(intent.action) !== sponsor))) ||
+              runSponsor(intent.action) !== sponsor) ||
+            (intent.action.kind === "requestCompletion" &&
+              (intent.action.expectedAttempt ?? 0) >=
+                settings.SPONSOR_MAX_ATTEMPTS))) ||
         (funding &&
           (BigInt(funding.lamports) !==
             settings.SPONSOR_COMPLETION_RESERVE_LAMPORTS ||
@@ -278,26 +282,49 @@ export async function prepare(wallet: string, intent: Intent) {
       starterSponsorLimit(policy.SPONSOR_OPERATION_LIMIT_LAMPORTS),
     );
   }
-  if (intent.operation === "game" && intent.playSponsor)
-    await verifyPlayAuthorization(wallet, intent.action, rpc);
-  if (intent.operation === "game" && intent.action.kind === "reserveRun") {
-    const funding = intent.action.completionFunding;
-    if (funding) {
-      await recycleRunBudget(rpc, wallet, intent.action);
-      await runSponsorCost(rpc, funding);
-    }
-  }
-  const block = await rpc.getLatestBlockhash(
-    network === "er" ? "confirmed" : "finalized",
-  );
+  const sponsoredPlay = intent.operation === "game" && intent.playSponsor;
+  const reserve =
+    intent.operation === "game" && intent.action.kind === "reserveRun"
+      ? intent.action
+      : null;
+  const funding = reserve?.completionFunding;
+  // Reclaim available SOL before checking headroom.
+  if (reserve && funding) await recycleRunBudget(rpc, wallet, reserve);
+  const [block] = await Promise.all([
+    rpc.getLatestBlockhash(
+      network === "er" || sponsoredPlay ? "confirmed" : "finalized",
+    ),
+    intent.operation === "game" &&
+      sponsoredPlay &&
+      verifyPlayAuthorization(wallet, intent.action, rpc),
+    funding && runSponsorCost(rpc, funding),
+  ]);
   const message = new TransactionMessage({
     payerKey: built.payer,
     recentBlockhash: block.blockhash,
     instructions: built.instructions,
   }).compileToV0Message();
   const tx = new VersionedTransaction(message);
-  if (intent.operation === "game" && intent.playSponsor)
-    await checkPlaySpend(rpc, tx, built.payer, network, false);
+  if (intent.operation === "game" && sponsoredPlay) {
+    try {
+      await checkPlaySpend(rpc, tx, built.payer, network, false);
+    } catch (error) {
+      if (
+        intent.action.kind === "activateRun" &&
+        error instanceof ApiError &&
+        error.code === "SIMULATION_REJECTED"
+      ) {
+        const run = runAddresses({
+          owner: wallet,
+          nonce: BigInt(intent.action.nonce),
+        }).run[0];
+        const replica = await rpc.getAccountInfo(run, "confirmed");
+        if (!replica || replica.owner.equals(DELEGATION_PROGRAM_ID))
+          throw new ApiError("RUN_DELEGATION_PENDING", 409);
+      }
+      throw error;
+    }
+  }
   const bytes = tx.serialize();
   if (bytes.length > 1232) throw new ApiError("INVALID_TRANSACTION", 400);
   return {

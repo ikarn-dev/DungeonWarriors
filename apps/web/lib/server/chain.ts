@@ -13,7 +13,7 @@ import {
 } from "@solana/web3.js";
 import { z } from "zod";
 import { requiredVaultBalance } from "../game/economy";
-import { RULES_V1, U64_MAX } from "../game/rules";
+import { RULES_V1, rulesForVersion, U64_MAX } from "../game/rules";
 import {
   decodeEscrowAccount,
   decodeRunAccount,
@@ -335,7 +335,8 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
     return { ...context, entry: { status: "closed" } };
   if (
     config.schemaVersion !== 1 ||
-    config.rules?.version !== RULES_V1.rulesVersion
+    !config.rules ||
+    !rulesForVersion(config.rules.version)
   )
     throw invalidAccount();
   const player = readPlayer(owner, playerInfo ?? null);

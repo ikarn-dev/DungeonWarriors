@@ -5,15 +5,34 @@ import { type CatId, catStats } from "../../../../../apps/web/lib/game/catalog";
 import { grossPayout } from "../../../../../apps/web/lib/game/economy";
 import {
   RULES_V1,
+  RULES_V2,
   runLevel,
   U64_MAX,
 } from "../../../../../apps/web/lib/game/rules";
 import { step } from "../../../../../apps/web/lib/game/simulation";
-import { stepWorld } from "../../../../../apps/web/lib/game/world";
+import {
+  initializeWorld,
+  stepWorld,
+} from "../../../../../apps/web/lib/game/world";
 import { entity, frame } from "./simulation-fixtures";
 import { baseControl, initialWorld, sample, worldHash } from "./world-fixtures";
 
 const cats: CatId[] = ["collector", "acrobat", "guardian", "sprinter"];
+it("renders the v2 quiet-market obstacle and maps small price changes to signed slopes", () => {
+  const stats = catStats("acrobat", 1);
+  const start = initialWorld("acrobat", 1, 0n).frame;
+  for (const change of [0n, 1n, -1n]) {
+    const world = initializeWorld(start, stats, sample(change), RULES_V2);
+    expect(
+      world.entities.filter((entity) => entity.kind === "hazard"),
+    ).toHaveLength(1);
+    const ramp = world.entities.find(
+      (entity) => entity.kind === "ramp" && entity.riseSubpixels !== 0,
+    );
+    if (change === 0n) expect(ramp).toBeUndefined();
+    else expect(ramp).toMatchObject({ riseSubpixels: Number(-change * 307n) });
+  }
+});
 it("matches independent signed ramp-contact and jump cases", () => {
   const rows = readFileSync(
     new URL("../../../../fixtures/game-v1/ramps.csv", import.meta.url),

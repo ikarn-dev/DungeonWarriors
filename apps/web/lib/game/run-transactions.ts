@@ -42,7 +42,7 @@ const positive = u64Input.refine((n) => n !== "0");
 const version = z.number().int().min(1).max(0xffffffff);
 const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
 // New reservations in the current program start at delegation epoch 1.
-const initialDelegationEpoch = "1";
+export const initialDelegationEpoch = "1";
 const catSchema = z.enum(["collector", "acrobat", "guardian", "sprinter"]);
 const nonce = { nonce: u64Input };
 const identity = { ...nonce, delegationEpoch: positive };
@@ -127,6 +127,7 @@ const action = z.discriminatedUnion("kind", [
     ...nonce,
     market: marketSchema,
     hasCrank: z.boolean().optional(),
+    expectedAttempt: z.number().int().min(0).max(65_535).optional(),
   }),
   z.strictObject({
     kind: z.literal("settleReturnedRun"),
@@ -568,7 +569,11 @@ export function gameInstructions(
         ? { crank: program, rentVault: program, hydraProgram: program }
         : {}),
     });
-    return build({ expectedAttempt: 0 }, [], operationId);
+    return build(
+      { expectedAttempt: action.expectedAttempt ?? 0 },
+      [],
+      operationId,
+    );
   }
   Object.assign(values, { receipt: pda("result", ownerBytes, n) });
   return build({}, [], operationId);

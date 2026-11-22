@@ -4,7 +4,7 @@ use super::{
 use crate::{
     catalog::{CatStats, Power},
     protocol::{PlayerIntent, RunPhase},
-    rules::{price_change_bps, speed_bps, terrain_step_subpixels, RULES_V1},
+    rules::{price_change_bps, speed_bps, RULES_V1},
     state::run::{EntityKind, GenerationState, WorldEntity, MAX_WORLD_ENTITIES},
 };
 
@@ -156,7 +156,11 @@ fn rebase(state: &mut WorldState) -> Result<(), SimulationError> {
     Ok(())
 }
 
-fn prepare(state: &mut WorldState, sample: PriceSample) -> Result<(), SimulationError> {
+fn prepare(
+    state: &mut WorldState,
+    sample: PriceSample,
+    game_rules: &crate::rules::GameRules,
+) -> Result<(), SimulationError> {
     let change = price_change_bps(
         sample.previous_price,
         sample.previous_exponent,
@@ -165,7 +169,16 @@ fn prepare(state: &mut WorldState, sample: PriceSample) -> Result<(), Simulation
     )
     .map_err(|_| SimulationError::InvalidObservation)?;
     let p = RULES_V1.physics;
-    let rules = RULES_V1.generation;
+    let rules = game_rules.generation;
+    let terrain_step = if game_rules.rules_version == 2 {
+        let maximum = i128::from(p.max_required_rise_subpixels);
+        let change = i128::from(sample.previous_price) - i128::from(sample.price);
+        (change * 10_000 * maximum
+            / (i128::from(sample.previous_price) * i128::from(rules.max_sample_change_bps)))
+        .clamp(-maximum, maximum) as i32
+    } else {
+        crate::rules::terrain_step_subpixels(change)
+    };
     let width = rules.segment_width_subpixels;
     let cutoff = i64::from(state.frame.runner.x_subpixels) - 2 * i64::from(width);
     state.entities.retain(|e| {
@@ -191,7 +204,7 @@ fn prepare(state: &mut WorldState, sample: PriceSample) -> Result<(), Simulation
         let end_y = if g.next_segment < 2 {
             g.surface_y_subpixels
         } else {
-            (g.surface_y_subpixels + terrain_step_subpixels(change)).clamp(
+            (g.surface_y_subpixels + terrain_step).clamp(
                 i32::from(p.viewport_height_pixels) * 256 / 4,
                 i32::from(p.viewport_height_pixels) * 256 * 3 / 4,
             )
@@ -272,7 +285,11 @@ fn prepare(state: &mut WorldState, sample: PriceSample) -> Result<(), Simulation
                 continue;
             };
             let surface = surface_at(tile, i64::from(x)).unwrap();
-            if !hazard || change.abs() >= i32::from(rules.sharp_move_bps) {
+            // The first obstacle in v2 is always present. Price moves can add two more.
+            if !hazard
+                || (game_rules.rules_version == 2 && index == 0)
+                || change.abs() >= i32::from(rules.sharp_move_bps)
+            {
                 let size = if hazard {
                     p.hitbox_width_subpixels / 2
                 } else {
@@ -317,6 +334,15 @@ pub fn initialize_world(
     stats: &CatStats,
     sample: PriceSample,
 ) -> Result<WorldState, SimulationError> {
+    initialize_world_for_rules(frame, stats, sample, &RULES_V1)
+}
+
+pub fn initialize_world_for_rules(
+    frame: SimulationFrame,
+    stats: &CatStats,
+    sample: PriceSample,
+    game_rules: &crate::rules::GameRules,
+) -> Result<WorldState, SimulationError> {
     validate_frame(&frame, stats)?;
     if frame.active_ticks != 0
         || frame.runner.x_subpixels != 0
@@ -351,7 +377,7 @@ pub fn initialize_world(
         world_origin_pixels: 0,
         next_entity_id: 0,
     };
-    prepare(&mut world, sample)?;
+    prepare(&mut world, sample, game_rules)?;
     Ok(world)
 }
 
@@ -361,13 +387,23 @@ pub fn step_world(
     actions: &[PlayerIntent],
     sample: PriceSample,
 ) -> Result<WorldState, SimulationError> {
+    step_world_for_rules(state, stats, actions, sample, &RULES_V1)
+}
+
+pub fn step_world_for_rules(
+    state: &WorldState,
+    stats: &CatStats,
+    actions: &[PlayerIntent],
+    sample: PriceSample,
+    game_rules: &crate::rules::GameRules,
+) -> Result<WorldState, SimulationError> {
     validate_state(state)?;
     validate_frame(&state.frame, stats)?;
     let mut result = state.clone();
     if state.frame.phase != RunPhase::Active {
         return Ok(result);
     }
-    prepare(&mut result, sample)?;
+    prepare(&mut result, sample, game_rules)?;
     let next = step(&result.frame, &result.entities, stats, actions)?;
     result.frame = next.frame;
     result.entities = next.entities;

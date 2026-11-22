@@ -8,7 +8,7 @@ use purrps_game::{
     contracts::{Market, VersionBinding},
     instruction_args::{InitializeConfigArgs, PublishCatalogArgs, PublishRulesArgs},
     oracle::InspectedOracle,
-    rules::RULES_V1,
+    rules::{RULES_V1, RULES_V2},
     state::{
         collection::{Collection, PlayerAccount, StarterClaim},
         config::{CatalogVersion, GameConfig, GameRulesVersion},
@@ -66,7 +66,7 @@ fn rules_instruction(
         &purrps_game::ID,
     )
     .0;
-    let mut rules = RULES_V1;
+    let mut rules = if version == 2 { RULES_V2 } else { RULES_V1 };
     rules.rules_version = version;
     let instruction = Instruction::new_with_bytes(
         purrps_game::ID,
@@ -156,6 +156,7 @@ fn publication_is_admin_only_atomic_versioned_and_retains_old_rules() {
     h.send(next, &admin).unwrap();
     let config: GameConfig = h.read(h.config);
     assert_eq!(config.rules.unwrap().version, 2);
+    assert_eq!(h.read::<GameRulesVersion>(second).rules, RULES_V2);
     let retained: GameRulesVersion = h.read(key);
     assert_eq!(retained.rules, first.rules);
     assert_eq!(retained.binding, first.binding);

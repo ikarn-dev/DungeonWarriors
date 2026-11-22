@@ -1,6 +1,7 @@
 import { BN, utils } from "@anchor-lang/core";
 import { MAGIC_CONTEXT_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import {
+  type BlockhashWithExpiryBlockHeight,
   type Connection,
   type Keypair,
   type PublicKey,
@@ -18,12 +19,33 @@ import {
 import { RULES_V1 } from "./rules";
 import { programInstruction } from "./run-transactions";
 
+const runBlockhashes = new WeakMap<
+  Connection,
+  {
+    fetchedAt: number;
+    block: Promise<BlockhashWithExpiryBlockHeight>;
+  }
+>();
+
+export function getRunBlockhash(rpc: Connection) {
+  const now = performance.now();
+  const cached = runBlockhashes.get(rpc);
+  if (cached && now - cached.fetchedAt < 1000) return cached.block;
+  const block = rpc.getLatestBlockhash("processed").catch((error: unknown) => {
+    if (runBlockhashes.get(rpc)?.block === block) runBlockhashes.delete(rpc);
+    throw error;
+  });
+  runBlockhashes.set(rpc, { fetchedAt: now, block });
+  return block;
+}
+
 export function runInputTransaction(
   run: PublicKey,
   key: Keypair,
   sequence: bigint,
   actions: readonly PlayerIntent[],
   blockhash: string,
+  rulesVersion: number = RULES_V1.rulesVersion,
 ) {
   if (actions.length === 0 || actions.length > MAX_INTENTS_PER_SUBMISSION)
     throw new RangeError("Invalid control batch");
@@ -35,7 +57,7 @@ export function runInputTransaction(
   const intents = actions.map((action, i) => {
     const envelope = intentEnvelopeSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
-      rulesVersion: RULES_V1.rulesVersion,
+      rulesVersion,
       run: run.toBase58(),
       clientSequence: sequence + BigInt(i) + 1n,
       action,
@@ -76,19 +98,26 @@ export async function sendRunInput(
   sequence: bigint,
   actions: readonly PlayerIntent[],
   signal: AbortSignal,
+  rulesVersion: number = RULES_V1.rulesVersion,
 ) {
-  const block = await rpc.getLatestBlockhash("confirmed").catch(() => null);
+  const block = await getRunBlockhash(rpc).catch(() => null);
   if (block === null) return false;
   signal.throwIfAborted();
-  const tx = runInputTransaction(run, key, sequence, actions, block.blockhash);
+  const tx = runInputTransaction(
+    run,
+    key,
+    sequence,
+    actions,
+    block.blockhash,
+    rulesVersion,
+  );
   const signature = utils.bytes.bs58.encode(
     tx.signatures[0] ?? new Uint8Array(),
   );
   // Resolve the original signature even when the RPC response is lost.
   try {
     await rpc.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
+      skipPreflight: true,
       maxRetries: 0,
     });
   } catch (error) {
@@ -98,7 +127,11 @@ export async function sendRunInput(
     signal.throwIfAborted();
     try {
       const result = await rpc.confirmTransaction(
-        { ...block, signature, abortSignal: signal },
+        {
+          ...block,
+          signature,
+          abortSignal: AbortSignal.any([signal, AbortSignal.timeout(3000)]),
+        },
         "confirmed",
       );
       return result.value.err === null;

@@ -172,6 +172,19 @@ pub const RULES_V1: GameRules = GameRules {
     },
 };
 
+// Preserve existing runs while making small market changes legible in new runs.
+pub const RULES_V2: GameRules = GameRules {
+    rules_version: 2,
+    generation: GenerationRules {
+        flat_band_bps: 0,
+        sharp_move_bps: 5,
+        max_sample_change_bps: 40,
+        booster_stride_segments: 8,
+        ..RULES_V1.generation
+    },
+    ..RULES_V1
+};
+
 pub fn price_change_bps(
     previous_price: i64,
     previous_exponent: i32,

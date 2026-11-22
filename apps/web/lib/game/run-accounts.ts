@@ -11,7 +11,7 @@ import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
 import { type CatId, catStats } from "./catalog";
 import { parsePredictionSnapshot } from "./predictor";
 import { runAccountObservationSchema } from "./protocol";
-import { RULES_V1, U64_MAX } from "./rules";
+import { rulesForVersion, U64_MAX } from "./rules";
 import { guardRunLayout, SNAPSHOT_END, SNAPSHOT_START } from "./run-layout";
 
 const program = new PublicKey(DEVNET.program);
@@ -86,14 +86,13 @@ async function checkSnapshot(data: Buffer, hash: number[]) {
   if (hex(digest) !== hex(hash)) throw new RunAccountError("SNAPSHOT_MISMATCH");
 }
 function checkVersion(s: Accounts["runGameState"]["snapshot"]) {
+  const rules = rulesForVersion(s.rulesBinding.version);
   if (
     s.protocolVersion !== 1 ||
-    s.rulesBinding.version !== 1 ||
+    !rules ||
     s.cat.definingCatalog.version < 1 ||
     s.assetManifest.version < 1 ||
-    !types
-      .encode("gameRules", s.rules)
-      .equals(types.encode("gameRules", RULES_V1))
+    !types.encode("gameRules", s.rules).equals(types.encode("gameRules", rules))
   )
     throw new RunAccountError("UNSUPPORTED_RUN");
   const stats = catStats(enumTag(s.cat.definition.id) as CatId, s.cat.level);
@@ -152,6 +151,7 @@ export async function decodeRunAccount(
   )
     throw new RunAccountError("INVALID_ACCOUNT");
   let prediction = null;
+  let prices: { sequence: bigint; price: bigint; exponent: number }[] = [];
   let acceptedOrder = 0n;
   if (r.startObservation !== null && r.entityCount > 0) {
     if (r.observationCount === 0) throw new RunAccountError("INVALID_ACCOUNT");
@@ -159,10 +159,24 @@ export async function decodeRunAccount(
       r.observations[(r.observationHead + r.observationCount - 1) % 16];
     const previous =
       r.observations[
-        (r.observationHead + Math.max(0, r.observationCount - 2)) % 16
+        (r.observationHead +
+          (r.snapshot.rulesBinding.version === 2
+            ? 0
+            : Math.max(0, r.observationCount - 2))) %
+          16
       ];
     if (latest === undefined || previous === undefined)
       throw new RunAccountError("INVALID_ACCOUNT");
+    prices = Array.from({ length: r.observationCount }, (_, i) => {
+      const item = r.observations[(r.observationHead + i) % 16];
+      if (!item || item.price.lten(0) || item.exponent !== latest.exponent)
+        throw new RunAccountError("INVALID_ACCOUNT");
+      return {
+        sequence: big(item.sequence),
+        price: big(item.price),
+        exponent: item.exponent,
+      };
+    });
     const projected = {
       frame: {
         phase: observation.phase,
@@ -233,6 +247,7 @@ export async function decodeRunAccount(
     throw new RunAccountError("INVALID_ACCOUNT");
   return {
     observation,
+    prices,
     prediction,
     stats,
     stake: big(r.snapshot.stakeBaseUnits),
@@ -244,6 +259,7 @@ export async function decodeRunAccount(
       intervalMs: r.snapshot.rules.crankIntervalMs,
       originSeconds: big(r.crank.clockOriginSeconds),
       consumedMs: big(r.crank.consumedElapsedMs),
+      completionAttempts: r.crank.completionAttempts,
     },
     cat: enumTag(r.snapshot.cat.definition.id) as CatId,
     assetBinding: {

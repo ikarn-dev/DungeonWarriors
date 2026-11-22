@@ -9,25 +9,28 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { verifyManifestBinding } from "../lib/game/assets";
 import { displayUsdc } from "../lib/game/custody-client";
 import { grossPayout } from "../lib/game/economy";
 import { Predictor } from "../lib/game/predictor";
+import { type PlayerIntent, PROTOCOL_VERSION } from "../lib/game/protocol";
 import { earnedMultiplierBps, RULES_V1, runLevel } from "../lib/game/rules";
 import { decodeRunAccount, runAddresses } from "../lib/game/run-accounts";
-import {
-  confirmGameAction,
-  type GameSignature,
-  type RunActionSubmitter,
-} from "../lib/game/run-client";
+import { loadRunArtwork, type RunArtwork } from "../lib/game/run-artwork";
 import { crankInstructions } from "../lib/game/run-crank";
 import { RunState } from "../lib/game/run-feed";
-import type { GameIntent } from "../lib/game/run-transactions";
-import { readWebJson, webApi } from "../lib/game/web-api";
+import { getRunBlockhash } from "../lib/game/run-input";
+import { mergeRunPrices, type RunPrice } from "../lib/game/run-price";
+import {
+  type GameIntent,
+  playSponsorSchema,
+} from "../lib/game/run-transactions";
+import { webApi } from "../lib/game/web-api";
 import { DEVNET, publicKeySchema } from "../lib/solana/addresses";
 import RunControls from "./RunControls";
+import RunMarket from "./RunMarket";
+import { useRunDelivery } from "./useRunDelivery";
 
 const amount = z.string().regex(/^(0|[1-9][0-9]{0,19})$/);
 const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
@@ -36,6 +39,9 @@ const payout = z.object({
   refundBaseUnits: amount,
 });
 const schema = z.object({
+  sponsor: playSponsorSchema
+    .extend({ maxAttempts: z.number().int().positive() })
+    .optional(),
   run: z.object({
     status: z.enum([
       "absent",
@@ -47,6 +53,12 @@ const schema = z.object({
       "refunded",
     ]),
     market: marketSchema.optional(),
+    result: z
+      .object({
+        outcome: z.enum(["win", "loss", "technicalRefund"]),
+        market: marketSchema,
+      })
+      .optional(),
     pending: payout.optional(),
     grossPayoutBaseUnits: amount.optional(),
     refundBaseUnits: amount.optional(),
@@ -72,7 +84,7 @@ const labels: Record<z.infer<typeof schema>["run"]["status"], string> = {
   reserved: "Waiting for activation",
   refundReady: "Reservation expired",
   recoveryPending: "Checking the run on MagicBlock",
-  settlementReady: "Ready for settlement",
+  settlementReady: "Finalizing your result…",
   settled: "Settlement finalized",
   refunded: "Refund finalized",
 };
@@ -85,22 +97,36 @@ const suspensionCopy: Readonly<Record<string, string>> = {
 };
 const livePollMs = 500;
 const maxCranksInFlight = 4;
-const crankBlockhashRefreshMs = 1000;
+const completionRetryMs = 30_000;
+const powers = {
+  magnet: ["Magnet", "Pulls in nearby pickups"],
+  doubleJump: ["Double jump", "Press Jump again in the air"],
+  shield: ["Shield", "Blocks one hit"],
+  extraDash: ["Extra dash", "Dash again during cooldown"],
+} as const;
 
 export default function RunStage({
   wallet,
   nonce,
   close,
   playKey,
+  artwork,
+  activating,
   runSettled,
-  submitAction,
+  autoDeliver = false,
+  present = true,
+  onFinalized,
 }: {
   wallet: string;
   nonce: string;
   close?: (() => void) | undefined;
   playKey?: Keypair | undefined;
+  artwork?: RunArtwork | undefined;
+  activating?: boolean | undefined;
   runSettled?: () => void;
-  submitAction?: RunActionSubmitter | undefined;
+  onFinalized?: () => void;
+  autoDeliver?: boolean;
+  present?: boolean;
 }) {
   const [status, setStatus] = useState("Reading your run…");
   const [visible, setVisible] = useState<{
@@ -110,9 +136,11 @@ export default function RunStage({
   const [error, setError] = useState<string | null>(null);
   const [artError, setArtError] = useState(false);
   const [artReady, setArtReady] = useState(false);
+  const [prices, setPrices] = useState<RunPrice[]>([]);
   const [settlement, setSettlement] = useState<string | null>(null);
   const mount = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
+  const reported = useRef(false);
   const [control, setControl] = useState<{
     rpc: Connection;
     run: PublicKey;
@@ -120,23 +148,47 @@ export default function RunStage({
   const [base, setBase] = useState<z.infer<typeof schema>["run"] | null>(null);
   const [activationExpired, setActivationExpired] = useState(false);
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
-  const [confirmedAction, setConfirmedAction] = useState<
-    GameIntent["action"]["kind"] | null
-  >(null);
-  const actionKind = useRef<GameIntent["action"]["kind"] | null>(null);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const actionWork = useRef<AbortController | null>(null);
-  const actionSignature = useRef<GameSignature | null>(null);
-  const [actionPending, setActionPending] = useState(false);
-  useEffect(() => () => actionWork.current?.abort(), []);
+  const [sponsor, setSponsor] = useState<z.infer<typeof schema>["sponsor"]>();
+  const [erReachable, setErReachable] = useState(false);
+  const [retryCompletion, setRetryCompletion] = useState<number | null>(null);
   const prediction = useRef<{
     engine: Predictor;
     extrapolate: boolean;
     sampledAt: number;
+    confirmedTick: bigint;
     ticks: number;
     world: ReturnType<Predictor["predict"]>;
   } | null>(null);
+  const rulesVersion =
+    visible?.run.observation.rulesVersion ?? RULES_V1.rulesVersion;
+  const predictionInput = useCallback(
+    (sequence: bigint, actions: readonly PlayerIntent[]) => {
+      const scene = prediction.current;
+      if (!scene) return;
+      const run = runAddresses({
+        owner: wallet,
+        nonce: BigInt(nonce),
+      }).run[0].toBase58();
+      scene.ticks = -1;
+      if (actions.length === 0) {
+        scene.engine.discardAfter(sequence);
+        return;
+      }
+      try {
+        for (const [index, action] of actions.entries())
+          scene.engine.enqueue({
+            protocolVersion: PROTOCOL_VERSION,
+            rulesVersion,
+            run,
+            clientSequence: sequence + BigInt(index) + 1n,
+            action,
+          });
+      } catch {
+        // A newer snapshot already owns the sequence.
+      }
+    },
+    [wallet, nonce, rulesVersion],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,7 +202,13 @@ export default function RunStage({
     let er: Connection | undefined;
     let subscription: number | undefined;
     let lastPush = 0;
+    let lastAdvance = 0;
+    let lastFrameTick = -1n;
+    let lastData: Buffer | undefined;
+    let livePhase: Run["observation"]["phase"] | undefined;
     let stopped = false;
+    let lastPrice: bigint | undefined;
+    let initialChecks = playKey ? 5 : 0;
     function disconnectFeed() {
       if (er && subscription !== undefined)
         void er.removeAccountChangeListener(subscription).catch(() => {});
@@ -163,25 +221,56 @@ export default function RunStage({
       slot: number,
       market: z.infer<typeof marketSchema>,
     ) {
-      if (controller.signal.aborted || slot < lastSlot) return;
+      if (
+        controller.signal.aborted ||
+        slot < lastSlot ||
+        lastData?.equals(info.data)
+      )
+        return;
       const decoded = await decodeRunAccount(identity, run, info);
       if (controller.signal.aborted || slot < lastSlot || stopped) return;
       feed.applyRun(slot, decoded);
       lastSlot = slot;
+      lastData = info.data;
+      livePhase = decoded.observation.phase;
+      if (decoded.observation.activeTicks > lastFrameTick) {
+        lastFrameTick = decoded.observation.activeTicks;
+        lastAdvance = performance.now();
+      }
+      const quote = decoded.prices.at(-1);
+      if (quote && (lastPrice === undefined || quote.sequence > lastPrice)) {
+        lastPrice = quote.sequence;
+        setPrices((points) => mergeRunPrices(points, decoded.prices));
+      }
       if (decoded.prediction !== null) {
+        const previous = prediction.current;
+        const confirmedTick = decoded.prediction.frame.activeTicks;
         const engine =
-          prediction.current?.engine ??
-          new Predictor(decoded.prediction, decoded.stats);
-        if (engine.reconcile(decoded.prediction))
+          previous?.engine ?? new Predictor(decoded.prediction, decoded.stats);
+        if (engine.reconcile(decoded.prediction)) {
+          const now = performance.now();
+          const tickMs = 1000 / RULES_V1.ticksPerSecond;
+          const sampledAt = previous?.extrapolate
+            ? Math.min(
+                now,
+                Math.max(
+                  now - RULES_V1.maxPredictionTicks * tickMs,
+                  previous.sampledAt +
+                    Number(confirmedTick - previous.confirmedTick) * tickMs,
+                ),
+              )
+            : now;
           prediction.current = {
             engine,
             extrapolate:
               decoded.prediction.frame.phase === "active" &&
               decoded.prediction.frame.activeTicks > 0n,
-            sampledAt: performance.now(),
+            sampledAt,
+            confirmedTick,
             ticks: 0,
             world: engine.predict(0),
           };
+        }
       }
       setError(null);
       setVisible({ run: decoded, market });
@@ -236,17 +325,26 @@ export default function RunStage({
     }
     const poll = async () => {
       try {
-        if (document.hidden) return;
+        // During healthy play, a pinned MagicBlock feed is enough. Read Solana
+        // escrow again when the run finishes or MagicBlock stops advancing.
+        if (
+          er &&
+          livePhase === "active" &&
+          performance.now() - lastAdvance < 2500
+        )
+          return;
         const response = schema.parse(
           await webApi(
             "/api/chain/state",
             { kind: "liveRun", nonce },
-            controller.signal,
+            AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
           ),
         );
         if (controller.signal.aborted) return;
         setError(null);
         setBase(response.run);
+        setSponsor(response.sponsor);
+        setErReachable(response.er !== null);
         setActivationExpired(response.er?.activationExpired === true);
         setRecoveryAvailable(response.er?.recoveryAvailable === true);
         const funds = response.run.pending ?? response.run;
@@ -254,19 +352,33 @@ export default function RunStage({
         const refund = funds.refundBaseUnits;
         if (gross !== undefined && refund !== undefined) {
           setSettlement(
-            `${response.run.pending ? "Pending" : "Finalized"} ${
-              refund !== "0"
-                ? `refund ${displayUsdc(refund)}`
-                : `payout ${displayUsdc(gross)}`
-            } USDC`,
+            response.run.result?.outcome === "loss"
+              ? "Wager settled"
+              : `${response.run.pending ? "Pending" : "Finalized"} ${
+                  refund !== "0"
+                    ? `refund ${displayUsdc(refund)}`
+                    : `payout ${displayUsdc(gross)}`
+                } USDC`,
           );
         }
         if (response.er === null) {
+          if (response.run.status === "absent" && initialChecks > 0) return;
+          if (
+            response.run.status === "recoveryPending" &&
+            er &&
+            livePhase === "active"
+          )
+            return;
           setStatus(labels[response.run.status]);
           stopped = true;
           disconnectFeed();
           setControl(null);
-          if (response.run.status !== "recoveryPending") setVisible(null);
+          if (
+            response.run.status !== "recoveryPending" &&
+            livePhase !== "terminalRecorded" &&
+            livePhase !== "completionRequested"
+          )
+            setVisible(null);
           if (["settled", "refunded", "absent"].includes(response.run.status))
             controller.abort();
           return;
@@ -281,6 +393,7 @@ export default function RunStage({
           response.er.slot,
           response.er.market,
         );
+        initialChecks = 0;
         if (!er && playKey?.publicKey.toBase58() === response.er.inputKey) {
           const rpc = new Connection(response.er.endpoint, {
             commitment: "confirmed",
@@ -317,11 +430,15 @@ export default function RunStage({
         if (!controller.signal.aborted)
           setError("Run data is temporarily unavailable.");
       } finally {
-        if (!controller.signal.aborted)
-          timer = setTimeout(() => void poll(), 6000);
+        if (!controller.signal.aborted) {
+          const delay = initialChecks > 0 ? 1200 : 6000;
+          if (initialChecks > 0) initialChecks--;
+          timer = setTimeout(() => void poll(), delay);
+        }
       }
     };
     prediction.current = null;
+    setPrices([]);
     void poll();
     return () => {
       controller.abort();
@@ -333,19 +450,13 @@ export default function RunStage({
   const phase = visible?.run.observation.phase;
   const started = (visible?.run.observation.activeTicks ?? 0n) > 0n;
   useEffect(() => {
-    if (
-      playKey &&
-      artReady &&
-      phase === "active" &&
-      started &&
-      !focused.current
-    ) {
+    if (playKey && artReady && phase === "active" && !focused.current) {
       focused.current = true;
       mount.current?.focus({ preventScroll: true });
     }
-  }, [artReady, phase, playKey, started]);
+  }, [artReady, phase, playKey]);
   const crank = visible?.run.crank;
-  const crankActive = phase === "active" && (artReady || started);
+  const crankActive = phase === "active" && (artReady || started || !present);
   const crankOracle = crank?.oracle;
   const crankEpoch = crank?.epoch;
   const crankGeneration = crank?.generation;
@@ -369,37 +480,16 @@ export default function RunStage({
     const generation = crankGeneration;
     const driver = crypto.randomUUID();
     let attempt = 0;
-    let recent: { blockhash: string; fetchedAt: number } | null = null;
-    let refreshing = false;
     let inFlight = 0;
-    async function refreshBlockhash() {
-      refreshing = true;
-      const fetchedAt = performance.now();
-      try {
-        const { blockhash } = await rpc.getLatestBlockhash("processed");
-        recent = { blockhash, fetchedAt };
-      } catch {
-        // The next scheduled drive retries the read.
-      } finally {
-        refreshing = false;
-      }
-    }
     async function drive(key: Keypair) {
-      if (controller.signal.aborted) return;
-      const age = recent ? performance.now() - recent.fetchedAt : Infinity;
-      if (!refreshing && age >= crankBlockhashRefreshMs)
-        void refreshBlockhash();
-      if (
-        !recent ||
-        age >= 3 * crankBlockhashRefreshMs ||
-        inFlight >= maxCranksInFlight
-      )
-        return;
+      if (controller.signal.aborted || inFlight >= maxCranksInFlight) return;
       inFlight++;
       try {
+        const { blockhash } = await getRunBlockhash(rpc);
+        if (controller.signal.aborted) return;
         const message = new TransactionMessage({
           payerKey: key.publicKey,
-          recentBlockhash: recent.blockhash,
+          recentBlockhash: blockhash,
           instructions: crankInstructions(
             run,
             key.publicKey,
@@ -443,6 +533,11 @@ export default function RunStage({
   const hasWorld = visible?.run.prediction != null;
 
   useEffect(() => {
+    if (!present) {
+      focused.current = false;
+      setArtReady(false);
+      return;
+    }
     const parent = mount.current;
     if (
       !parent ||
@@ -465,24 +560,17 @@ export default function RunStage({
       binding: { version: number; contentHash: string },
     ) {
       if (selected === undefined) return;
-      const response = await fetch(
-        `/game-assets/v${binding.version}/manifest.json`,
-        { signal: controller.signal },
-      );
-      if (!response.ok) throw new Error("ASSETS_NOT_READY");
-      const manifest = await verifyManifestBinding(
-        await readWebJson(response),
-        binding,
-      );
-      const [{ default: Phaser }, { renderRun }] = await Promise.all([
-        import("phaser"),
-        import("../lib/game/render-run"),
-      ]);
+      const { engine, manifest, renderRun, assets } =
+        artwork?.binding.version === binding.version &&
+        artwork.binding.contentHash === binding.contentHash &&
+        artwork.cat === selected
+          ? artwork
+          : await loadRunArtwork(binding, controller.signal);
       if (controller.signal.aborted) return;
       const initial = prediction.current?.world;
       if (!initial) return;
       game = renderRun(
-        Phaser,
+        engine,
         container,
         manifest,
         selected,
@@ -500,8 +588,14 @@ export default function RunStage({
               )
             : 0;
           if (ticks !== active.ticks) {
-            active.world = active.engine.predict(ticks);
-            active.ticks = ticks;
+            try {
+              active.world = active.engine.predict(ticks);
+              active.ticks = ticks;
+            } catch {
+              active.extrapolate = false;
+              active.world = active.engine.predict(0);
+              active.ticks = 0;
+            }
           }
           return active.world;
         },
@@ -512,6 +606,7 @@ export default function RunStage({
         () => {
           if (!controller.signal.aborted) setArtReady(true);
         },
+        assets,
       );
     }
     void attach(parent, cat, { version, contentHash: hash }).catch(() => {
@@ -521,149 +616,122 @@ export default function RunStage({
       controller.abort();
       game?.destroy(true);
     };
-  }, [cat, version, hash, hasWorld]);
+  }, [artwork, cat, version, hash, hasWorld, present]);
 
   const frame = visible?.run.prediction?.frame;
   const terminal = base?.status === "settled" || base?.status === "refunded";
+  useEffect(() => {
+    if (terminal && !reported.current) {
+      reported.current = true;
+      onFinalized?.();
+    }
+  }, [terminal, onFinalized]);
   const finalizing = visible?.run.observation.phase === "completionRequested";
-  const market = visible?.market ?? base?.market;
+  const market = visible?.market ?? base?.market ?? base?.result?.market;
   const suspension = visible?.run.suspensionReason;
   const suspendedAt = visible?.run.suspendedAt;
   const canResume =
     phase === "suspended" &&
     suspendedAt != null &&
-    artReady &&
-    control &&
     playKey &&
     !visible?.run.inputKeyRevoked &&
     (suspension === "schedulerGap" ||
       suspension === "oracleStale" ||
       suspension === "oracleInvalid");
-  const nextAction: GameIntent["action"] | null =
-    base?.status === "refundReady"
-      ? { kind: "abortUndelegatedReservation", nonce }
-      : base?.status === "settlementReady" && market
-        ? { kind: "settleReturnedRun", nonce, market }
-        : activationExpired && visible?.run.observation.phase === "ready"
-          ? { kind: "expireDelegatedActivation", nonce }
-          : recoveryAvailable &&
-              market &&
-              (phase === "active" || phase === "suspended")
-            ? { kind: "suspendOrResumeRun", nonce, market }
-            : canResume && market
-              ? {
-                  kind: "resumeRun",
-                  nonce,
-                  market,
-                  inputKey: playKey.publicKey.toBase58(),
-                  suspendedAt: suspendedAt.toString(),
-                }
-              : !terminal &&
-                  market &&
-                  visible?.run.observation.phase === "terminalRecorded"
-                ? {
-                    kind: "requestCompletion",
-                    nonce,
-                    market,
-                    hasCrank: visible.run.crank.generation !== "0",
-                  }
-                : null;
-  async function settle() {
+  const completionAttempts =
+    finalizing && visible ? visible.run.crank.completionAttempts : null;
+  const maxAttempts = sponsor?.maxAttempts ?? 0;
+  useEffect(() => {
     if (
-      !submitAction ||
-      (!nextAction && !actionSignature.current) ||
-      submitting
+      completionAttempts === null ||
+      completionAttempts >= maxAttempts ||
+      !erReachable
     )
       return;
-    const controller = new AbortController();
-    actionWork.current = controller;
-    setSubmitting(true);
-    setActionNotice("Waiting for confirmation…");
-    try {
-      if (!actionSignature.current && nextAction)
-        actionKind.current = nextAction.kind;
-      const signature =
-        actionSignature.current ??
-        (nextAction &&
-          (await submitAction(
-            nextAction,
-            (value) => {
-              actionSignature.current = value;
-              setActionPending(value !== null);
-            },
-            controller.signal,
-          )));
-      if (!signature) return;
-      const status = await confirmGameAction(signature, controller.signal);
-      if (status === "pending") {
-        setActionNotice(
-          "Confirmation is pending. Check the original signature.",
-        );
-        return;
-      }
-      actionSignature.current = null;
-      setActionPending(false);
-      if (status === "confirmed") {
-        if (actionKind.current === "resumeRun")
-          mount.current?.focus({ preventScroll: true });
-        else setConfirmedAction(actionKind.current);
-      }
-      setActionNotice(
-        status === "confirmed"
-          ? actionKind.current === "resumeRun"
-            ? "Confirmed. Syncing the run…"
-            : "Confirmed. Waiting for finalized result."
-          : "Transaction failed. Check the run status and try again.",
-      );
-    } catch {
-      if (!controller.signal.aborted)
-        setActionNotice(
-          actionSignature.current
-            ? "Check the original transaction before retrying."
-            : actionKind.current === "resumeRun"
-              ? "MagicBlock could not resume this run yet. Try again when updates recover."
-              : "Could not submit. Check the run and try again.",
-        );
-    } finally {
-      if (!controller.signal.aborted) setSubmitting(false);
+    const timer = setTimeout(
+      () => setRetryCompletion(completionAttempts),
+      completionRetryMs,
+    );
+    return () => clearTimeout(timer);
+  }, [completionAttempts, maxAttempts, erReachable]);
+  let nextAction: GameIntent["action"] | null = null;
+  if (autoDeliver && !terminal) {
+    if (base?.status === "refundReady") {
+      nextAction = { kind: "abortUndelegatedReservation", nonce };
+    } else if (base?.status === "settlementReady" && market) {
+      nextAction = { kind: "settleReturnedRun", nonce, market };
+    } else if (activationExpired && phase === "ready") {
+      nextAction = { kind: "expireDelegatedActivation", nonce };
+    } else if (
+      recoveryAvailable &&
+      market &&
+      (phase === "active" || phase === "suspended")
+    ) {
+      nextAction = { kind: "suspendOrResumeRun", nonce, market };
+    } else if (canResume && market) {
+      nextAction = {
+        kind: "resumeRun",
+        nonce,
+        market,
+        inputKey: playKey.publicKey.toBase58(),
+        suspendedAt: suspendedAt.toString(),
+      };
+    } else if (
+      market &&
+      visible &&
+      (phase === "terminalRecorded" ||
+        (erReachable &&
+          completionAttempts !== null &&
+          completionAttempts === retryCompletion &&
+          completionAttempts < maxAttempts))
+    ) {
+      nextAction = {
+        kind: "requestCompletion",
+        nonce,
+        market,
+        hasCrank: visible.run.crank.generation !== "0",
+        expectedAttempt: visible.run.crank.completionAttempts,
+      };
     }
   }
-
-  const actionLabel = actionPending
-    ? "Check submission"
-    : nextAction?.kind === "resumeRun"
-      ? "Resume run"
-      : nextAction?.kind === "abortUndelegatedReservation"
-        ? "Refund expired reservation"
-        : nextAction?.kind === "expireDelegatedActivation"
-          ? "Recover expired run"
-          : nextAction?.kind === "suspendOrResumeRun"
-            ? "Recover stalled run"
-            : nextAction?.kind === "settleReturnedRun"
-              ? "Finalize result"
-              : "Settle run";
-  const actionButton = !terminal &&
-    submitAction &&
-    (nextAction || actionPending) && (
-      <button
-        type="button"
-        className="run-control"
-        data-cash-out
-        disabled={
-          submitting || (!actionPending && confirmedAction === nextAction?.kind)
-        }
-        onClick={() => void settle()}
-      >
-        {actionLabel}
-      </button>
-    );
+  const actionNotice = useRunDelivery(wallet, nextAction, sponsor, playKey);
   const qualified = (frame?.qualifiedCheckpoints ?? 0n) > 0n;
   const checkpoint = frame
     ? Number(frame.activeTicks % BigInt(RULES_V1.checkpointTicks))
     : 0;
   const paused = phase === "suspended";
-  const playing = phase === "active" && started;
+  const playing = phase === "active";
+  const speed = frame
+    ? frame.runner.automaticSpeedSubpixelsPerTick /
+      RULES_V1.physics.runnerSpeedSubpixelsPerTick
+    : 1;
+  const power = visible?.run.stats.power;
+  const state = power && frame?.powers[power];
+  const powerControl =
+    power && state && frame
+      ? {
+          name: powers[power][0],
+          ready: state.readyAtTick <= frame.activeTicks,
+          detail:
+            state.charges > 0 && state.endsAtTick > frame.activeTicks
+              ? powers[power][1]
+              : state.readyAtTick > frame.activeTicks
+                ? `${powers[power][0]} ready in ${Math.ceil(Number(state.readyAtTick - frame.activeTicks) / RULES_V1.ticksPerSecond)}s`
+                : `${powers[power][0]} ready`,
+        }
+      : null;
   const statusPanel = !artReady || !playing;
+  const resultTitle =
+    base?.result?.outcome === "loss" ||
+    visible?.run.observation.terminalReason === "crash"
+      ? "Run over"
+      : base?.result?.outcome === "win"
+        ? "Cash out complete"
+        : base?.result?.outcome === "technicalRefund"
+          ? "Wager refunded"
+          : null;
+
+  if (!present) return null;
 
   return (
     <section className="run-stage" aria-label="Run viewer">
@@ -703,6 +771,10 @@ export default function RunStage({
               <dt>Coins</dt>
               <dd>{formatNumber.format(frame.totalCoins)}</dd>
             </div>
+            <div>
+              <dt>Speed</dt>
+              <dd>{speed.toFixed(2)}×</dd>
+            </div>
             <div className="run-checkpoint">
               <dt id={`checkpoint-${nonce}`}>Checkpoint</dt>
               <dd>
@@ -714,6 +786,7 @@ export default function RunStage({
               </dd>
             </div>
           </dl>
+          {market && <RunMarket market={market} prices={prices} />}
           {playing && artReady && (
             <p className="run-rotate">Rotate to landscape to play</p>
           )}
@@ -724,8 +797,10 @@ export default function RunStage({
                   {artError
                     ? "Artwork unavailable"
                     : paused
-                      ? "Run paused"
-                      : (error ?? (artReady ? status : "Loading the course…"))}
+                      ? "Reconnecting…"
+                      : (resultTitle ??
+                        error ??
+                        (artReady ? status : "Loading the course…"))}
                 </h4>
                 {paused && (
                   <p>
@@ -733,16 +808,15 @@ export default function RunStage({
                       (suspension && suspensionCopy[suspension]) ??
                       "MagicBlock paused the run."}{" "}
                     {recoveryAvailable
-                      ? "Recover the original wager."
+                      ? "Returning the original wager."
                       : canResume
-                        ? "Resume from the same position when updates recover."
-                        : "Recovery becomes available after the pause expires."}
+                        ? "Your run will continue from here when the feed recovers."
+                        : "Waiting for MagicBlock to resolve the run."}
                   </p>
                 )}
                 {artError && <p>Reopen the run to reload its artwork.</p>}
                 {settlement && <p>{settlement}</p>}
               </div>
-              {actionButton}
               {actionNotice && !terminal && <output>{actionNotice}</output>}
             </div>
           )}
@@ -750,44 +824,58 @@ export default function RunStage({
       )}
       {!hasWorld && (
         <div className="run-message" aria-live="polite">
-          <h4>{error ?? status}</h4>
+          <h4>
+            {resultTitle ??
+              error ??
+              (activating && base?.status === "recoveryPending"
+                ? "Starting on MagicBlock…"
+                : status)}
+          </h4>
           {settlement && <p>{settlement}</p>}
         </div>
       )}
       {playing && error && <output className="run-notice">{error}</output>}
-      {!terminal && control && playKey && frame && visible && (
-        <div className="run-deck">
-          <div className="run-earnings">
-            <span>Cash out</span>
-            <strong>
-              {qualified
-                ? `${displayUsdc(grossPayout(visible.run.stake, frame.qualifiedCheckpoints, visible.run.maxGross).toString())} USDC`
-                : "Locked"}
-            </strong>
-            <small>
-              {qualified
-                ? `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}× earned`
-                : "Reach a qualifying checkpoint"}
-            </small>
+      {!terminal &&
+        playing &&
+        control &&
+        playKey &&
+        frame &&
+        visible &&
+        powerControl && (
+          <div className="run-deck">
+            <div className="run-earnings">
+              <span>Cash out</span>
+              <strong>
+                {qualified
+                  ? `${displayUsdc(grossPayout(visible.run.stake, frame.qualifiedCheckpoints, visible.run.maxGross).toString())} USDC`
+                  : "Locked"}
+              </strong>
+              <small>
+                {qualified
+                  ? `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}× earned`
+                  : "Reach a qualifying checkpoint"}
+              </small>
+            </div>
+            <RunControls
+              rpc={control.rpc}
+              run={control.run}
+              playKey={playKey}
+              eligible={qualified}
+              accepted={visible.run.observation.acceptedSequence}
+              playing={playing}
+              artReady={artReady}
+              surface={mount}
+              power={powerControl}
+              onInputs={predictionInput}
+              rulesVersion={rulesVersion}
+            />
           </div>
-          <RunControls
-            rpc={control.rpc}
-            run={control.run}
-            playKey={playKey}
-            eligible={qualified}
-            accepted={visible.run.observation.acceptedSequence}
-            playing={playing}
-            artReady={artReady}
-            surface={mount}
-          />
-        </div>
-      )}
+        )}
       {playing && !control && (
         <p className="run-notice">
           Controls are available in the tab that authorized this run.
         </p>
       )}
-      {(!hasWorld || !statusPanel) && actionButton}
       {!terminal && finalizing && (
         <p className="run-notice">Settling on Solana Devnet.</p>
       )}

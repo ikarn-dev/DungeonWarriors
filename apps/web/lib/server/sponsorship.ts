@@ -120,7 +120,10 @@ export async function dedicatedSponsor(rpc: Connection) {
     [program.toBytes()],
     loaderProgram,
   )[0];
-  const programData = await rpc.getAccountInfo(loader, "finalized");
+  const programData = await rpc.getAccountInfo(loader, {
+    commitment: "finalized",
+    dataSlice: { offset: 0, length: 45 },
+  });
   if (
     programData === null ||
     programData.data.length < 45 ||
@@ -416,10 +419,11 @@ export async function submitPlay(
 ) {
   const network = gameNetwork(intent.action);
   const operationId = gameInstructions(wallet, intent).operationId;
-  const rpc = await checkedConnection(network);
-  const sponsor = await dedicatedSponsor(
-    network === "base" ? rpc : await checkedConnection("base"),
-  );
+  const base = checkedConnection("base");
+  const [rpc, sponsor] = await Promise.all([
+    network === "base" ? base : checkedConnection("er"),
+    base.then(dedicatedSponsor),
+  ]);
   tx.sign([sponsor]);
   const signature = utils.bytes.bs58.encode(
     tx.signatures[0] ?? new Uint8Array(),
@@ -436,11 +440,17 @@ export async function submitPlay(
       network,
       unknownResponse: false,
     };
-  if (network === "er") await verifyScope();
-  await verifyPlayAuthorization(wallet, intent.action, rpc);
-  const cost = await checkPlaySpend(rpc, tx, sponsor.publicKey, network, true);
+  const scopedRpc = network === "er" ? await verifyScope() : rpc;
+  await verifyPlayAuthorization(wallet, intent.action, scopedRpc);
+  const cost = await checkPlaySpend(
+    scopedRpc,
+    tx,
+    sponsor.publicKey,
+    network,
+    true,
+  );
   if (cost > 0n) await admitSponsorCost(operationId, cost, signature);
-  return sendReviewed(rpc, tx, network, signature);
+  return sendReviewed(scopedRpc, tx, network, signature, true);
 }
 
 export async function sendReviewed(
@@ -448,10 +458,12 @@ export async function sendReviewed(
   tx: VersionedTransaction,
   network: "base" | "er",
   signature: string,
+  simulated = false,
 ) {
   try {
     await rpc.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
+      // Sponsored submissions have just simulated these exact signed bytes.
+      skipPreflight: simulated,
       preflightCommitment: "confirmed",
       maxRetries: 2,
     });

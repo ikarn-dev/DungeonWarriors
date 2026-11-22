@@ -84,6 +84,16 @@ fn set_clock_and_oracle(p: &mut Play, quote: Pubkey, at: i64, slot: u64, publish
 #[test]
 #[ignore = "requires the read-only deployed ER Hydra executable snapshot"]
 fn deployed_hydra_registers_and_advances_only_trusted_elapsed_play() {
+    play_with_hydra(false);
+}
+
+#[test]
+#[ignore = "requires the read-only deployed ER Hydra executable snapshot"]
+fn deployed_hydra_supports_v2_obstacles_under_the_same_compute_budget() {
+    play_with_hydra(true);
+}
+
+fn play_with_hydra(v2: bool) {
     let mut p = reserved();
     let owner = p.owner.pubkey();
     let run = pda(purrps_game::RUN_GAME_SEED, owner, 0);
@@ -91,6 +101,16 @@ fn deployed_hydra_registers_and_advances_only_trusted_elapsed_play() {
     let source = p.h.read::<RunGameState>(run).snapshot.oracle;
     let crank = task_address(run);
     let mut escrow_fixture: RunEscrow = p.h.read(escrow);
+    if v2 {
+        let mut game: RunGameState = p.h.read(run);
+        game.snapshot.rules = purrps_game::rules::RULES_V2;
+        game.snapshot.rules_binding =
+            purrps_game::publication::rules_binding(&game.snapshot.rules).unwrap();
+        game.snapshot_hash = purrps_game::contracts::snapshot_hash(&game.snapshot).unwrap();
+        escrow_fixture.snapshot = game.snapshot.clone();
+        escrow_fixture.snapshot_hash = game.snapshot_hash;
+        setup::put(&mut p.h, run, &game);
+    }
     escrow_fixture.delegation_initiated = true;
     setup::put(&mut p.h, escrow, &escrow_fixture);
     let hydra = std::fs::read(std::env::var("PURRPS_HYDRA_PROGRAM_SNAPSHOT").unwrap()).unwrap();
@@ -150,6 +170,11 @@ fn deployed_hydra_registers_and_advances_only_trusted_elapsed_play() {
         (active.phase, active.active_ticks, active.crank.task),
         (RunPhase::Active, 0, crank)
     );
+    if v2 {
+        assert!(active.entities[..usize::from(active.entity_count)]
+            .iter()
+            .any(|entity| entity.kind == purrps_game::state::run::EntityKind::Hazard));
+    }
 
     let trigger = Instruction::new_with_bytes(
         HYDRA_ID,

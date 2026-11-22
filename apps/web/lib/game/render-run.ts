@@ -11,6 +11,13 @@ const width = GAME_VIEW.width;
 const height = GAME_VIEW.height;
 const groundOffset = Math.round(height * 0.18);
 const pixels = (value: number) => value / 256;
+const correctionMs = 46;
+const powerTints = {
+  magnet: 0xffd880,
+  doubleJump: 0xb6a4f3,
+  shield: 0x9ae1ff,
+  extraDash: 0xfbaf91,
+} as const;
 const stills = [
   "background-sky",
   "background-forest-far",
@@ -32,6 +39,11 @@ const boosters = {
   doubleJump: "booster-double-jump",
   extraDash: "booster-extra-dash",
 } as const;
+export function runImages(manifest: AssetManifest, cat: CatId) {
+  return manifest.assets.filter(({ id }) =>
+    [`cat-${cat}`, "coin-spin", ...stills].includes(id),
+  );
+}
 
 export function renderRun(
   engine: typeof Phaser,
@@ -42,15 +54,15 @@ export function renderRun(
   reduced: () => boolean,
   onError: () => void,
   onReady: () => void,
+  preloaded?: ReadonlyMap<string, Blob>,
 ) {
   const catSheet = `cat-${cat}`;
-  const images = manifest.assets.filter((item) =>
-    [catSheet, "coin-spin", ...stills].includes(item.id),
-  );
+  const images = runImages(manifest, cat);
   if (images.length !== stills.length + 2) throw new Error("ASSETS_NOT_READY");
   class RunScene extends engine.Scene {
     private scenery: Phaser.GameObjects.TileSprite[] = [];
     private land?: Phaser.GameObjects.Graphics;
+    private effects?: Phaser.GameObjects.Graphics;
     private ground: [
       Phaser.GameObjects.TileSprite,
       Phaser.GameObjects.TileSprite,
@@ -61,6 +73,8 @@ export function renderRun(
     private unavailable = false;
     private lastWorld?: WorldState;
     private lastReduced?: boolean;
+    private displayX = 0;
+    private displayY = 0;
     private catClips = new Map(
       images
         .find((item) => item.id === catSheet)
@@ -68,13 +82,24 @@ export function renderRun(
     );
 
     preload() {
+      const urls: string[] = [];
+      if (preloaded) {
+        const release = () => {
+          for (const url of urls.splice(0)) URL.revokeObjectURL(url);
+        };
+        this.load.once("complete", release);
+        this.events.once("shutdown", release);
+      }
       this.load.on("loaderror", () => {
         this.unavailable = true;
         onError();
       });
       for (const art of images) {
-        if (art.path.endsWith(".svg")) this.load.svg(art.id, art.path);
-        else this.load.image(art.id, art.path);
+        const bytes = preloaded?.get(art.id);
+        const url = bytes ? URL.createObjectURL(bytes) : art.path;
+        if (bytes) urls.push(url);
+        if (art.path.endsWith(".svg")) this.load.svg(art.id, url);
+        else this.load.image(art.id, url);
       }
     }
 
@@ -108,6 +133,7 @@ export function renderRun(
       );
       this.add.tileSprite(0, height - 56, width, 56, "water-fill").setOrigin(0);
       this.land = this.add.graphics().setDepth(1);
+      this.effects = this.add.graphics().setDepth(4);
       this.ground = Array.from({ length: 64 }, () => [
         this.add
           .tileSprite(0, 0, 32, 32, "terrain-fill")
@@ -131,22 +157,50 @@ export function renderRun(
       onReady();
     }
 
-    override update() {
-      if (!this.land || !this.runner || this.unavailable) return;
+    override update(_time: number, delta: number) {
+      if (!this.land || !this.runner || !this.effects || this.unavailable)
+        return;
       const current = world();
       const reduceMotion = reduced();
-      if (this.lastWorld === current && this.lastReduced === reduceMotion)
-        return;
-      this.lastWorld = current;
-      this.lastReduced = reduceMotion;
       const { frame, entities, worldOriginPixels } = current;
       const { runner } = frame;
       const playing = frame.phase === "active" && frame.activeTicks > 0n;
+      const previous = this.lastWorld;
+      const targetX = pixels(runner.xSubpixels);
+      const targetY = pixels(runner.ySubpixels);
+      const offset = previous
+        ? Number(worldOriginPixels - previous.worldOriginPixels)
+        : 0;
+      const fromX = this.displayX - offset;
+      const fromY = this.displayY;
+      const mix =
+        !playing ||
+        !previous ||
+        previous.frame.phase !== "active" ||
+        reduceMotion
+          ? 1
+          : 1 - Math.exp(-delta / correctionMs);
+      const blend = (from: number, target: number) =>
+        Math.abs(target - from) < 0.125 ||
+        Math.abs(target - from) > GAME_VIEW.hitboxWidth * 2
+          ? target
+          : from + (target - from) * mix;
+      this.displayX = blend(fromX, targetX);
+      this.displayY = blend(fromY, targetY);
+      if (
+        previous === current &&
+        this.lastReduced === reduceMotion &&
+        this.displayX === fromX &&
+        this.displayY === fromY
+      )
+        return;
+      this.lastWorld = current;
+      this.lastReduced = reduceMotion;
       const animationTime =
         (Number(frame.activeTicks % BigInt(RULES_V1.ticksPerSecond * 60)) *
           1000) /
         RULES_V1.ticksPerSecond;
-      const left = pixels(runner.xSubpixels) - width * 0.28;
+      const left = this.displayX - width * 0.28;
       const origin = Number(worldOriginPixels % BigInt(width * 40)) + left;
       this.scenery.forEach((layer, i) => {
         layer.tilePositionX = origin * (i === 0 ? 0 : i === 1 ? 0.15 : 0.35);
@@ -164,7 +218,12 @@ export function renderRun(
         );
         if (end <= 0 || x >= width) continue;
         const tiles = this.ground[groundUsed];
-        if (entity.kind === "terrain" && tiles && y < height) {
+        if (
+          (entity.kind === "terrain" ||
+            (entity.kind === "ramp" && entity.riseSubpixels === 0)) &&
+          tiles &&
+          y < height
+        ) {
           const from = Math.max(0, x);
           const span = Math.min(width, end) - from;
           tiles[0]
@@ -228,17 +287,40 @@ export function renderRun(
               ? "jump"
               : "fall";
       const clip = this.catClips.get(pose);
+      const cadence =
+        pose === "run"
+          ? runner.automaticSpeedSubpixelsPerTick /
+            RULES_V1.physics.runnerSpeedSubpixelsPerTick
+          : 1;
       const animated =
         clip && !reduceMotion
           ? clip.start +
-            (Math.floor((animationTime * clip.fps) / 1000) % clip.count)
+            (Math.floor((animationTime * clip.fps * cadence) / 1000) %
+              clip.count)
           : (clip?.start ?? 0);
-      this.runner
-        .setFrame(animated)
-        .setPosition(
-          pixels(runner.xSubpixels) - left + GAME_VIEW.hitboxWidth / 2,
-          pixels(runner.ySubpixels) + GAME_VIEW.hitboxHeight + groundOffset,
-        );
+      const runnerX = this.displayX - left + GAME_VIEW.hitboxWidth / 2;
+      const runnerY = this.displayY + GAME_VIEW.hitboxHeight + groundOffset;
+      this.runner.setFrame(animated).setPosition(runnerX, runnerY);
+      this.effects.clear();
+      let radius = 22;
+      for (const power of [
+        "magnet",
+        "doubleJump",
+        "shield",
+        "extraDash",
+      ] as const) {
+        const state = frame.powers[power];
+        if (state.charges > 0 && frame.activeTicks < state.endsAtTick) {
+          this.effects
+            .lineStyle(2, powerTints[power], 0.84)
+            .strokeCircle(
+              runnerX,
+              runnerY - GAME_VIEW.hitboxHeight / 2,
+              radius,
+            );
+          radius += 4;
+        }
+      }
     }
 
     private spawn(
@@ -280,7 +362,15 @@ export function renderRun(
             : entity.kind === "booster"
               ? boosters[entity.power]
               : "hazard-obstacle";
-        sprite.setVisible(true).setTexture(texture).setPosition(x, y);
+        sprite
+          .setVisible(true)
+          .setTexture(texture)
+          .setPosition(
+            x,
+            entity.kind === "hazard"
+              ? y + pixels(entity.heightSubpixels) / 2 - sprite.height / 2
+              : y,
+          );
       }
     }
   }

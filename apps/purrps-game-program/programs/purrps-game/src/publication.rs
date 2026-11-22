@@ -6,7 +6,7 @@ use crate::{
     constants::*,
     contracts::{Market, OracleBinding, VersionBinding},
     error::ErrorCode,
-    rules::{GameRules, RULES_V1},
+    rules::{GameRules, RULES_V1, RULES_V2},
 };
 
 pub fn validate_oracle_binding(binding: &OracleBinding, market: Market) -> Result<()> {
@@ -48,8 +48,11 @@ pub fn validate_rules(
         expected_version == current_version && rules.rules_version == next,
         ErrorCode::StaleVersion
     );
-    let mut canonical = RULES_V1;
-    canonical.rules_version = next;
+    let canonical = match next {
+        1 => RULES_V1,
+        2 => RULES_V2,
+        _ => return err!(ErrorCode::InvalidRules),
+    };
     require!(*rules == canonical, ErrorCode::InvalidRules);
     Ok(())
 }

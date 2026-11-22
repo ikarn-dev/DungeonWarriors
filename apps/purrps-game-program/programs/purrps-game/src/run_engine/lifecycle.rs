@@ -7,7 +7,7 @@ use crate::{
     protocol::{FaultReason, InputAxis, PlayerIntent, RunPhase, TerminalReason},
     simulation::{
         command_terminal,
-        world::{initialize_world, step_world, PriceSample, WorldState},
+        world::{initialize_world_for_rules, step_world_for_rules, PriceSample, WorldState},
         SimulationFrame,
     },
     state::run::{OracleObservation, RunGameState, RunTerminal, Suspension},
@@ -78,10 +78,11 @@ pub fn activate_world(run: &mut RunGameState, oracle: &InspectedOracle, now: i64
     let observation = oracle.next_observation(None)?;
     let mut initial = frame(run);
     initial.phase = RunPhase::Active;
-    let world = initialize_world(
+    let world = initialize_world_for_rules(
         initial,
         &run.snapshot.cat.stats,
         sample(observation, observation),
+        &run.snapshot.rules,
     )
     .map_err(|_| error!(ErrorCode::InvalidRunWorld))?;
     save_world(run, world);
@@ -197,7 +198,9 @@ pub fn advance_tick(run: &mut RunGameState, oracle: &InspectedOracle, now: i64) 
     );
     let last = run.latest_observation()?.ok_or(ErrorCode::InvalidRun)?;
     let current = oracle.next_observation(Some(last))?;
-    let previous = if current == last && run.observation_count > 1 {
+    let previous = if run.snapshot.rules.rules_version == 2 {
+        run.observations[usize::from(run.observation_head)]
+    } else if current == last && run.observation_count > 1 {
         let end = usize::from(run.observation_head) + usize::from(run.observation_count);
         run.observations[(end - 2) % run.observations.len()]
     } else {
@@ -266,11 +269,12 @@ pub fn advance_tick(run: &mut RunGameState, oracle: &InspectedOracle, now: i64) 
         world_origin_pixels: run.world_origin_pixels,
         next_entity_id: run.next_entity_id,
     };
-    let mut next = step_world(
+    let mut next = step_world_for_rules(
         &world,
         &run.snapshot.cat.stats,
         &actions,
         sample(previous, current),
+        &run.snapshot.rules,
     )
     .map_err(|_| error!(ErrorCode::InvalidRunWorld))?;
     let sequence = run.last_processed_sequence + actions.len() as u64;

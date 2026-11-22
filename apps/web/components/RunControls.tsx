@@ -26,6 +26,9 @@ export default function RunControls({
   playing,
   artReady,
   surface,
+  power,
+  onInputs,
+  rulesVersion,
 }: {
   rpc: Connection;
   run: PublicKey;
@@ -35,18 +38,20 @@ export default function RunControls({
   playing: boolean;
   artReady: boolean;
   surface: RefObject<HTMLDivElement | null>;
+  power: { name: string; ready: boolean; detail: string };
+  onInputs: (sequence: bigint, actions: readonly PlayerIntent[]) => void;
+  rulesVersion: number;
 }) {
   const root = useRef<HTMLFieldSetElement>(null);
   const [paused, setPaused] = useState(false);
-  const [portrait, setPortrait] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [cashOut, setCashOut] = useState(false);
   const enqueue = useRef<(action: PlayerIntent) => void>(() => {});
-  const resume = useRef<() => void>(() => {});
-  const policy = useRef({ accepted, eligible, playing, artReady });
+  const powerReady = power.ready;
+  const policy = useRef({ accepted, eligible, playing, artReady, powerReady });
   useEffect(() => {
-    policy.current = { accepted, eligible, playing, artReady };
-  }, [accepted, eligible, playing, artReady]);
+    policy.current = { accepted, eligible, playing, artReady, powerReady };
+  }, [accepted, eligible, playing, artReady, powerReady]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -63,12 +68,15 @@ export default function RunControls({
     let liveness: PlayerIntent | null = null;
     let wasPlaying = false;
     let cashPending = false;
+    let lastFlush = -Infinity;
+    const sendInterval = 1000 / RULES_V1.maxControlUpdatesPerSecond;
     const isCash = ({ kind }: PlayerIntent) => kind === "cashOut";
 
     function queueAction(action: PlayerIntent) {
       if (
         inputLost ||
         !policy.current.playing ||
+        (action.kind === "boost" && !policy.current.powerReady) ||
         (action.kind === "cashOut"
           ? !policy.current.eligible || cashPending
           : !active || !policy.current.artReady)
@@ -88,11 +96,12 @@ export default function RunControls({
         setCashOut(true);
         queue.unshift(action);
       } else queue.push(action);
+      void flush();
     }
 
     function inactive() {
-      if (!document.hidden && !vertical.matches) return;
-      pendingInactive();
+      if (document.hidden || vertical.matches) pendingInactive();
+      else if (document.hasFocus()) restoreControls();
     }
     function pendingInactive() {
       if (!active) return;
@@ -102,19 +111,19 @@ export default function RunControls({
       liveness = { kind: "inactive" };
       setPaused(true);
     }
-    function orientationChanged() {
-      setPortrait(vertical.matches);
-      inactive();
-    }
-    orientationChanged();
+    inactive();
     setPaused(!active);
     enqueue.current = queueAction;
-    resume.current = () => {
+    function restoreControls() {
       if (vertical.matches || document.hidden || inputLost) return;
+      if (active) return;
       active = true;
       setPaused(false);
       liveness = { kind: "heartbeat", active: true };
-    };
+      if (policy.current.playing)
+        surface.current?.focus({ preventScroll: true });
+      void flush();
+    }
     function keyAction(event: KeyboardEvent) {
       const action =
         binding[event.key.length === 1 ? event.key.toLowerCase() : event.key];
@@ -150,11 +159,15 @@ export default function RunControls({
       );
     }
     function blur() {
-      pendingInactive();
+      if (held.size > 0) {
+        held.clear();
+        queueAction({ kind: "move", axis: "neutral" });
+      }
     }
-    vertical.addEventListener("change", orientationChanged);
+    vertical.addEventListener("change", inactive);
     document.addEventListener("visibilitychange", inactive);
     window.addEventListener("blur", blur);
+    window.addEventListener("focus", restoreControls);
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
     // One in-flight message at a time keeps strict sequential nonces, even on lost replies.
@@ -178,7 +191,8 @@ export default function RunControls({
             ? { kind: "heartbeat", active: true }
             : { kind: "inactive" };
       }
-      if (busy || inputLost) return;
+      if (busy || inputLost || performance.now() - lastFlush < sendInterval)
+        return;
       let actions: PlayerIntent[];
       if (liveness) {
         actions = [liveness];
@@ -188,15 +202,28 @@ export default function RunControls({
         actions = queue.splice(0, 8);
       }
       busy = true;
+      lastFlush = performance.now();
       try {
         const next =
           localSequence > policy.current.accepted
             ? localSequence
             : policy.current.accepted;
-        if (await sendRunInput(rpc, run, playKey, next, actions, signal)) {
+        onInputs(next, actions);
+        if (
+          await sendRunInput(
+            rpc,
+            run,
+            playKey,
+            next,
+            actions,
+            signal,
+            rulesVersion,
+          )
+        ) {
           localSequence = next + BigInt(actions.length);
           setMessage(null);
         } else {
+          onInputs(next, []);
           setMessage("Control was declined by MagicBlock.");
           if (actions.some(isCash)) {
             cashPending = false;
@@ -213,10 +240,7 @@ export default function RunControls({
         busy = false;
       }
     }
-    const commands = setInterval(
-      () => void flush(),
-      1000 / RULES_V1.maxControlUpdatesPerSecond,
-    );
+    const commands = setInterval(() => void flush(), sendInterval);
     const heartbeat = setInterval(() => {
       if (active && policy.current.playing && policy.current.artReady)
         liveness = { kind: "heartbeat", active: true };
@@ -225,25 +249,17 @@ export default function RunControls({
       controller.abort();
       clearInterval(commands);
       clearInterval(heartbeat);
-      vertical.removeEventListener("change", orientationChanged);
+      vertical.removeEventListener("change", inactive);
       document.removeEventListener("visibilitychange", inactive);
       window.removeEventListener("blur", blur);
+      window.removeEventListener("focus", restoreControls);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
     };
-  }, [rpc, run, playKey, surface]);
+  }, [rpc, run, playKey, surface, onInputs, rulesVersion]);
 
   return (
     <fieldset className="run-controls" aria-label="Run controls" ref={root}>
-      {playing && paused && !portrait && (
-        <button
-          type="button"
-          className={button}
-          onClick={() => resume.current()}
-        >
-          Resume controls
-        </button>
-      )}
       <div className="run-control-row">
         {(["left", "right"] as const).map((axis) => (
           <button
@@ -279,10 +295,15 @@ export default function RunControls({
             type="button"
             key={kind}
             className={button}
-            disabled={paused || !playing || !artReady}
+            disabled={
+              paused ||
+              !playing ||
+              !artReady ||
+              (kind === "boost" && !power.ready)
+            }
             onClick={() => enqueue.current({ kind })}
           >
-            {kind === "jump" ? "Jump" : kind === "dash" ? "Dash" : "Boost"}
+            {kind === "jump" ? "Jump" : kind === "dash" ? "Dash" : power.name}
           </button>
         ))}
         <button
@@ -296,9 +317,12 @@ export default function RunControls({
         </button>
       </div>
       {playing && !paused && artReady && (
-        <p className="run-keyboard">
-          ← / → Move · ↑ Jump · Shift Dash · B Boost · C Cash out
-        </p>
+        <>
+          <p className="run-notice">{power.detail}</p>
+          <p className="run-keyboard">
+            ← / → Move · ↑ Jump · Shift Dash · B Power · C Cash out
+          </p>
+        </>
       )}
       {message && <output className="text-sm">{message}</output>}
     </fieldset>

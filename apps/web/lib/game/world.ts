@@ -1,6 +1,7 @@
 import type { CatStats, Power } from "./catalog";
 import type { PlayerIntent } from "./protocol";
 import {
+  type GameplayRules,
   priceChangeBps,
   RULES_V1,
   speedBps,
@@ -88,7 +89,11 @@ function rebase(state: WorldState): void {
     state.generation.checkpointXSubpixels - shift,
   );
 }
-function prepare(state: WorldState, sample: PriceSample): void {
+function prepare(
+  state: WorldState,
+  sample: PriceSample,
+  gameRules: GameplayRules,
+): void {
   if (!priceSampleSchema.safeParse(sample).success)
     throw new SimulationError("INVALID_OBSERVATION");
   let change: number;
@@ -103,7 +108,16 @@ function prepare(state: WorldState, sample: PriceSample): void {
     throw new SimulationError("INVALID_OBSERVATION");
   }
   const p = RULES_V1.physics;
-  const rules = RULES_V1.generation;
+  const rules = gameRules.generation;
+  const maximum = BigInt(p.maxRequiredRiseSubpixels);
+  const movement =
+    gameRules.rulesVersion === 2
+      ? ((sample.previousPrice - sample.price) * 10_000n * maximum) /
+        (sample.previousPrice * BigInt(rules.maxSampleChangeBps))
+      : BigInt(terrainStepSubpixels(change));
+  const terrainStep = Number(
+    movement < -maximum ? -maximum : movement > maximum ? maximum : movement,
+  );
   const width = rules.segmentWidthSubpixels;
   const cutoff = state.frame.runner.xSubpixels - 2 * width;
   state.entities = state.entities.filter(
@@ -131,7 +145,7 @@ function prepare(state: WorldState, sample: PriceSample): void {
             (p.viewportHeightPixels * 256) / 4,
             Math.min(
               (p.viewportHeightPixels * 256 * 3) / 4,
-              g.surfaceYSubpixels + terrainStepSubpixels(change),
+              g.surfaceYSubpixels + terrainStep,
             ),
           );
     const ramp: WorldEntity = {
@@ -209,7 +223,11 @@ function prepare(state: WorldState, sample: PriceSample): void {
       if (tile === undefined) continue;
       const surface = surfaceAt(tile, x);
       if (surface === null) throw new SimulationError("INVALID_WORLD");
-      if (!hazard || Math.abs(change) >= rules.sharpMoveBps) {
+      if (
+        !hazard ||
+        (gameRules.rulesVersion === 2 && index === 0) ||
+        Math.abs(change) >= rules.sharpMoveBps
+      ) {
         const size = hazard ? Math.trunc(p.hitboxWidthSubpixels / 2) : 8 * 256;
         const y = coordinate(
           surface -
@@ -240,6 +258,7 @@ export function initializeWorld(
   frame: SimulationFrame,
   stats: CatStats,
   sample: PriceSample,
+  gameRules: GameplayRules = RULES_V1,
 ): WorldState {
   validateFrame(frame, stats);
   if (
@@ -274,7 +293,7 @@ export function initializeWorld(
       spawnedHazardMask: 0,
     },
   };
-  prepare(state, sample);
+  prepare(state, sample, gameRules);
   return state;
 }
 
@@ -283,12 +302,13 @@ export function stepWorld(
   stats: CatStats,
   actions: readonly PlayerIntent[],
   sample: PriceSample,
+  gameRules: GameplayRules = RULES_V1,
 ): WorldState {
   validateWorldState(state);
   validateFrame(state.frame, stats);
   const result = structuredClone(state);
   if (state.frame.phase !== "active") return result;
-  prepare(result, sample);
+  prepare(result, sample, gameRules);
   const next = step(result.frame, result.entities, stats, actions);
   result.frame = next.frame;
   result.entities = next.entities;

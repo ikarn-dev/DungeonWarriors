@@ -11,6 +11,13 @@ const rpc = vi.hoisted(() => ({
   base: vi.fn(),
   er: vi.fn(),
   account: vi.fn(),
+  sponsor: vi.fn(),
+}));
+vi.mock("../../../../../apps/web/lib/server/runtime", async (original) => ({
+  ...(await original<
+    typeof import("../../../../../apps/web/lib/server/runtime")
+  >()),
+  sponsorshipConfig: rpc.sponsor,
 }));
 vi.mock("../../../../../apps/web/lib/server/chain", () => ({
   readState: rpc.base,
@@ -32,13 +39,31 @@ const fixture = (name: string) =>
     "hex",
   );
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  rpc.sponsor.mockReturnValue({
+    SPONSOR_PUBLIC_KEY: wallet,
+    SPONSOR_MIN_BALANCE_LAMPORTS: 1000n,
+    SPONSOR_MAX_ATTEMPTS: 3,
+  });
+});
 
 it("uses finalized absence directly and avoids an ER request", async () => {
   rpc.base.mockResolvedValue({ run: { status: "absent" }, accounts: [] });
   await expect(readLiveRun(wallet, "1")).resolves.toEqual({
     run: { status: "absent" },
     er: null,
+  });
+  expect(rpc.er).not.toHaveBeenCalled();
+});
+
+it("returns sponsorship for a returned run even without an ER account", async () => {
+  const run = { status: "settlementReady", market: "SOL" };
+  rpc.base.mockResolvedValue({ run, accounts: [] });
+  await expect(readLiveRun(wallet, "1")).resolves.toEqual({
+    run,
+    er: null,
+    sponsor: { sponsor: wallet, floor: "1000", maxAttempts: 3 },
   });
   expect(rpc.er).not.toHaveBeenCalled();
 });
@@ -63,17 +88,17 @@ it("returns a decoded snapshot pinned to the finalized escrow and rejects incomp
   });
   const data = fixture("active");
   const account = { owner: program, executable: false, data };
-  rpc.account.mockResolvedValue({ context: { slot: 800 }, value: account });
+  const clock = {
+    owner: new PublicKey(DEVNET.sysvarOwner),
+    executable: false,
+    data: Buffer.alloc(40),
+  };
+  rpc.account.mockResolvedValue({
+    context: { slot: 800 },
+    value: [account, clock],
+  });
   rpc.er.mockResolvedValue({
-    getAccountInfoAndContext: rpc.account,
-    getAccountInfo: async (key: PublicKey) => {
-      expect(key.toBase58()).toBe(DEVNET.clock);
-      return {
-        owner: new PublicKey(DEVNET.sysvarOwner),
-        executable: false,
-        data: Buffer.alloc(40),
-      };
-    },
+    getMultipleAccountsInfoAndContext: rpc.account,
     rpcEndpoint: "https://devnet-as.magicblock.app/",
   });
   await expect(readLiveRun(wallet, "1")).resolves.toMatchObject({
@@ -91,10 +116,13 @@ it("returns a decoded snapshot pinned to the finalized escrow and rejects incomp
     "er",
     original.snapshot.oracle.validator.toBase58(),
   );
-  expect(rpc.account).toHaveBeenCalledWith(addresses.run[0], "confirmed");
+  expect(rpc.account).toHaveBeenCalledWith(
+    [addresses.run[0], new PublicKey(DEVNET.clock)],
+    "confirmed",
+  );
   rpc.account.mockResolvedValue({
     context: { slot: 801 },
-    value: { ...account, owner: PublicKey.default },
+    value: [{ ...account, owner: PublicKey.default }, clock],
   });
   await expect(readLiveRun(wallet, "1")).rejects.toThrow(
     "INVALID_CHAIN_ACCOUNT",

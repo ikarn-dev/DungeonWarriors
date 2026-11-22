@@ -10,10 +10,6 @@ import {
 } from "../lib/game/custody-client";
 import { decodeLobbyState, type LobbyState } from "../lib/game/lobby-state";
 import {
-  type RunActionSubmitter,
-  sendGameAction,
-} from "../lib/game/run-client";
-import {
   type LobbyIntent,
   validatePreparedTransaction,
 } from "../lib/game/transaction-intents";
@@ -285,12 +281,6 @@ export default function StarterPanel() {
     };
   }, [authenticated, address, state?.pendingDraw]);
   const blocked = busy || pending !== null;
-  const sign = wallet.signTransaction;
-  const submitRunAction: RunActionSubmitter | undefined =
-    address !== null && sign !== undefined
-      ? (action, onSignature, signal) =>
-          sendGameAction(address, sign, action, null, onSignature, signal)
-      : undefined;
   return (
     <div className={style.grid}>
       <StarterCapsule
@@ -570,7 +560,6 @@ export default function StarterPanel() {
                     key={`account:${address}`}
                     wallet={address}
                     blocked={blocked}
-                    submitRunAction={submitRunAction}
                     transfer={(kind, amount) =>
                       perform((signal) =>
                         transact(

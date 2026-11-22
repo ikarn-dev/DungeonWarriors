@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { PublicKey } from "@solana/web3.js";
 import {
   decodeEscrowAccount,
@@ -7,16 +8,38 @@ import {
   runAddresses,
 } from "../game/run-accounts";
 import { stalledRunFaultAt } from "../game/run-crank";
+import type { PlaySponsor } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses";
 import { readState } from "./chain";
-import { ApiError } from "./runtime";
+import { ApiError, sponsorshipConfig } from "./runtime";
 import { checkedConnection } from "./transaction-network";
 
 export async function readLiveRun(wallet: string, nonce: string) {
   const base = await readState(wallet, { kind: "run", nonce });
   if (!("run" in base) || base.run === undefined || !("accounts" in base))
     throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-  if (base.run.status !== "recoveryPending") return { run: base.run, er: null };
+  let sponsor: (PlaySponsor & { maxAttempts: number }) | undefined;
+  if (
+    ["recoveryPending", "refundReady", "settlementReady"].includes(
+      base.run.status,
+    )
+  ) {
+    try {
+      const settings = sponsorshipConfig();
+      sponsor = {
+        sponsor: settings.SPONSOR_PUBLIC_KEY,
+        floor: settings.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
+        maxAttempts: settings.SPONSOR_MAX_ATTEMPTS,
+      };
+    } catch (error) {
+      if (
+        !(error instanceof ApiError && error.code === "SERVICE_NOT_CONFIGURED")
+      )
+        throw error;
+    }
+  }
+  if (base.run.status !== "recoveryPending")
+    return { run: base.run, er: null, sponsor };
 
   const identity = { owner: wallet, nonce: BigInt(nonce) };
   const addresses = runAddresses(identity);
@@ -30,11 +53,15 @@ export async function readLiveRun(wallet: string, nonce: string) {
   if (!escrow.delegationInitiated || escrow.status !== "reserved")
     throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
   const er = await checkedConnection("er", escrow.validator);
-  const { context, value } = await er.getAccountInfoAndContext(
-    addresses.run[0],
+  const {
+    context,
+    value: [value, clock],
+  } = await er.getMultipleAccountsInfoAndContext(
+    [addresses.run[0], new PublicKey(DEVNET.clock)],
     "confirmed",
   );
-  if (value === null) return { run: base.run, er: null };
+  if (!value || value.owner.equals(DELEGATION_PROGRAM_ID))
+    return { run: base.run, er: null, sponsor };
   const snapshot = await decodeRunAccount(
     identity,
     addresses.run[0],
@@ -48,10 +75,6 @@ export async function readLiveRun(wallet: string, nonce: string) {
   let recoveryAvailable = false;
   const phase = snapshot.observation.phase;
   if (phase === "ready" || phase === "suspended" || phase === "active") {
-    const clock = await er.getAccountInfo(
-      new PublicKey(DEVNET.clock),
-      "confirmed",
-    );
     if (
       !clock ||
       clock.executable ||
@@ -76,6 +99,7 @@ export async function readLiveRun(wallet: string, nonce: string) {
   }
   return {
     run: base.run,
+    sponsor,
     er: {
       slot: context.slot,
       data: value.data.toString("base64"),

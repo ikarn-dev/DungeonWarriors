@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { publicKeySchema } from "../solana/addresses.ts";
-import { RULES_V1, U64_MAX } from "./rules";
+import { rulesForVersion, U64_MAX } from "./rules";
 
 export { publicKeySchema } from "../solana/addresses.ts";
 
@@ -10,6 +10,7 @@ export const MAX_INTENTS_PER_SUBMISSION = 8;
 
 const u64Schema = z.bigint().min(0n).max(U64_MAX);
 const inputAxisSchema = z.enum(["left", "neutral", "right"]);
+export const rulesVersionSchema = z.literal([1, 2]);
 
 const playerIntentSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("move"), axis: inputAxisSchema }).strict(),
@@ -25,7 +26,7 @@ const playerIntentSchema = z.discriminatedUnion("kind", [
 export const intentEnvelopeSchema = z
   .object({
     protocolVersion: z.literal(PROTOCOL_VERSION),
-    rulesVersion: z.literal(RULES_V1.rulesVersion),
+    rulesVersion: rulesVersionSchema,
     run: publicKeySchema,
     clientSequence: u64Schema.min(1n),
     action: playerIntentSchema,
@@ -108,9 +109,10 @@ export function decodeIntent(bytes: Uint8Array): IntentEnvelope {
   if (bytes.byteLength < 47 || bytes.byteLength > 48)
     throw new ProtocolError("MALFORMED_INTENT");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const rulesVersion = view.getUint32(2, true);
   if (
     view.getUint16(0, true) !== PROTOCOL_VERSION ||
-    view.getUint32(2, true) !== RULES_V1.rulesVersion
+    !rulesForVersion(rulesVersion)
   ) {
     throw new ProtocolError("UNSUPPORTED_VERSION");
   }
@@ -121,7 +123,7 @@ export function decodeIntent(bytes: Uint8Array): IntentEnvelope {
   const action = decodeAction(tag, bytes[47]);
   const parsed = intentEnvelopeSchema.safeParse({
     protocolVersion: PROTOCOL_VERSION,
-    rulesVersion: RULES_V1.rulesVersion,
+    rulesVersion,
     run: new PublicKey(bytes.subarray(6, 38)).toBase58(),
     clientSequence: view.getBigUint64(38, true),
     action,
@@ -164,7 +166,7 @@ const runSnapshotStructure = z
   .object({
     protocolVersion: z.literal(PROTOCOL_VERSION),
     schemaVersion: z.literal(1),
-    rulesVersion: z.literal(RULES_V1.rulesVersion),
+    rulesVersion: rulesVersionSchema,
     catalogVersion: z.number().int().min(1).max(0xffff_ffff),
     run: publicKeySchema,
     phase: runPhaseSchema,

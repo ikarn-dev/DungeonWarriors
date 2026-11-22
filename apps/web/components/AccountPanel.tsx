@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
-import type { RunActionSubmitter } from "../lib/game/run-client";
 import { webApi } from "../lib/game/web-api";
 import { publicKeySchema } from "../lib/solana/addresses";
 import RunStage from "./RunStage";
@@ -58,12 +57,10 @@ export default function AccountPanel({
   wallet,
   blocked,
   transfer,
-  submitRunAction,
 }: {
   wallet: string;
   blocked: boolean;
   transfer: (kind: "deposit" | "withdraw", amount: string) => Promise<void>;
-  submitRunAction?: RunActionSubmitter | undefined;
 }) {
   const [view, setView] = useState<null | {
     balances: z.infer<typeof balances>["balances"];
@@ -279,7 +276,6 @@ export default function AccountPanel({
               nonce={watchedRun}
               wallet={wallet}
               close={() => setWatchedRun(null)}
-              submitAction={submitRunAction}
               runSettled={() => {
                 setWatchedRun(null);
                 void read();

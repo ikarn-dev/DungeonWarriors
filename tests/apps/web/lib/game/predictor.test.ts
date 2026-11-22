@@ -83,6 +83,18 @@ it("uses accepted ticks instead of guessed ticks", () => {
     snapshot().frame.runner.ySubpixels - 2944,
   );
 });
+it("reuses predicted ticks without replaying a jump and clears a declined input", () => {
+  const s = snapshot();
+  const stats = catStats("collector", 1);
+  const p = new Predictor(s, stats);
+  p.enqueue(jump());
+  const once = stepWorld(initialWorld(), stats, [{ kind: "jump" }], s.sample);
+  const twice = stepWorld(once, stats, [], s.sample);
+  expect(p.predict(1).frame).toEqual(once.frame);
+  expect(p.predict(2).frame).toEqual(twice.frame);
+  p.discardAfter(0n);
+  expect(p.predict(2).frame.runner.grounded).toBe(true);
+});
 it("rejects gaps, wrong identities and full local queues", () => {
   const p = new Predictor(snapshot(), catStats("collector", 1));
   expect(() => p.enqueue({ ...jump(), clientSequence: 2n })).toThrow(
