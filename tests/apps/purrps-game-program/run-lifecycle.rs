@@ -310,20 +310,37 @@ fn oracle_recovery_keeps_ticks_frozen_and_expiry_records_one_refund() {
         current.data[125..133].copy_from_slice(&slot.to_le_bytes());
         p.h.svm.set_account(source, current).unwrap();
     };
-    next_quote(&mut p, NOW + 1, oracle.quote.posted_slot + 1);
+    set_time(&mut p, NOW + 2);
+    next_quote(&mut p, NOW + 2, oracle.quote.posted_slot + 1);
     p.h.send(recover(source), &p.key).unwrap();
+    assert_eq!(p.h.read::<RunGameState>(key).phase, RunPhase::Suspended);
+    let mut resume = ix(
+        instruction::ResumeRun {
+            suspended_at: NOW + 1,
+        },
+        accounts::RecoverRunOracle {
+            run: key,
+            price_update: source,
+            magic_context: MAGIC_CONTEXT_ID,
+        },
+    );
+    resume.accounts.push(
+        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(p.key.pubkey(), true),
+    );
+    p.h.send(resume, &p.key).unwrap();
     let resumed: RunGameState = p.h.read(key);
     assert_eq!(resumed.phase, RunPhase::Active);
     assert_eq!(resumed.active_ticks, run.active_ticks);
     assert_eq!(resumed.latest_observation().unwrap().unwrap().sequence, 2);
 
-    set_time(&mut p, NOW + 4);
-    p.h.send(recover(source), &p.key).unwrap();
-    set_time(&mut p, NOW + 303);
+    set_time(&mut p, NOW + 5);
     p.h.send(recover(source), &p.key).unwrap();
     assert_eq!(p.h.read::<RunGameState>(key).phase, RunPhase::Suspended);
     set_time(&mut p, NOW + 304);
-    next_quote(&mut p, NOW + 304, oracle.quote.posted_slot + 2);
+    p.h.send(recover(source), &p.key).unwrap();
+    assert_eq!(p.h.read::<RunGameState>(key).phase, RunPhase::Suspended);
+    set_time(&mut p, NOW + 305);
+    next_quote(&mut p, NOW + 305, oracle.quote.posted_slot + 2);
     p.h.send(recover(source), &p.key).unwrap();
     let terminal = p.h.read::<RunGameState>(key).terminal.unwrap();
     assert_eq!(terminal.reason, TerminalReason::TechnicalAbort);

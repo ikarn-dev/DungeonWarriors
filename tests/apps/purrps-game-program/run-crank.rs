@@ -208,17 +208,47 @@ fn deployed_hydra_registers_and_advances_only_trusted_elapsed_play() {
         );
     }
 
+    set_clock_and_oracle(&mut p, source.account, NOW + 4, start_slot + 60, NOW + 4);
+    let delayed = send_crank(&mut p, &pair).unwrap();
+    assert!(delayed.compute_units_consumed < 600_000);
+    assert_eq!(p.h.read::<RunGameState>(run).active_ticks, 66);
+
     set_clock_and_oracle(&mut p, source.account, NOW + 5, start_slot + 80, NOW + 5);
     send_crank(&mut p, &pair).unwrap();
     let paused = p.h.read::<RunGameState>(run);
     assert_eq!(paused.suspension.unwrap().reason, FaultReason::SchedulerGap);
-    assert_eq!(paused.active_ticks, 60);
+    assert_eq!(paused.active_ticks, 66);
     set_clock_and_oracle(&mut p, source.account, NOW + 6, start_slot + 100, NOW + 6);
     send_crank(&mut p, &pair).unwrap();
+    assert_eq!(p.h.read::<RunGameState>(run).phase, RunPhase::Suspended);
+    let recover_accounts = accounts::RecoverRunOracle {
+        run,
+        price_update: source.account,
+        magic_context: MAGIC_CONTEXT_ID,
+    };
+    let recovery = ix(instruction::SuspendOrResumeRun {}, recover_accounts);
+    p.h.send(recovery.clone(), &p.sponsor).unwrap();
+    assert_eq!(p.h.read::<RunGameState>(run).phase, RunPhase::Suspended);
+    let mut resume = recovery;
+    resume.data = anchor_lang::InstructionData::data(&instruction::ResumeRun {
+        suspended_at: NOW + 5,
+    });
+    rejected(p.h.send(resume.clone(), &p.sponsor), "InvalidSession");
+    resume
+        .accounts
+        .push(AccountMeta::new_readonly(p.sponsor.pubkey(), true));
+    rejected(p.h.send(resume.clone(), &p.sponsor), "InvalidSession");
+    *resume.accounts.last_mut().unwrap() = AccountMeta::new_readonly(p.key.pubkey(), true);
+    let mut outdated = resume.clone();
+    outdated.data = anchor_lang::InstructionData::data(&instruction::ResumeRun {
+        suspended_at: NOW + 4,
+    });
+    rejected(p.h.send(outdated, &p.key), "InvalidRun");
+    p.h.send(resume, &p.key).unwrap();
     let resumed = p.h.read::<RunGameState>(run);
     assert_eq!(
         (resumed.phase, resumed.active_ticks),
-        (RunPhase::Active, 60)
+        (RunPhase::Active, 66)
     );
     assert_eq!(resumed.crank.consumed_elapsed_ms, 0);
     assert_eq!(resumed.crank.clock_origin_seconds, (NOW + 6) as u64);
@@ -235,7 +265,7 @@ fn deployed_hydra_registers_and_advances_only_trusted_elapsed_play() {
         TerminalReason::TechnicalAbort
     );
     assert_eq!(terminal.terminal.unwrap().refund_base_units, 1_000_000);
-    assert_eq!(terminal.active_ticks, 60);
+    assert_eq!(terminal.active_ticks, 66);
     let terminal_bytes = account_bytes(&p, run);
     set_clock_and_oracle(
         &mut p,

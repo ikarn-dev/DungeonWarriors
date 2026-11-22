@@ -253,6 +253,9 @@ export async function decodeRunAccount(
     snapshotHash: hex(r.snapshotHash),
     suspendedAt:
       r.suspension === null ? null : big(r.suspension.startedAtSeconds),
+    suspensionReason:
+      r.suspension === null ? null : enumTag(r.suspension.reason),
+    inputKeyRevoked: r.inputKeyRevoked,
     suspensionTimeoutSeconds: r.snapshot.rules.suspensionTimeoutSeconds,
     terminal: r.terminal === null ? null : fields(r.terminal),
   };

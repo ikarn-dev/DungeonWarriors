@@ -215,6 +215,7 @@ function instructionsFor(wallet: string, intent: Intent) {
               "activateRun",
               "requestCompletion",
               "suspendOrResumeRun",
+              "resumeRun",
               "expireDelegatedActivation",
               "abortUndelegatedReservation",
               "settleReturnedRun",

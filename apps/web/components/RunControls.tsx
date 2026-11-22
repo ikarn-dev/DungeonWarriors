@@ -1,13 +1,12 @@
 "use client";
 
 import type { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import type { PlayerIntent } from "../lib/game/protocol";
 import { RULES_V1 } from "../lib/game/rules";
 import { sendRunInput } from "../lib/game/run-input";
 
-const button =
-  "min-h-11 touch-none rounded-md border border-current px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50";
+const button = "run-control";
 const binding: Record<string, PlayerIntent> = {
   ArrowLeft: { kind: "move", axis: "left" },
   ArrowRight: { kind: "move", axis: "right" },
@@ -24,12 +23,18 @@ export default function RunControls({
   playKey,
   accepted,
   eligible,
+  playing,
+  artReady,
+  surface,
 }: {
   rpc: Connection;
   run: PublicKey;
   playKey: Keypair;
   accepted: bigint;
   eligible: boolean;
+  playing: boolean;
+  artReady: boolean;
+  surface: RefObject<HTMLDivElement | null>;
 }) {
   const root = useRef<HTMLFieldSetElement>(null);
   const [paused, setPaused] = useState(false);
@@ -38,10 +43,10 @@ export default function RunControls({
   const [cashOut, setCashOut] = useState(false);
   const enqueue = useRef<(action: PlayerIntent) => void>(() => {});
   const resume = useRef<() => void>(() => {});
-  const policy = useRef({ accepted, eligible });
+  const policy = useRef({ accepted, eligible, playing, artReady });
   useEffect(() => {
-    policy.current = { accepted, eligible };
-  }, [accepted, eligible]);
+    policy.current = { accepted, eligible, playing, artReady };
+  }, [accepted, eligible, playing, artReady]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,18 +60,18 @@ export default function RunControls({
     let inputLost = false;
     let localSequence = policy.current.accepted;
     let queue: PlayerIntent[] = [];
-    let liveness: PlayerIntent | null = active
-      ? { kind: "heartbeat", active: true }
-      : { kind: "inactive" };
+    let liveness: PlayerIntent | null = null;
+    let wasPlaying = false;
     let cashPending = false;
     const isCash = ({ kind }: PlayerIntent) => kind === "cashOut";
 
     function queueAction(action: PlayerIntent) {
       if (
         inputLost ||
+        !policy.current.playing ||
         (action.kind === "cashOut"
           ? !policy.current.eligible || cashPending
-          : !active)
+          : !active || !policy.current.artReady)
       )
         return;
       if (action.kind === "move")
@@ -115,7 +120,8 @@ export default function RunControls({
         binding[event.key.length === 1 ? event.key.toLowerCase() : event.key];
       if (
         action &&
-        (root.current?.contains(document.activeElement) ||
+        (surface.current === document.activeElement ||
+          root.current?.contains(document.activeElement) ||
           held.has(event.key)) &&
         !event.ctrlKey &&
         !event.metaKey &&
@@ -153,7 +159,26 @@ export default function RunControls({
     window.addEventListener("keyup", keyUp);
     // One in-flight message at a time keeps strict sequential nonces, even on lost replies.
     async function flush() {
-      if (signal.aborted || busy || inputLost) return;
+      if (signal.aborted) return;
+      if (!policy.current.playing) {
+        if (wasPlaying) {
+          wasPlaying = false;
+          held.clear();
+          queue = [];
+          liveness = null;
+          cashPending = false;
+          setCashOut(false);
+        }
+        return;
+      }
+      if (!wasPlaying) {
+        wasPlaying = true;
+        liveness =
+          active && policy.current.artReady
+            ? { kind: "heartbeat", active: true }
+            : { kind: "inactive" };
+      }
+      if (busy || inputLost) return;
       let actions: PlayerIntent[];
       if (liveness) {
         actions = [liveness];
@@ -193,7 +218,8 @@ export default function RunControls({
       1000 / RULES_V1.maxControlUpdatesPerSecond,
     );
     const heartbeat = setInterval(() => {
-      if (active) liveness = { kind: "heartbeat", active: true };
+      if (active && policy.current.playing && policy.current.artReady)
+        liveness = { kind: "heartbeat", active: true };
     }, 1000);
     return () => {
       controller.abort();
@@ -205,16 +231,11 @@ export default function RunControls({
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
     };
-  }, [rpc, run, playKey]);
+  }, [rpc, run, playKey, surface]);
 
   return (
-    <fieldset className="grid gap-2" aria-label="Run controls" ref={root}>
-      {paused && (
-        <p className="text-sm">
-          {portrait ? "Rotate to landscape to resume." : "Controls paused."}
-        </p>
-      )}
-      {paused && !portrait && (
+    <fieldset className="run-controls" aria-label="Run controls" ref={root}>
+      {playing && paused && !portrait && (
         <button
           type="button"
           className={button}
@@ -223,13 +244,15 @@ export default function RunControls({
           Resume controls
         </button>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div className="run-control-row">
         {(["left", "right"] as const).map((axis) => (
           <button
             key={axis}
             type="button"
             className={button}
-            disabled={paused}
+            aria-label={axis === "left" ? "Move left" : "Move right"}
+            data-direction
+            disabled={paused || !playing || !artReady}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               enqueue.current({ kind: "move", axis });
@@ -248,7 +271,7 @@ export default function RunControls({
                 enqueue.current({ kind: "move", axis: "neutral" });
             }}
           >
-            {axis === "left" ? "Left" : "Right"}
+            <span aria-hidden="true">{axis === "left" ? "←" : "→"}</span>
           </button>
         ))}
         {(["jump", "dash", "boost"] as const).map((kind) => (
@@ -256,7 +279,7 @@ export default function RunControls({
             type="button"
             key={kind}
             className={button}
-            disabled={paused}
+            disabled={paused || !playing || !artReady}
             onClick={() => enqueue.current({ kind })}
           >
             {kind === "jump" ? "Jump" : kind === "dash" ? "Dash" : "Boost"}
@@ -265,21 +288,17 @@ export default function RunControls({
         <button
           type="button"
           className={button}
-          data-primary
-          disabled={!eligible || cashOut}
+          data-cash-out
+          disabled={!eligible || cashOut || !playing}
           onClick={() => enqueue.current({ kind: "cashOut" })}
         >
           {cashOut ? "Cash-out requested" : "Cash Out"}
         </button>
       </div>
-      {!paused && (
-        <p className="text-xs">
-          Keyboard with a control focused: ←/→ move · ↑ jump · Shift dash · B
-          boost · C cash out.
+      {playing && !paused && artReady && (
+        <p className="run-keyboard">
+          ← / → Move · ↑ Jump · Shift Dash · B Boost · C Cash out
         </p>
-      )}
-      {!eligible && (
-        <p className="text-xs">Qualify at a checkpoint to unlock cash-out.</p>
       )}
       {message && <output className="text-sm">{message}</output>}
     </fieldset>

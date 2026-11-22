@@ -46,6 +46,7 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "heartbeat",
   "revoke_run_input_key",
   "suspend_or_resume_run",
+  "resume_run",
 ] as const;
 
 const byte = z.number().int().min(0).max(255);

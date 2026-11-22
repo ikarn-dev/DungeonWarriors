@@ -487,6 +487,7 @@ export default function RunEntry({
         shown={open || runningNonce !== null}
         busy={blocked}
         title={cat ? CAT_NAMES[cat.id] : "PURRPS"}
+        inRun={viewer !== null}
         onClose={() => setOpen(false)}
         onBack={close}
       >
@@ -519,6 +520,9 @@ export default function RunEntry({
                             action,
                           },
                           signal,
+                          action.kind === "resumeRun"
+                            ? permission?.key
+                            : undefined,
                         ),
                       };
                       const pending = await submitSponsoredPlay(

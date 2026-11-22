@@ -15,6 +15,7 @@ export function RunGameDialog({
   shown,
   busy,
   title,
+  inRun,
   onClose,
   onBack,
   children,
@@ -23,6 +24,7 @@ export function RunGameDialog({
   shown: boolean;
   busy: boolean;
   title: string;
+  inRun: boolean;
   onClose: () => void;
   onBack: () => void;
   children: ReactNode;
@@ -35,19 +37,29 @@ export function RunGameDialog({
       onCancel={(event) => {
         if (busy) event.preventDefault();
       }}
-      className="m-0 h-dvh max-h-none w-full max-w-none bg-[#f4f0e3] text-[#173b32] backdrop:bg-[#173b32]/70"
+      className={
+        inRun
+          ? "run-dialog"
+          : "m-0 h-dvh max-h-none w-full max-w-none bg-[#f4f0e3] text-[#173b32] backdrop:bg-[#173b32]/70"
+      }
     >
       {shown && (
-        <section className="mx-auto grid min-h-full max-w-6xl content-center gap-5 px-4 py-5 sm:px-8">
+        <section
+          className={
+            inRun
+              ? "run-dialog-layout"
+              : "mx-auto grid min-h-full max-w-6xl content-center gap-5 px-4 py-5 sm:px-8"
+          }
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-semibold">{title}</h2>
             <button
               type="button"
-              className={button}
+              className={inRun ? "run-control" : button}
               disabled={busy}
               onClick={onBack}
             >
-              Back to lobby
+              {inRun ? "← Lobby" : "Back to lobby"}
             </button>
           </div>
           {children}

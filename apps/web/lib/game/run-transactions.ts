@@ -114,6 +114,15 @@ const action = z.discriminatedUnion("kind", [
     market: marketSchema,
   }),
   z.strictObject({
+    kind: z.literal("resumeRun"),
+    ...nonce,
+    market: marketSchema,
+    inputKey: publicKeySchema,
+    suspendedAt: positive.refine(
+      (value) => BigInt(value) <= 0x7fffffffffffffffn,
+    ),
+  }),
+  z.strictObject({
     kind: z.literal("requestCompletion"),
     ...nonce,
     market: marketSchema,
@@ -236,6 +245,7 @@ export function gameNetwork(action: GameIntent["action"]): "base" | "er" {
     case "expireDelegatedActivation":
     case "revokeRunInputKey":
     case "suspendOrResumeRun":
+    case "resumeRun":
       return "er";
     default:
       return "base";
@@ -369,6 +379,21 @@ export function gameInstructions(
     });
   }
   const operationId = run.toBase58();
+  if (action.kind === "resumeRun") {
+    const inputKey = new PublicKey(action.inputKey);
+    sessionToken(owner, inputKey);
+    const prepared = build(
+      { suspendedAt: new BN(action.suspendedAt) },
+      [],
+      operationId,
+    );
+    prepared.instructions[0]?.keys.push({
+      pubkey: inputKey,
+      isSigner: true,
+      isWritable: false,
+    });
+    return prepared;
+  }
   if (action.kind === "reserveRun") {
     Object.assign(values, {
       authority: playSponsor ? new PublicKey(action.inputKey) : owner,

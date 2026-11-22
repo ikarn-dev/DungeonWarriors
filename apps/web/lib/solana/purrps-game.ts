@@ -2833,6 +2833,47 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "resumeRun";
+      discriminator: [137, 94, 143, 61, 62, 65, 164, 178];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "priceUpdate";
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "suspendedAt";
+          type: "i64";
+        },
+      ];
+    },
+    {
       name: "revokeRunInputKey";
       discriminator: [10, 249, 190, 190, 246, 228, 48, 105];
       accounts: [
@@ -9591,6 +9632,47 @@ export const PURRPS_GAME_IDL = {
               name: "ReserveRunArgs",
             },
           },
+        },
+      ],
+    },
+    {
+      name: "resume_run",
+      discriminator: [137, 94, 143, 61, 62, 65, 164, 178],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "price_update",
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "suspended_at",
+          type: "i64",
         },
       ],
     },

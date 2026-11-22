@@ -18,9 +18,7 @@ use crate::{
     instruction_args::{AdvanceRunArgs, RunIdentityArgs},
     oracle::{inspect_account, InspectedOracle},
     protocol::{FaultReason, RunPhase},
-    run_engine::lifecycle::{
-        activate_world, advance_tick, expire_suspension, resume_oracle, suspend,
-    },
+    run_engine::lifecycle::{activate_world, advance_tick, expire_suspension, suspend},
     state::{
         economy::{EscrowStatus, RunEscrow},
         run::RunGameState,
@@ -28,7 +26,8 @@ use crate::{
 };
 
 const GENERATION: u64 = 1;
-pub(super) const MAX_CLOCK_BACKLOG_MS: u64 = 1600;
+pub(super) const CLOCK_CREDIT_MS: u64 = 1_000;
+pub(super) const MAX_CLOCK_BACKLOG_MS: u64 = 2 * CLOCK_CREDIT_MS;
 pub const CRANK_RENT_HEADROOM: u64 = 32_000;
 
 pub struct HydraProgram;
@@ -252,6 +251,15 @@ pub fn handle_advance_run(ctx: Context<AdvanceRun>, args: AdvanceRunArgs) -> Res
     let ordinal = authenticate_trigger(a, &args)?;
     validate_input_snapshot(&a.run)?;
     let clock = Clock::get()?;
+    if a.run.phase == RunPhase::Suspended {
+        let run = &mut a.run;
+        let suspension = run.suspension.ok_or(ErrorCode::InvalidRun)?;
+        if clock.unix_timestamp >= suspension.started_at_seconds {
+            expire_suspension(run, clock.unix_timestamp)?;
+        }
+        run.crank.last_execution_ordinal = ordinal;
+        return Ok(());
+    }
     let quote = read_oracle(&a.run, &a.price_update, &clock).and_then(|oracle| {
         oracle.next_observation(a.run.latest_observation()?)?;
         Ok(oracle)
@@ -259,25 +267,6 @@ pub fn handle_advance_run(ctx: Context<AdvanceRun>, args: AdvanceRunArgs) -> Res
     let run = &mut a.run;
     require!(run.terminal.is_none(), ErrorCode::InvalidRun);
     run.crank.last_execution_ordinal = ordinal;
-    if run.phase == RunPhase::Suspended {
-        let suspension = run.suspension.ok_or(ErrorCode::InvalidRun)?;
-        if clock.unix_timestamp < suspension.started_at_seconds
-            || expire_suspension(run, clock.unix_timestamp)?
-        {
-            return Ok(());
-        }
-        if let Ok(oracle) = quote {
-            let can_resume = match suspension.reason {
-                FaultReason::OracleInvalid | FaultReason::OracleStale => true,
-                FaultReason::SchedulerGap => clock.unix_timestamp > suspension.started_at_seconds,
-                _ => false,
-            };
-            if can_resume {
-                resume_oracle(run, &oracle, clock.unix_timestamp)?;
-            }
-        }
-        return Ok(());
-    }
     require!(run.phase == RunPhase::Active, ErrorCode::InvalidRun);
     let now = u64::try_from(clock.unix_timestamp).map_err(|_| error!(ErrorCode::InvalidCrank))?;
     let Some(elapsed) = now.checked_sub(run.crank.clock_origin_seconds) else {
@@ -285,7 +274,7 @@ pub fn handle_advance_run(ctx: Context<AdvanceRun>, args: AdvanceRunArgs) -> Res
     };
     let earned = elapsed
         .saturating_sub(1)
-        .checked_mul(1000)
+        .checked_mul(CLOCK_CREDIT_MS)
         .ok_or(ErrorCode::ArithmeticOverflow)?;
     let Some(available) = earned.checked_sub(run.crank.consumed_elapsed_ms) else {
         return suspend(run, FaultReason::SchedulerGap, clock.unix_timestamp);

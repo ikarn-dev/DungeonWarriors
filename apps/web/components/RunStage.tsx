@@ -77,6 +77,15 @@ const labels: Record<z.infer<typeof schema>["run"]["status"], string> = {
   refunded: "Refund finalized",
 };
 const formatNumber = new Intl.NumberFormat("en-US");
+const suspensionCopy: Readonly<Record<string, string>> = {
+  schedulerGap: "MagicBlock fell behind on game updates.",
+  oracleStale: "The market price feed went stale.",
+  oracleInvalid: "MagicBlock could not verify the market price.",
+  unsafeWorld: "The game could not safely advance the course.",
+};
+const livePollMs = 500;
+const maxCranksInFlight = 4;
+const crankBlockhashRefreshMs = 1000;
 
 export default function RunStage({
   wallet,
@@ -100,9 +109,9 @@ export default function RunStage({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [artError, setArtError] = useState(false);
+  const [artReady, setArtReady] = useState(false);
   const [settlement, setSettlement] = useState<string | null>(null);
   const mount = useRef<HTMLDivElement>(null);
-  const gameHeading = useRef<HTMLHeadingElement>(null);
   const focused = useRef(false);
   const [control, setControl] = useState<{
     rpc: Connection;
@@ -139,7 +148,16 @@ export default function RunStage({
     let timer: ReturnType<typeof setTimeout>;
     let erTimer: ReturnType<typeof setTimeout>;
     let er: Connection | undefined;
+    let subscription: number | undefined;
+    let lastPush = 0;
     let stopped = false;
+    function disconnectFeed() {
+      if (er && subscription !== undefined)
+        void er.removeAccountChangeListener(subscription).catch(() => {});
+      er = undefined;
+      subscription = undefined;
+      clearTimeout(erTimer);
+    }
     async function apply(
       info: Pick<AccountInfo<Buffer>, "owner" | "data" | "executable">,
       slot: number,
@@ -157,7 +175,9 @@ export default function RunStage({
         if (engine.reconcile(decoded.prediction))
           prediction.current = {
             engine,
-            extrapolate: decoded.prediction.frame.phase === "active",
+            extrapolate:
+              decoded.prediction.frame.phase === "active" &&
+              decoded.prediction.frame.activeTicks > 0n,
             sampledAt: performance.now(),
             ticks: 0,
             world: engine.predict(0),
@@ -194,6 +214,7 @@ export default function RunStage({
       try {
         if (
           document.hidden ||
+          performance.now() - lastPush < livePollMs * 2 ||
           stopped ||
           er !== rpc ||
           controller.signal.aborted
@@ -210,7 +231,7 @@ export default function RunStage({
           setError("Live run updates are delayed.");
       } finally {
         if (!controller.signal.aborted && !stopped && er === rpc)
-          erTimer = setTimeout(() => void pollEr(rpc, market), 500);
+          erTimer = setTimeout(() => void pollEr(rpc, market), livePollMs);
       }
     }
     const poll = async () => {
@@ -243,8 +264,7 @@ export default function RunStage({
         if (response.er === null) {
           setStatus(labels[response.run.status]);
           stopped = true;
-          clearTimeout(erTimer);
-          er = undefined;
+          disconnectFeed();
           setControl(null);
           if (response.run.status !== "recoveryPending") setVisible(null);
           if (["settled", "refunded", "absent"].includes(response.run.status))
@@ -275,6 +295,23 @@ export default function RunStage({
           er = rpc;
           setControl({ rpc, run });
           void pollEr(rpc, response.er.market);
+          const market = response.er.market;
+          subscription = rpc.onAccountChange(
+            run,
+            (info, { slot }) => {
+              if (document.hidden || er !== rpc) return;
+              void apply(info, slot, market).then(
+                () => {
+                  lastPush = performance.now();
+                },
+                () => {
+                  if (!controller.signal.aborted)
+                    setError("Live run updates are delayed.");
+                },
+              );
+            },
+            "confirmed",
+          );
         }
       } catch {
         if (!controller.signal.aborted)
@@ -289,20 +326,26 @@ export default function RunStage({
     return () => {
       controller.abort();
       clearTimeout(timer);
-      clearTimeout(erTimer);
+      disconnectFeed();
     };
   }, [wallet, nonce, playKey]);
 
   const phase = visible?.run.observation.phase;
   const started = (visible?.run.observation.activeTicks ?? 0n) > 0n;
   useEffect(() => {
-    if (playKey && started && !focused.current) {
+    if (
+      playKey &&
+      artReady &&
+      phase === "active" &&
+      started &&
+      !focused.current
+    ) {
       focused.current = true;
-      gameHeading.current?.focus();
+      mount.current?.focus({ preventScroll: true });
     }
-  }, [playKey, started]);
+  }, [artReady, phase, playKey, started]);
   const crank = visible?.run.crank;
-  const crankActive = phase === "active" || phase === "suspended";
+  const crankActive = phase === "active" && (artReady || started);
   const crankOracle = crank?.oracle;
   const crankEpoch = crank?.epoch;
   const crankGeneration = crank?.generation;
@@ -321,46 +364,68 @@ export default function RunStage({
       return;
     const controller = new AbortController();
     const { rpc, run } = control;
-    const instructions = crankInstructions(
-      run,
-      playKey.publicKey,
-      new PublicKey(crankOracle),
-      crankEpoch,
-      crankGeneration,
-    );
-    let timer: ReturnType<typeof setTimeout>;
-    let lastBlockhash = "";
-    async function drive(key: Keypair, interval: number) {
-      const started = performance.now();
+    const oracle = new PublicKey(crankOracle);
+    const epoch = crankEpoch;
+    const generation = crankGeneration;
+    const driver = crypto.randomUUID();
+    let attempt = 0;
+    let recent: { blockhash: string; fetchedAt: number } | null = null;
+    let refreshing = false;
+    let inFlight = 0;
+    async function refreshBlockhash() {
+      refreshing = true;
+      const fetchedAt = performance.now();
       try {
-        const { blockhash } = await rpc.getLatestBlockhash("confirmed");
-        if (controller.signal.aborted || lastBlockhash === blockhash) return;
+        const { blockhash } = await rpc.getLatestBlockhash("processed");
+        recent = { blockhash, fetchedAt };
+      } catch {
+        // The next scheduled drive retries the read.
+      } finally {
+        refreshing = false;
+      }
+    }
+    async function drive(key: Keypair) {
+      if (controller.signal.aborted) return;
+      const age = recent ? performance.now() - recent.fetchedAt : Infinity;
+      if (!refreshing && age >= crankBlockhashRefreshMs)
+        void refreshBlockhash();
+      if (
+        !recent ||
+        age >= 3 * crankBlockhashRefreshMs ||
+        inFlight >= maxCranksInFlight
+      )
+        return;
+      inFlight++;
+      try {
         const message = new TransactionMessage({
           payerKey: key.publicKey,
-          recentBlockhash: blockhash,
-          instructions,
+          recentBlockhash: recent.blockhash,
+          instructions: crankInstructions(
+            run,
+            key.publicKey,
+            oracle,
+            epoch,
+            generation,
+            `${driver}:${attempt++}`,
+          ),
         }).compileToV0Message();
         const tx = new VersionedTransaction(message);
         tx.sign([key]);
-        lastBlockhash = blockhash;
         await rpc.sendRawTransaction(tx.serialize(), {
           skipPreflight: true,
           maxRetries: 0,
         });
       } catch {
-        // A later blockhash can retry a due scheduler task. Only confirmed snapshots drive the UI.
+        // A failed trigger grants no progress. Confirmed snapshots drive the UI.
       } finally {
-        if (!controller.signal.aborted)
-          timer = setTimeout(
-            () => void drive(key, interval),
-            Math.max(0, interval - (performance.now() - started)),
-          );
+        inFlight--;
       }
     }
-    void drive(playKey, crankInterval);
+    void drive(playKey);
+    const timer = setInterval(() => void drive(playKey), crankInterval);
     return () => {
       controller.abort();
-      clearTimeout(timer);
+      clearInterval(timer);
     };
   }, [
     control,
@@ -393,6 +458,7 @@ export default function RunStage({
       | ReturnType<typeof import("../lib/game/render-run").renderRun>
       | undefined;
     setArtError(false);
+    setArtReady(false);
     async function attach(
       container: HTMLDivElement,
       selected: typeof cat,
@@ -443,6 +509,9 @@ export default function RunStage({
         () => {
           if (!controller.signal.aborted) setArtError(true);
         },
+        () => {
+          if (!controller.signal.aborted) setArtReady(true);
+        },
       );
     }
     void attach(parent, cat, { version, contentHash: hash }).catch(() => {
@@ -458,6 +527,18 @@ export default function RunStage({
   const terminal = base?.status === "settled" || base?.status === "refunded";
   const finalizing = visible?.run.observation.phase === "completionRequested";
   const market = visible?.market ?? base?.market;
+  const suspension = visible?.run.suspensionReason;
+  const suspendedAt = visible?.run.suspendedAt;
+  const canResume =
+    phase === "suspended" &&
+    suspendedAt != null &&
+    artReady &&
+    control &&
+    playKey &&
+    !visible?.run.inputKeyRevoked &&
+    (suspension === "schedulerGap" ||
+      suspension === "oracleStale" ||
+      suspension === "oracleInvalid");
   const nextAction: GameIntent["action"] | null =
     base?.status === "refundReady"
       ? { kind: "abortUndelegatedReservation", nonce }
@@ -469,16 +550,24 @@ export default function RunStage({
               market &&
               (phase === "active" || phase === "suspended")
             ? { kind: "suspendOrResumeRun", nonce, market }
-            : !terminal &&
-                market &&
-                visible?.run.observation.phase === "terminalRecorded"
+            : canResume && market
               ? {
-                  kind: "requestCompletion",
+                  kind: "resumeRun",
                   nonce,
                   market,
-                  hasCrank: visible.run.crank.generation !== "0",
+                  inputKey: playKey.publicKey.toBase58(),
+                  suspendedAt: suspendedAt.toString(),
                 }
-              : null;
+              : !terminal &&
+                  market &&
+                  visible?.run.observation.phase === "terminalRecorded"
+                ? {
+                    kind: "requestCompletion",
+                    nonce,
+                    market,
+                    hasCrank: visible.run.crank.generation !== "0",
+                  }
+                : null;
   async function settle() {
     if (
       !submitAction ||
@@ -514,10 +603,16 @@ export default function RunStage({
       }
       actionSignature.current = null;
       setActionPending(false);
-      if (status === "confirmed") setConfirmedAction(actionKind.current);
+      if (status === "confirmed") {
+        if (actionKind.current === "resumeRun")
+          mount.current?.focus({ preventScroll: true });
+        else setConfirmedAction(actionKind.current);
+      }
       setActionNotice(
         status === "confirmed"
-          ? "Confirmed. Waiting for finalized result."
+          ? actionKind.current === "resumeRun"
+            ? "Confirmed. Syncing the run…"
+            : "Confirmed. Waiting for finalized result."
           : "Transaction failed. Check the run status and try again.",
       );
     } catch {
@@ -525,133 +620,179 @@ export default function RunStage({
         setActionNotice(
           actionSignature.current
             ? "Check the original transaction before retrying."
-            : "Could not submit. Check your wallet and try again.",
+            : actionKind.current === "resumeRun"
+              ? "MagicBlock could not resume this run yet. Try again when updates recover."
+              : "Could not submit. Check the run and try again.",
         );
     } finally {
       if (!controller.signal.aborted) setSubmitting(false);
     }
   }
 
+  const actionLabel = actionPending
+    ? "Check submission"
+    : nextAction?.kind === "resumeRun"
+      ? "Resume run"
+      : nextAction?.kind === "abortUndelegatedReservation"
+        ? "Refund expired reservation"
+        : nextAction?.kind === "expireDelegatedActivation"
+          ? "Recover expired run"
+          : nextAction?.kind === "suspendOrResumeRun"
+            ? "Recover stalled run"
+            : nextAction?.kind === "settleReturnedRun"
+              ? "Finalize result"
+              : "Settle run";
+  const actionButton = !terminal &&
+    submitAction &&
+    (nextAction || actionPending) && (
+      <button
+        type="button"
+        className="run-control"
+        data-cash-out
+        disabled={
+          submitting || (!actionPending && confirmedAction === nextAction?.kind)
+        }
+        onClick={() => void settle()}
+      >
+        {actionLabel}
+      </button>
+    );
+  const qualified = (frame?.qualifiedCheckpoints ?? 0n) > 0n;
+  const checkpoint = frame
+    ? Number(frame.activeTicks % BigInt(RULES_V1.checkpointTicks))
+    : 0;
+  const paused = phase === "suspended";
+  const playing = phase === "active" && started;
+  const statusPanel = !artReady || !playing;
+
   return (
-    <section
-      className="grid gap-2 rounded-md border border-[#cbd3be] p-3"
-      aria-label="Run viewer"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h3
-          className="font-medium focus-visible:outline-2"
-          ref={gameHeading}
-          tabIndex={-1}
-        >
-          Run {formatNumber.format(BigInt(nonce))}
-          {visible ? ` · ${visible.market}` : ""}
+    <section className="run-stage" aria-label="Run viewer">
+      <div className="run-stage-bar">
+        <h3>
+          {market && `${market}/USD · `}Run {formatNumber.format(BigInt(nonce))}
         </h3>
         {(close || (terminal && runSettled)) && (
           <button
+            className="run-control"
             type="button"
-            className="min-h-11 px-2 text-sm underline"
             onClick={terminal && runSettled ? runSettled : close}
           >
             {terminal ? "Done" : "Close viewer"}
           </button>
         )}
       </div>
-      <output className="text-sm">{error ?? status}</output>
-      {settlement && (
-        <p className="font-mono text-sm tabular-nums">{settlement}</p>
-      )}
-      {hasWorld && (
-        <div
-          className="aspect-video w-full overflow-hidden rounded bg-[#173b32]"
-          ref={mount}
-          role="img"
-          aria-label="Run scene"
-        />
-      )}
-      {artError && (
-        <p className="text-sm" role="alert">
-          Run artwork is unavailable.
-        </p>
-      )}
-      {frame && (
-        <div className="flex flex-wrap gap-x-4 text-sm tabular-nums">
-          <span>Level {formatNumber.format(runLevel(frame.activeTicks))}</span>
-          <span>Score {formatNumber.format(frame.score)}</span>
-          <span>
-            Checkpoint{" "}
-            {formatNumber.format(
-              frame.activeTicks % BigInt(RULES_V1.checkpointTicks),
-            )}
-            /{RULES_V1.checkpointTicks}
-          </span>
-          {frame.qualifiedCheckpoints > 0n && (
-            <span>
-              {earnedMultiplierBps(frame.qualifiedCheckpoints) / 10000}× earned
-            </span>
+      {hasWorld && frame && (
+        <div className="run-playfield">
+          <div
+            className="run-canvas"
+            ref={mount}
+            role="application"
+            tabIndex={control && playing && artReady ? 0 : -1}
+            aria-label="Game playfield"
+          />
+          <dl className="run-hud">
+            <div>
+              <dt>Level</dt>
+              <dd>{formatNumber.format(runLevel(frame.activeTicks))}</dd>
+            </div>
+            <div>
+              <dt>Score</dt>
+              <dd>{formatNumber.format(frame.score)}</dd>
+            </div>
+            <div>
+              <dt>Coins</dt>
+              <dd>{formatNumber.format(frame.totalCoins)}</dd>
+            </div>
+            <div className="run-checkpoint">
+              <dt id={`checkpoint-${nonce}`}>Checkpoint</dt>
+              <dd>
+                <progress
+                  aria-labelledby={`checkpoint-${nonce}`}
+                  value={checkpoint}
+                  max={RULES_V1.checkpointTicks}
+                />
+              </dd>
+            </div>
+          </dl>
+          {playing && artReady && (
+            <p className="run-rotate">Rotate to landscape to play</p>
           )}
-          {visible &&
-            visible.run.observation.phase === "active" &&
-            frame.qualifiedCheckpoints > 0n && (
-              <span>
-                Cash-out value{" "}
-                {displayUsdc(
-                  grossPayout(
-                    visible.run.stake,
-                    frame.qualifiedCheckpoints,
-                    visible.run.maxGross,
-                  ).toString(),
-                )}{" "}
-                USDC
-              </span>
-            )}
+          {statusPanel && (
+            <div className="run-overlay">
+              <div aria-live="polite">
+                <h4>
+                  {artError
+                    ? "Artwork unavailable"
+                    : paused
+                      ? "Run paused"
+                      : (error ?? (artReady ? status : "Loading the course…"))}
+                </h4>
+                {paused && (
+                  <p>
+                    {error ??
+                      (suspension && suspensionCopy[suspension]) ??
+                      "MagicBlock paused the run."}{" "}
+                    {recoveryAvailable
+                      ? "Recover the original wager."
+                      : canResume
+                        ? "Resume from the same position when updates recover."
+                        : "Recovery becomes available after the pause expires."}
+                  </p>
+                )}
+                {artError && <p>Reopen the run to reload its artwork.</p>}
+                {settlement && <p>{settlement}</p>}
+              </div>
+              {actionButton}
+              {actionNotice && !terminal && <output>{actionNotice}</output>}
+            </div>
+          )}
         </div>
       )}
-      {!terminal &&
-        control &&
-        playKey &&
-        visible?.run.observation.phase === "active" &&
-        frame && (
+      {!hasWorld && (
+        <div className="run-message" aria-live="polite">
+          <h4>{error ?? status}</h4>
+          {settlement && <p>{settlement}</p>}
+        </div>
+      )}
+      {playing && error && <output className="run-notice">{error}</output>}
+      {!terminal && control && playKey && frame && visible && (
+        <div className="run-deck">
+          <div className="run-earnings">
+            <span>Cash out</span>
+            <strong>
+              {qualified
+                ? `${displayUsdc(grossPayout(visible.run.stake, frame.qualifiedCheckpoints, visible.run.maxGross).toString())} USDC`
+                : "Locked"}
+            </strong>
+            <small>
+              {qualified
+                ? `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}× earned`
+                : "Reach a qualifying checkpoint"}
+            </small>
+          </div>
           <RunControls
             rpc={control.rpc}
             run={control.run}
             playKey={playKey}
-            eligible={frame.qualifiedCheckpoints > 0n}
+            eligible={qualified}
             accepted={visible.run.observation.acceptedSequence}
+            playing={playing}
+            artReady={artReady}
+            surface={mount}
           />
-        )}
-      {!terminal && visible?.run.observation.phase === "active" && !playKey && (
-        <p className="text-sm">
+        </div>
+      )}
+      {playing && !control && (
+        <p className="run-notice">
           Controls are available in the tab that authorized this run.
         </p>
       )}
-      {!terminal && submitAction && (nextAction || actionPending) && (
-        <button
-          type="button"
-          className="min-h-11 rounded-md border px-3 text-sm"
-          disabled={
-            submitting ||
-            (!actionPending && confirmedAction === nextAction?.kind)
-          }
-          onClick={() => void settle()}
-        >
-          {actionPending
-            ? "Check submission"
-            : nextAction?.kind === "abortUndelegatedReservation"
-              ? "Refund expired reservation"
-              : nextAction?.kind === "expireDelegatedActivation"
-                ? "Recover expired run"
-                : nextAction?.kind === "suspendOrResumeRun"
-                  ? "Recover stalled run"
-                  : nextAction?.kind === "settleReturnedRun"
-                    ? "Finalize result"
-                    : "Settle run"}
-        </button>
-      )}
+      {(!hasWorld || !statusPanel) && actionButton}
       {!terminal && finalizing && (
-        <p className="text-sm">Settling on Solana Devnet.</p>
+        <p className="run-notice">Settling on Solana Devnet.</p>
       )}
-      {actionNotice && !terminal && (
-        <output className="text-sm">{actionNotice}</output>
+      {!hasWorld && actionNotice && !terminal && (
+        <output className="run-notice">{actionNotice}</output>
       )}
     </section>
   );

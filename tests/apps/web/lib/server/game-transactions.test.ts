@@ -29,7 +29,10 @@ import {
   decodeEscrowAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
-import { crankInstructions } from "../../../../../apps/web/lib/game/run-crank";
+import {
+  crankInstructions,
+  stalledRunFaultAt,
+} from "../../../../../apps/web/lib/game/run-crank";
 import { validatePreparedGame } from "../../../../../apps/web/lib/game/run-transactions";
 import {
   DEVNET,
@@ -73,15 +76,20 @@ it("builds an adjacent Hydra trigger and onchain advance for the pinned run", ()
   const run = Keypair.generate().publicKey;
   const payer = Keypair.generate().publicKey;
   const oracle = Keypair.generate().publicKey;
-  const [compute, trigger, advance] = crankInstructions(
+  const [compute, memo, trigger, advance] = crankInstructions(
     run,
     payer,
     oracle,
     "7",
     "3",
+    "driver:1",
   );
   const task = crankAddress(run);
   expect(compute?.programId).toEqual(ComputeBudgetProgram.programId);
+  const second = crankInstructions(run, payer, oracle, "7", "3", "driver:2");
+  expect(memo?.data.toString()).toBe("driver:1");
+  expect(second[1]?.data).not.toEqual(memo?.data);
+  expect(second.slice(-2)).toEqual([trigger, advance]);
   expect(trigger?.programId).toEqual(hydraProgram);
   expect(trigger?.data).toEqual(Buffer.from([1]));
   expect(trigger?.keys).toEqual([
@@ -101,6 +109,12 @@ it("builds an adjacent Hydra trigger and onchain advance for the pinned run", ()
   expect(coder.instruction.decode(data)?.name).toBe("advanceRun");
   expect(data.readBigUInt64LE(8)).toBe(7n);
   expect(data.readBigUInt64LE(16)).toBe(3n);
+});
+
+it("waits until trusted clock credit exceeds the two-second backlog", () => {
+  expect(stalledRunFaultAt(100n, 0n)).toBe(104n);
+  expect(stalledRunFaultAt(100n, 1_000n)).toBe(105n);
+  expect(stalledRunFaultAt(100n, 1_900n)).toBe(105n);
 });
 
 function intent(action: GameIntent["action"]): GameIntent {
@@ -232,6 +246,13 @@ describe("game transaction intents", () => {
       { kind: "activateRun", ...runNonce, market: "SOL", inputKey },
       { kind: "revokeRunInputKey", nonce: runNonce.nonce },
       { kind: "suspendOrResumeRun", nonce: runNonce.nonce, market: "SOL" },
+      {
+        kind: "resumeRun",
+        nonce: runNonce.nonce,
+        market: "SOL",
+        inputKey,
+        suspendedAt: "1800000000",
+      },
       { kind: "expireDelegatedActivation", nonce: runNonce.nonce },
       { kind: "abortUndelegatedReservation", nonce: runNonce.nonce },
       { kind: "requestCompletion", nonce: runNonce.nonce, market: "SOL" },

@@ -134,7 +134,11 @@ pub mod purrps_game {
     }
 
     pub fn suspend_or_resume_run(ctx: Context<RecoverRunOracle>) -> Result<()> {
-        crate::instructions::run_recovery::handle_recover_run_oracle(ctx)
+        crate::instructions::run_recovery::handle_recover_run_oracle(ctx, None)
+    }
+
+    pub fn resume_run(ctx: Context<RecoverRunOracle>, suspended_at: i64) -> Result<()> {
+        crate::instructions::run_recovery::handle_recover_run_oracle(ctx, Some(suspended_at))
     }
 
     pub fn claim_starter(ctx: Context<ClaimStarter>, args: RequestCapsuleArgs) -> Result<()> {

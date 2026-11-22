@@ -6,6 +6,7 @@ import {
   decodeRunAccount,
   runAddresses,
 } from "../game/run-accounts";
+import { stalledRunFaultAt } from "../game/run-crank";
 import { DEVNET } from "../solana/addresses";
 import { readState } from "./chain";
 import { ApiError } from "./runtime";
@@ -62,17 +63,16 @@ export async function readLiveRun(wallet: string, nonce: string) {
     activationExpired =
       phase === "ready" && now >= BigInt(escrow.activationDeadlineSeconds);
     const timeout = BigInt(snapshot.suspensionTimeoutSeconds);
-    // One credited second and the scheduler backlog both precede a stalled-run refund.
-    const lastPossibleTick =
-      snapshot.crank.originSeconds +
-      (snapshot.crank.consumedMs + 999n) / 1000n +
-      3n;
+    const faultAt = stalledRunFaultAt(
+      snapshot.crank.originSeconds,
+      snapshot.crank.consumedMs,
+    );
     recoveryAvailable =
       snapshot.suspendedAt !== null
         ? now >= snapshot.suspendedAt + timeout
         : phase === "active" &&
           snapshot.crank.generation !== "0" &&
-          now >= lastPossibleTick + timeout;
+          now >= faultAt + timeout;
   }
   return {
     run: base.run,

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import {
   assetManifestBytes,
   FIRST_SCENE_ASSETS,
@@ -16,6 +17,84 @@ import {
   logicalPointer,
   UI_TOKENS,
 } from "../../../../../apps/web/lib/game/presentation";
+import { renderRun } from "../../../../../apps/web/lib/game/render-run";
+
+it("registers all bound cat and coin frames under the keys loaded by the scene", () => {
+  const bound = parseAssetManifest(
+    JSON.parse(
+      readFileSync(
+        new URL(
+          "../../../../../apps/web/public/game-assets/v1/manifest.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ),
+  );
+  const loaded = new Map<string, string>();
+  const frames = new Map<string, number>();
+  const drawing = new Error("textures ready for drawing");
+  class Scene {
+    load = {
+      on: vi.fn(),
+      svg: (key: string, path: string) => loaded.set(key, path),
+    };
+    textures = {
+      get: (key: string) => {
+        expect(loaded.has(key)).toBe(true);
+        return key;
+      },
+      addSpriteSheet: (
+        alias: string,
+        key: string,
+        { endFrame }: { endFrame: number },
+      ) => {
+        expect(alias).toBe("");
+        frames.set(key, endFrame + 1);
+        return { has: (frame: string) => Number(frame) <= endFrame };
+      },
+    };
+    add = {
+      tileSprite: () => {
+        throw drawing;
+      },
+    };
+  }
+  const onError = vi.fn();
+  class Game {
+    constructor({
+      scene: [RunScene],
+    }: {
+      scene: [
+        new () => Scene & {
+          preload(): void;
+          create(): void;
+        },
+      ];
+    }) {
+      const scene = new RunScene();
+      scene.preload();
+      expect(() => scene.create()).toThrow(drawing);
+    }
+  }
+  renderRun(
+    { Scene, Game, Scale: {} } as unknown as Parameters<typeof renderRun>[0],
+    {} as HTMLElement,
+    bound,
+    "acrobat",
+    () => {
+      throw new Error("No world requested during preload");
+    },
+    () => false,
+    onError,
+    vi.fn(),
+  );
+  expect([...frames]).toEqual([
+    ["cat-acrobat", 24],
+    ["coin-spin", 16],
+  ]);
+  expect(onError).not.toHaveBeenCalled();
+});
 
 function image(id = "coin-spin"): ImageAsset {
   return {
