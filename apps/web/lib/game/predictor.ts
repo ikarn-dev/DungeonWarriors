@@ -61,7 +61,7 @@ export function parsePredictionSnapshot(input: unknown): Snapshot {
   if (!parsed.success) throw new PredictionError("INVALID_SNAPSHOT");
   const s = parsed.data;
   try {
-    validateWorldState(worldOf(s));
+    validateWorldState(worldOf(s), s.rulesVersion === 2 ? RULES_V2 : RULES_V1);
   } catch {
     throw new PredictionError("INVALID_SNAPSHOT");
   }

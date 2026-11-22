@@ -39,17 +39,16 @@ export function RunGameDialog({
     >
       {shown && (
         <section className="run-dialog-layout">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-semibold">{title}</h2>
-            <button
-              type="button"
-              className="run-control"
-              disabled={busy}
-              onClick={onBack}
-            >
-              ← Lobby
-            </button>
-          </div>
+          <h2 className="sr-only">{title}</h2>
+          <button
+            type="button"
+            className="pixel-button run-lobby"
+            disabled={busy}
+            onClick={onBack}
+          >
+            <span className="pixel-icon" data-icon="back" aria-hidden="true" />
+            Lobby
+          </button>
           {children}
         </section>
       )}

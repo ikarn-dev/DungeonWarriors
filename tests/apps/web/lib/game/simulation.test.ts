@@ -2,11 +2,38 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { catStats } from "../../../../../apps/web/lib/game/catalog";
 import type { PlayerIntent } from "../../../../../apps/web/lib/game/protocol";
-import { U64_MAX } from "../../../../../apps/web/lib/game/rules";
+import {
+  RULES_V2,
+  speedBps,
+  U64_MAX,
+} from "../../../../../apps/web/lib/game/rules";
 import { step } from "../../../../../apps/web/lib/game/simulation";
 import type { WorldEntity } from "../../../../../apps/web/lib/game/simulation-state";
 
 import { entity, floor, frame } from "./simulation-fixtures";
+
+it("uses the v2 native double jump once and keeps increasing speed beyond 1.8×", () => {
+  const stats = catStats("acrobat", 1);
+  const terrain = [floor()];
+  const jump = { kind: "jump" } as const;
+  const first = step(frame(), terrain, stats, [jump, jump], RULES_V2).frame;
+  expect(first.powers.doubleJump.readyAtTick).toBe(0n);
+  const second = step(first, terrain, stats, [jump], RULES_V2).frame;
+  expect(second.runner.vySubpixelsPerTick).toBe(
+    first.runner.vySubpixelsPerTick,
+  );
+  expect(second.powers.doubleJump.charges).toBe(0);
+  expect(second.powers.doubleJump.readyAtTick).toBeGreaterThan(
+    second.activeTicks,
+  );
+  expect(
+    step(second, terrain, stats, [jump], RULES_V2).frame.runner
+      .vySubpixelsPerTick,
+  ).toBeGreaterThan(second.runner.vySubpixelsPerTick);
+  expect(speedBps(14n * 600n, RULES_V2)).toBe(26_800);
+  expect(speedBps(16n * 600n, RULES_V2)).toBe(29_200);
+  expect(speedBps(U64_MAX, RULES_V2)).toBe(31_600);
+});
 
 it("matches Rust's shared motion trace after every step", () => {
   const rows = readFileSync(

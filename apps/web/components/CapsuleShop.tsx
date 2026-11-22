@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { MEDIA_ROOT } from "../lib/game/assets";
 import { CATALOG_V1, catStats, eligibleCatWeights } from "../lib/game/catalog";
 import { displayUsdc, type PlayerIntent } from "../lib/game/custody-client";
 import {
@@ -186,7 +187,7 @@ export default function CapsuleShop({
             <div className="grid content-start gap-2 rounded-md border border-[#cbd3be] p-3 text-sm">
               <Image
                 unoptimized
-                src="/game-assets/v1/capsule-lid.svg"
+                src={`${MEDIA_ROOT}/capsule-lid.svg`}
                 alt=""
                 width={64}
                 height={64}
@@ -230,7 +231,7 @@ export default function CapsuleShop({
             <div className="grid content-start gap-2 rounded-md border border-[#cbd3be] p-3 text-sm">
               <Image
                 unoptimized
-                src="/game-assets/v1/upgrade-item.svg"
+                src={`${MEDIA_ROOT}/upgrade-item.svg`}
                 alt=""
                 width={64}
                 height={64}

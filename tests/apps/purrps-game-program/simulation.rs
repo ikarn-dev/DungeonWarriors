@@ -1,11 +1,42 @@
 use purrps_game::{
     catalog::{cat_stats, CatId, Power},
     protocol::{PlayerIntent, RunPhase, TerminalReason},
-    simulation::{step, SimulationError},
+    rules::RULES_V2,
+    simulation::{step, step_for_rules, SimulationError},
 };
 #[path = "support/simulation.rs"]
 mod support;
 use support::*;
+
+#[test]
+fn v2_second_jump_uses_one_charge_on_a_later_tick() {
+    let stats = cat_stats(CatId::Acrobat, 1).unwrap();
+    let terrain = [floor()];
+    let first = step_for_rules(
+        &frame(),
+        &terrain,
+        &stats,
+        &[PlayerIntent::Jump, PlayerIntent::Jump],
+        &RULES_V2,
+    )
+    .unwrap()
+    .frame;
+    assert_eq!(first.powers[Power::DoubleJump as usize].ready_at_tick, 0);
+    let second = step_for_rules(&first, &terrain, &stats, &[PlayerIntent::Jump], &RULES_V2)
+        .unwrap()
+        .frame;
+    assert_eq!(
+        second.runner.vy_subpixels_per_tick,
+        first.runner.vy_subpixels_per_tick
+    );
+    let charge = second.powers[Power::DoubleJump as usize];
+    assert_eq!(charge.charges, 0);
+    assert!(charge.ready_at_tick > second.active_ticks);
+    let third = step_for_rules(&second, &terrain, &stats, &[PlayerIntent::Jump], &RULES_V2)
+        .unwrap()
+        .frame;
+    assert!(third.runner.vy_subpixels_per_tick > second.runner.vy_subpixels_per_tick);
+}
 
 #[test]
 fn step_trace_matches_independent_fixture() {

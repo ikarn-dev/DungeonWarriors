@@ -38,8 +38,8 @@ test("the prerendered page references emitted local CSS", () => {
 test("the initial starter route renders the bundled capsule before wallet hydration", () => {
   const html = readFileSync(join(output, "server/app/starter.html"), "utf8");
   assert.match(html, /Starter draw/);
-  assert.match(html, /\/game-assets\/v1\/capsule-lid\.svg/);
-  assert.match(html, /\/game-assets\/v1\/capsule-base\.svg/);
+  assert.match(html, /\/game-assets\/v2\/capsule-lid\.svg/);
+  assert.match(html, /\/game-assets\/v2\/capsule-base\.svg/);
   assert.doesNotMatch(
     html,
     /portrait-(collector|acrobat|guardian|sprinter)\.svg/,

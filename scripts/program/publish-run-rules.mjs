@@ -65,7 +65,7 @@ async function hostedClientReady() {
     });
     if (
       response.ok &&
-      (await response.text()).includes("prices used by this run")
+      (await response.text()).includes("progressive-course-v2")
     )
       return true;
   }

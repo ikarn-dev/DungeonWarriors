@@ -13,17 +13,21 @@ export function mergeRunPrices(
   ].slice(-chartLength);
 }
 
-export function formatRunPrice(price: RunPrice) {
-  if (price.exponent >= 0)
-    return priceDigits.format(price.price * 10n ** BigInt(price.exponent));
-  const scale = 10n ** BigInt(-price.exponent);
-  const decimal = (price.price % scale)
-    .toString()
-    .padStart(-price.exponent, "0")
-    .replace(/0+$/, "");
-  return (
-    priceDigits.format(price.price / scale) + (decimal ? `.${decimal}` : "")
-  );
+export function formatRunPrice(price: RunPrice, compact = false) {
+  // The hosted Devnet feeds can encode the decimal count as a positive value.
+  const decimals = Math.abs(price.exponent);
+  const scale = 10n ** BigInt(decimals);
+  const digits =
+    compact && price.price >= scale ? Math.min(2, decimals) : decimals;
+  const unit = 10n ** BigInt(digits);
+  const divisor = scale / unit;
+  const rounded = (price.price + divisor / 2n) / divisor;
+  const padded = (rounded % unit).toString().padStart(digits, "0");
+  const decimal =
+    compact && price.price >= scale && digits > 0
+      ? padded
+      : padded.replace(/0+$/, "");
+  return priceDigits.format(rounded / unit) + (decimal ? `.${decimal}` : "");
 }
 
 export function runPricePath(points: readonly RunPrice[]) {

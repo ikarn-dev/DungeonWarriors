@@ -5,7 +5,7 @@ pub mod world;
 use crate::{
     catalog::CatStats,
     protocol::{InputAxis, PlayerIntent, RunPhase, TerminalReason},
-    rules::{speed_bps, RULES_V1},
+    rules::{speed_bps_for_rules, GameRules, RULES_V1},
     state::run::{
         EntityKind, PowerState, RunnerState, WorldEntity, MAX_QUEUED_INTENTS, MAX_WORLD_ENTITIES,
     },
@@ -110,12 +110,12 @@ fn validate_frame(frame: &SimulationFrame, stats: &CatStats) -> Result<(), Simul
     Ok(())
 }
 
-fn integrate_velocity(frame: &mut SimulationFrame, stats: &CatStats, tick: u64) {
+fn integrate_velocity(frame: &mut SimulationFrame, stats: &CatStats, tick: u64, rules: &GameRules) {
     let p = RULES_V1.physics;
     let r = &mut frame.runner;
     if r.grounded {
         let target = i64::from(p.runner_speed_subpixels_per_tick)
-            * i64::from(speed_bps(frame.active_ticks))
+            * i64::from(speed_bps_for_rules(frame.active_ticks, rules))
             / 10_000;
         let current = i64::from(r.automatic_speed_subpixels_per_tick);
         r.automatic_speed_subpixels_per_tick = (current
@@ -211,6 +211,16 @@ pub fn step(
     stats: &CatStats,
     actions: &[PlayerIntent],
 ) -> Result<SimulationStep, SimulationError> {
+    step_for_rules(frame, entities, stats, actions, &RULES_V1)
+}
+
+pub fn step_for_rules(
+    frame: &SimulationFrame,
+    entities: &[WorldEntity],
+    stats: &CatStats,
+    actions: &[PlayerIntent],
+    rules: &GameRules,
+) -> Result<SimulationStep, SimulationError> {
     validate_world(entities)?;
     validate_frame(frame, stats)?;
     if actions.len() > MAX_QUEUED_INTENTS {
@@ -244,9 +254,10 @@ pub fn step(
             stats,
             tick,
             action,
+            rules.rules_version == 2,
         )?;
     }
-    integrate_velocity(&mut result.frame, stats, tick);
+    integrate_velocity(&mut result.frame, stats, tick, rules);
     let path = collision::move_runner(&mut result.frame.runner, entities);
     validate_frame(&result.frame, stats)?;
     result.frame.active_ticks = tick;

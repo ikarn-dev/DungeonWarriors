@@ -24,7 +24,7 @@ it("registers all bound cat and coin frames under the keys loaded by the scene",
     JSON.parse(
       readFileSync(
         new URL(
-          "../../../../../apps/web/public/game-assets/v1/manifest.json",
+          "../../../../../apps/web/public/game-assets/v2/manifest.json",
           import.meta.url,
         ),
         "utf8",
@@ -61,7 +61,16 @@ it("registers all bound cat and coin frames under the keys loaded by the scene",
     };
   }
   const onError = vi.fn();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   class Game {
+    events = { once: vi.fn() };
+    scale = { setGameSize: vi.fn() };
     constructor({
       scene: [RunScene],
     }: {
@@ -79,19 +88,28 @@ it("registers all bound cat and coin frames under the keys loaded by the scene",
   }
   renderRun(
     { Scene, Game, Scale: {} } as unknown as Parameters<typeof renderRun>[0],
-    {} as HTMLElement,
+    {
+      getBoundingClientRect: () => ({ width: 1280, height: 720 }),
+    } as unknown as HTMLElement,
     bound,
     "acrobat",
-    () => {
-      throw new Error("No world requested during preload");
+    {
+      world: () => {
+        throw new Error("No world requested during preload");
+      },
+      sample: () => ({ lead: 0, revision: 0 }),
+      reduced: () => false,
+      onError,
+      onReady: vi.fn(),
     },
-    () => false,
-    onError,
-    vi.fn(),
   );
+  vi.unstubAllGlobals();
   expect([...frames]).toEqual([
-    ["cat-acrobat", 24],
+    ["cat-acrobat", 26],
     ["coin-spin", 16],
+    ["effects-actions", 24],
+    ["effects-powers", 30],
+    ["star", 4],
   ]);
   expect(onError).not.toHaveBeenCalled();
 });

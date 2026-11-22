@@ -1,6 +1,6 @@
 import type { CatStats } from "./catalog";
 import type { PlayerIntent } from "./protocol";
-import { RULES_V1, speedBps } from "./rules";
+import { type GameplayRules, RULES_V1, speedBps } from "./rules";
 import {
   body,
   collects,
@@ -91,11 +91,13 @@ function integrateVelocity(
   frame: SimulationFrame,
   stats: CatStats,
   tick: bigint,
+  rules: GameplayRules,
 ): void {
   const p = RULES_V1.physics;
   const r = frame.runner;
   const target = Math.trunc(
-    (p.runnerSpeedSubpixelsPerTick * speedBps(frame.activeTicks)) / 10_000,
+    (p.runnerSpeedSubpixelsPerTick * speedBps(frame.activeTicks, rules)) /
+      10_000,
   );
   if (r.grounded)
     r.automaticSpeedSubpixelsPerTick +=
@@ -180,6 +182,7 @@ export function step(
   entities: readonly WorldEntity[],
   stats: CatStats,
   actions: readonly PlayerIntent[],
+  rules: GameplayRules = RULES_V1,
 ): SimulationStep {
   validateWorld(entities);
   validateFrame(frame, stats);
@@ -205,9 +208,9 @@ export function step(
       result.frame.phase = "terminalRecorded";
       return result;
     }
-    command(result.frame, stats, tick, action);
+    command(result.frame, stats, tick, action, rules.rulesVersion === 2);
   }
-  integrateVelocity(result.frame, stats, tick);
+  integrateVelocity(result.frame, stats, tick, rules);
   const path = moveRunner(result.frame.runner, entities);
   validateFrame(result.frame, stats);
   result.frame.activeTicks = tick;

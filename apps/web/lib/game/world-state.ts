@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RULES_V1, speedBps, U64_MAX } from "./rules";
+import { type GameplayRules, RULES_V1, speedBps, U64_MAX } from "./rules";
 import { validateWorld } from "./simulation";
 import { surfaceAt } from "./simulation-collision";
 import {
@@ -56,7 +56,10 @@ export const worldStateSchema = z
   .strict();
 export type WorldState = z.infer<typeof worldStateSchema>;
 
-export function validateWorldState(state: WorldState): void {
+export function validateWorldState(
+  state: WorldState,
+  rules: GameplayRules = RULES_V1,
+): void {
   if (!worldStateSchema.safeParse(state).success)
     throw new SimulationError("INVALID_WORLD");
   validateWorld(state.entities);
@@ -64,7 +67,8 @@ export function validateWorldState(state: WorldState): void {
   const p = RULES_V1.physics;
   const checkpoint = state.frame.activeTicks / BigInt(RULES_V1.checkpointTicks);
   const target = Math.trunc(
-    (p.runnerSpeedSubpixelsPerTick * speedBps(state.frame.activeTicks)) / 10000,
+    (p.runnerSpeedSubpixelsPerTick * speedBps(state.frame.activeTicks, rules)) /
+      10000,
   );
   if (
     g.checkpoint > checkpoint ||

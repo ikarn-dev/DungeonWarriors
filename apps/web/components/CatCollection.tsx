@@ -1,3 +1,4 @@
+import { MEDIA_ROOT } from "../lib/game/assets";
 import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 export default function CatCollection({
@@ -24,7 +25,7 @@ export default function CatCollection({
               <div className="flex items-center gap-3">
                 <Image
                   unoptimized
-                  src={`/game-assets/v1/portrait-${cat.id}.svg`}
+                  src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
                   width={56}
                   height={56}
                   alt=""

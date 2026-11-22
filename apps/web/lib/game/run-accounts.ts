@@ -262,6 +262,7 @@ export async function decodeRunAccount(
       completionAttempts: r.crank.completionAttempts,
     },
     cat: enumTag(r.snapshot.cat.definition.id) as CatId,
+    catLevel: r.snapshot.cat.level,
     assetBinding: {
       version: r.snapshot.assetManifest.version,
       contentHash: hex(r.snapshot.assetManifest.contentHash),

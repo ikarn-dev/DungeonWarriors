@@ -119,6 +119,7 @@ try {
   }
   process.stdout.write(
     "Git guards installed. Local Codex Stop hook registered.\n" +
+      "PURRPS task commits run on local main.\n" +
       "Review and trust the hook in Codex Settings > Hooks (or /hooks) before relying on automatic commits.\n" +
       'Manual completion: pnpm task:commit -- "feat(game): describe the completed change"\n' +
       "Automatic pushing is not configured.\n",

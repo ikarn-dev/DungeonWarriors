@@ -1,0 +1,165 @@
+/* Pixel UI primitives shared by the in-game HUD and controls. */
+/* Notched pixel frame: orthogonal outer shadows leave the corners open. */
+.pixel-panel,
+.pixel-button {
+  --face: var(--panel);
+  --face-hi: var(--panel-hi);
+  --face-lo: var(--panel-lo);
+  background: var(--face);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 var(--px) 0 0 var(--face-hi),
+    inset 0 calc(var(--px) * -1) 0 0 var(--face-lo);
+}
+
+.pixel-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.875rem;
+  border: 0;
+  color: var(--cream);
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 var(--ink);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pixel-button:not(:disabled):active {
+  transform: translateY(var(--px));
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 var(--px) 0 0 var(--face-lo);
+}
+.pixel-button:disabled {
+  filter: grayscale(0.7) brightness(0.8);
+  opacity: 0.75;
+}
+.pixel-button:focus-visible,
+.run-canvas:focus-visible {
+  outline: var(--px) solid var(--gold-hi);
+  outline-offset: calc(var(--px) * 2);
+}
+@media (hover: hover) {
+  .pixel-button:not(:disabled):hover {
+    filter: brightness(1.12);
+  }
+}
+
+.pixel-button[data-tone="gold"] {
+  --face: var(--gold);
+  --face-hi: var(--gold-hi);
+  --face-lo: var(--gold-lo);
+  color: var(--ink);
+  text-shadow: 0 1px 0 var(--gold-hi);
+}
+.pixel-button[data-tone="green"] {
+  --face: #4fb848;
+  --face-hi: #8ee05c;
+  --face-lo: #2f8f3a;
+}
+.pixel-button[data-tone="blue"] {
+  --face: #3a7bff;
+  --face-hi: #7ea8ff;
+  --face-lo: #2453c2;
+}
+.pixel-button[data-tone="magnet"] {
+  --face: #e84a5a;
+  --face-hi: #ff8f99;
+  --face-lo: #a82c3a;
+}
+.pixel-button[data-tone="doubleJump"] {
+  --face: #8f62e0;
+  --face-hi: #c0a0ff;
+  --face-lo: #5f3aa8;
+}
+.pixel-button[data-tone="shield"] {
+  --face: #2f9fd6;
+  --face-hi: #7fdcff;
+  --face-lo: #1f6e9e;
+}
+.pixel-button[data-tone="extraDash"] {
+  --face: #f08a1c;
+  --face-hi: #ffc46b;
+  --face-lo: #b05e0c;
+}
+
+.pixel-icon {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  background: url("/game-assets/v2/hud-controls.svg") no-repeat;
+  background-size: calc(var(--icon) * 17) var(--icon);
+  background-position: calc(var(--i, 0) * var(--icon) * -1) 0;
+  image-rendering: pixelated;
+}
+.pixel-icon[data-icon="back"] {
+  --i: 0;
+}
+.pixel-icon[data-icon="boost"] {
+  --i: 1;
+}
+.pixel-icon[data-icon="cash-out"] {
+  --i: 2;
+}
+.pixel-icon[data-icon="dash"] {
+  --i: 3;
+}
+.pixel-icon[data-icon="double-jump"] {
+  --i: 4;
+}
+.pixel-icon[data-icon="extra-dash"] {
+  --i: 5;
+}
+.pixel-icon[data-icon="jump"] {
+  --i: 6;
+}
+.pixel-icon[data-icon="left"] {
+  --i: 7;
+}
+.pixel-icon[data-icon="lock"] {
+  --i: 8;
+}
+.pixel-icon[data-icon="magnet"] {
+  --i: 9;
+}
+.pixel-icon[data-icon="right"] {
+  --i: 12;
+}
+.pixel-icon[data-icon="rotate-device"] {
+  --i: 13;
+}
+.pixel-icon[data-icon="shield"] {
+  --i: 14;
+}
+
+.pixel-sprite {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  background: no-repeat 0 0;
+  image-rendering: pixelated;
+}
+.pixel-sprite[data-sprite="coin"] {
+  background-image: url("/game-assets/v2/coin-spin.svg");
+  background-size: 320px 20px;
+}
+.pixel-sprite[data-sprite="star"] {
+  background-image: url("/game-assets/v2/star.svg");
+  background-size: 80px 20px;
+}

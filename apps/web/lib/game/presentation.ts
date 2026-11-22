@@ -24,6 +24,41 @@ export const GAME_VIEW = {
   emergencyCashOutDuringPortrait: true,
 } as const;
 
+// Full-screen run view. The world keeps its 540 px height and widens up to the
+// generated lookahead (2 segments behind, 8 ahead of the runner); taller
+// screens gain sky above. Rendering zooms by an integer so pixel art stays crisp.
+export const RUN_VIEW = {
+  height: GAME_VIEW.height,
+  minWidth: GAME_VIEW.width,
+  maxWidth: 1216,
+  maxHeight: 720,
+  runnerScreenX: 232,
+  groundOffset: Math.round(GAME_VIEW.height * 0.18),
+  maxZoom: 4,
+} as const;
+export function runViewport(cssWidth: number, cssHeight: number, dpr: number) {
+  if (
+    [cssWidth, cssHeight, dpr].some((n) => !Number.isFinite(n) || n <= 0) ||
+    dpr > 8
+  )
+    throw new Error("INVALID_VIEWPORT");
+  const aspect = cssWidth / cssHeight;
+  let width = Math.round(RUN_VIEW.height * aspect);
+  let height: number = RUN_VIEW.height;
+  if (width < RUN_VIEW.minWidth) {
+    width = RUN_VIEW.minWidth;
+    height = Math.min(
+      RUN_VIEW.maxHeight,
+      Math.round(RUN_VIEW.minWidth / aspect),
+    );
+  }
+  width = Math.min(RUN_VIEW.maxWidth, width);
+  const display = Math.min(cssWidth / width, cssHeight / height) * dpr;
+  const zoom = Math.max(1, Math.min(RUN_VIEW.maxZoom, Math.round(display)));
+  return { width, height, zoom, skyRows: height - RUN_VIEW.height };
+}
+export type RunViewport = ReturnType<typeof runViewport>;
+
 // Safe-area/control space is excluded by the caller before fitting the canvas.
 export function fitGameViewport(width: number, height: number, dpr: number) {
   if (

@@ -6,8 +6,6 @@ import {
   Connection,
   type Keypair,
   PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -15,12 +13,10 @@ import { displayUsdc } from "../lib/game/custody-client";
 import { grossPayout } from "../lib/game/economy";
 import { Predictor } from "../lib/game/predictor";
 import { type PlayerIntent, PROTOCOL_VERSION } from "../lib/game/protocol";
-import { earnedMultiplierBps, RULES_V1, runLevel } from "../lib/game/rules";
+import { earnedMultiplierBps, RULES_V1 } from "../lib/game/rules";
 import { decodeRunAccount, runAddresses } from "../lib/game/run-accounts";
-import { loadRunArtwork, type RunArtwork } from "../lib/game/run-artwork";
-import { crankInstructions } from "../lib/game/run-crank";
+import type { RunArtwork } from "../lib/game/run-artwork";
 import { RunState } from "../lib/game/run-feed";
-import { getRunBlockhash } from "../lib/game/run-input";
 import { mergeRunPrices, type RunPrice } from "../lib/game/run-price";
 import {
   type GameIntent,
@@ -29,8 +25,10 @@ import {
 import { webApi } from "../lib/game/web-api";
 import { DEVNET, publicKeySchema } from "../lib/solana/addresses";
 import RunControls from "./RunControls";
-import RunMarket from "./RunMarket";
+import { POWER_LABELS, RunHud, RunPanel } from "./RunHud";
+import { useRunCrank } from "./useRunCrank";
 import { useRunDelivery } from "./useRunDelivery";
+import { type RunPrediction, useRunRenderer } from "./useRunRenderer";
 
 const amount = z.string().regex(/^(0|[1-9][0-9]{0,19})$/);
 const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
@@ -96,13 +94,12 @@ const suspensionCopy: Readonly<Record<string, string>> = {
   unsafeWorld: "The game could not safely advance the course.",
 };
 const livePollMs = 500;
-const maxCranksInFlight = 4;
 const completionRetryMs = 30_000;
-const powers = {
-  magnet: ["Magnet", "Pulls in nearby pickups"],
-  doubleJump: ["Double jump", "Press Jump again in the air"],
-  shield: ["Shield", "Blocks one hit"],
-  extraDash: ["Extra dash", "Dash again during cooldown"],
+const powerHints = {
+  magnet: "Pulling in nearby pickups",
+  doubleJump: "Jump again in the air",
+  shield: "Blocks one hit",
+  extraDash: "Dash again during cooldown",
 } as const;
 
 export default function RunStage({
@@ -115,10 +112,13 @@ export default function RunStage({
   runSettled,
   autoDeliver = false,
   present = true,
+  media,
   onFinalized,
 }: {
   wallet: string;
   nonce: string;
+  // Current published catalog media; every run renders with this version.
+  media: { version: number; contentHash: string } | null;
   close?: (() => void) | undefined;
   playKey?: Keypair | undefined;
   artwork?: RunArtwork | undefined;
@@ -134,12 +134,9 @@ export default function RunStage({
     market: z.infer<typeof marketSchema>;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [artError, setArtError] = useState(false);
-  const [artReady, setArtReady] = useState(false);
   const [prices, setPrices] = useState<RunPrice[]>([]);
   const [settlement, setSettlement] = useState<string | null>(null);
   const mount = useRef<HTMLDivElement>(null);
-  const focused = useRef(false);
   const reported = useRef(false);
   const [control, setControl] = useState<{
     rpc: Connection;
@@ -151,14 +148,8 @@ export default function RunStage({
   const [sponsor, setSponsor] = useState<z.infer<typeof schema>["sponsor"]>();
   const [erReachable, setErReachable] = useState(false);
   const [retryCompletion, setRetryCompletion] = useState<number | null>(null);
-  const prediction = useRef<{
-    engine: Predictor;
-    extrapolate: boolean;
-    sampledAt: number;
-    confirmedTick: bigint;
-    ticks: number;
-    world: ReturnType<Predictor["predict"]>;
-  } | null>(null);
+  const prediction = useRef<RunPrediction | null>(null);
+  const revision = useRef(0);
   const rulesVersion =
     visible?.run.observation.rulesVersion ?? RULES_V1.rulesVersion;
   const predictionInput = useCallback(
@@ -260,6 +251,7 @@ export default function RunStage({
                 ),
               )
             : now;
+          revision.current++;
           prediction.current = {
             engine,
             extrapolate:
@@ -268,6 +260,7 @@ export default function RunStage({
             sampledAt,
             confirmedTick,
             ticks: 0,
+            lead: 0,
             world: engine.predict(0),
           };
         }
@@ -449,174 +442,25 @@ export default function RunStage({
 
   const phase = visible?.run.observation.phase;
   const started = (visible?.run.observation.activeTicks ?? 0n) > 0n;
-  useEffect(() => {
-    if (playKey && artReady && phase === "active" && !focused.current) {
-      focused.current = true;
-      mount.current?.focus({ preventScroll: true });
-    }
-  }, [artReady, phase, playKey]);
-  const crank = visible?.run.crank;
-  const crankActive = phase === "active" && (artReady || started || !present);
-  const crankOracle = crank?.oracle;
-  const crankEpoch = crank?.epoch;
-  const crankGeneration = crank?.generation;
-  const crankInterval = crank?.intervalMs;
-  useEffect(() => {
-    if (
-      !control ||
-      !playKey ||
-      !crankActive ||
-      !crankOracle ||
-      !crankEpoch ||
-      !crankInterval ||
-      !crankGeneration ||
-      crankGeneration === "0"
-    )
-      return;
-    const controller = new AbortController();
-    const { rpc, run } = control;
-    const oracle = new PublicKey(crankOracle);
-    const epoch = crankEpoch;
-    const generation = crankGeneration;
-    const driver = crypto.randomUUID();
-    let attempt = 0;
-    let inFlight = 0;
-    async function drive(key: Keypair) {
-      if (controller.signal.aborted || inFlight >= maxCranksInFlight) return;
-      inFlight++;
-      try {
-        const { blockhash } = await getRunBlockhash(rpc);
-        if (controller.signal.aborted) return;
-        const message = new TransactionMessage({
-          payerKey: key.publicKey,
-          recentBlockhash: blockhash,
-          instructions: crankInstructions(
-            run,
-            key.publicKey,
-            oracle,
-            epoch,
-            generation,
-            `${driver}:${attempt++}`,
-          ),
-        }).compileToV0Message();
-        const tx = new VersionedTransaction(message);
-        tx.sign([key]);
-        await rpc.sendRawTransaction(tx.serialize(), {
-          skipPreflight: true,
-          maxRetries: 0,
-        });
-      } catch {
-        // A failed trigger grants no progress. Confirmed snapshots drive the UI.
-      } finally {
-        inFlight--;
-      }
-    }
-    void drive(playKey);
-    const timer = setInterval(() => void drive(playKey), crankInterval);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [
+  const cat = visible?.run.cat;
+  const hasWorld = visible?.run.prediction != null;
+  const { artReady, artError } = useRunRenderer({
+    present,
+    mount,
+    hasWorld,
+    cat,
+    media,
+    artwork,
+    prediction,
+    revision,
+    focusable: !!playKey && phase === "active",
+  });
+  useRunCrank(
     control,
     playKey,
-    crankActive,
-    crankOracle,
-    crankEpoch,
-    crankGeneration,
-    crankInterval,
-  ]);
-
-  const cat = visible?.run.cat;
-  const version = visible?.run.assetBinding.version;
-  const hash = visible?.run.assetBinding.contentHash;
-  const hasWorld = visible?.run.prediction != null;
-
-  useEffect(() => {
-    if (!present) {
-      focused.current = false;
-      setArtReady(false);
-      return;
-    }
-    const parent = mount.current;
-    if (
-      !parent ||
-      !hasWorld ||
-      cat === undefined ||
-      version === undefined ||
-      hash === undefined
-    )
-      return;
-    const controller = new AbortController();
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    let game:
-      | ReturnType<typeof import("../lib/game/render-run").renderRun>
-      | undefined;
-    setArtError(false);
-    setArtReady(false);
-    async function attach(
-      container: HTMLDivElement,
-      selected: typeof cat,
-      binding: { version: number; contentHash: string },
-    ) {
-      if (selected === undefined) return;
-      const { engine, manifest, renderRun, assets } =
-        artwork?.binding.version === binding.version &&
-        artwork.binding.contentHash === binding.contentHash &&
-        artwork.cat === selected
-          ? artwork
-          : await loadRunArtwork(binding, controller.signal);
-      if (controller.signal.aborted) return;
-      const initial = prediction.current?.world;
-      if (!initial) return;
-      game = renderRun(
-        engine,
-        container,
-        manifest,
-        selected,
-        () => {
-          const active = prediction.current;
-          if (!active) return initial;
-          const ticks = active.extrapolate
-            ? Math.min(
-                RULES_V1.maxPredictionTicks,
-                Math.floor(
-                  ((performance.now() - active.sampledAt) *
-                    RULES_V1.ticksPerSecond) /
-                    1000,
-                ),
-              )
-            : 0;
-          if (ticks !== active.ticks) {
-            try {
-              active.world = active.engine.predict(ticks);
-              active.ticks = ticks;
-            } catch {
-              active.extrapolate = false;
-              active.world = active.engine.predict(0);
-              active.ticks = 0;
-            }
-          }
-          return active.world;
-        },
-        () => reduced.matches,
-        () => {
-          if (!controller.signal.aborted) setArtError(true);
-        },
-        () => {
-          if (!controller.signal.aborted) setArtReady(true);
-        },
-        assets,
-      );
-    }
-    void attach(parent, cat, { version, contentHash: hash }).catch(() => {
-      if (!controller.signal.aborted) setArtError(true);
-    });
-    return () => {
-      controller.abort();
-      game?.destroy(true);
-    };
-  }, [artwork, cat, version, hash, hasWorld, present]);
+    phase === "active" && (artReady || started || !present),
+    visible?.run.crank,
+  );
 
   const frame = visible?.run.prediction?.frame;
   const terminal = base?.status === "settled" || base?.status === "refunded";
@@ -696,28 +540,53 @@ export default function RunStage({
   }
   const actionNotice = useRunDelivery(wallet, nextAction, sponsor, playKey);
   const qualified = (frame?.qualifiedCheckpoints ?? 0n) > 0n;
-  const checkpoint = frame
-    ? Number(frame.activeTicks % BigInt(RULES_V1.checkpointTicks))
-    : 0;
   const paused = phase === "suspended";
   const playing = phase === "active";
-  const speed = frame
-    ? frame.runner.automaticSpeedSubpixelsPerTick /
-      RULES_V1.physics.runnerSpeedSubpixelsPerTick
-    : 1;
   const power = visible?.run.stats.power;
   const state = power && frame?.powers[power];
+  const cooldown = visible?.run.stats.powerCooldownTicks ?? 1;
+  const pickedUp = frame
+    ? (Object.keys(POWER_LABELS) as (keyof typeof POWER_LABELS)[])
+        .filter(
+          (name) =>
+            name !== power &&
+            frame.powers[name].charges > 0 &&
+            frame.powers[name].endsAtTick > frame.activeTicks,
+        )
+        .map((name) => `${POWER_LABELS[name]} active`)
+    : [];
   const powerControl =
     power && state && frame
       ? {
-          name: powers[power][0],
+          id: power,
+          name: POWER_LABELS[power],
           ready: state.readyAtTick <= frame.activeTicks,
-          detail:
+          active: state.charges > 0 && state.endsAtTick > frame.activeTicks,
+          remaining: Math.min(
+            1,
+            Math.max(
+              0,
+              Number(state.readyAtTick - frame.activeTicks) / cooldown,
+            ),
+          ),
+          detail: [
             state.charges > 0 && state.endsAtTick > frame.activeTicks
-              ? powers[power][1]
+              ? powerHints[power]
               : state.readyAtTick > frame.activeTicks
-                ? `${powers[power][0]} ready in ${Math.ceil(Number(state.readyAtTick - frame.activeTicks) / RULES_V1.ticksPerSecond)}s`
-                : `${powers[power][0]} ready`,
+                ? `Ready in ${Math.ceil(Number(state.readyAtTick - frame.activeTicks) / RULES_V1.ticksPerSecond)}s`
+                : rulesVersion === 2 &&
+                    (power === "doubleJump" || power === "extraDash")
+                  ? powerHints[power]
+                  : "Ready",
+            ...pickedUp,
+          ].join(" · "),
+        }
+      : null;
+  const payout =
+    qualified && frame && visible
+      ? {
+          amount: `${displayUsdc(grossPayout(visible.run.stake, frame.qualifiedCheckpoints, visible.run.maxGross).toString())} USDC`,
+          multiplier: `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}×`,
         }
       : null;
   const statusPanel = !artReady || !playing;
@@ -730,132 +599,104 @@ export default function RunStage({
         : base?.result?.outcome === "technicalRefund"
           ? "Wager refunded"
           : null;
+  const panelTitle = !hasWorld
+    ? (resultTitle ??
+      error ??
+      (activating && base?.status === "recoveryPending"
+        ? "Starting on MagicBlock…"
+        : status))
+    : artError
+      ? "Artwork unavailable"
+      : paused
+        ? "Reconnecting…"
+        : (resultTitle ?? error ?? (artReady ? status : "Loading the course…"));
+  const finish = terminal && runSettled ? runSettled : undefined;
+  const toast =
+    (playing && error) ||
+    (playing && !control
+      ? "Controls are available in the tab that authorized this run."
+      : null) ||
+    (!terminal && finalizing ? "Settling on Solana Devnet." : null);
 
   if (!present) return null;
 
   return (
     <section className="run-stage" aria-label="Run viewer">
-      <div className="run-stage-bar">
-        <h3>
-          {market && `${market}/USD · `}Run {formatNumber.format(BigInt(nonce))}
-        </h3>
-        {(close || (terminal && runSettled)) && (
+      <h3 className="sr-only">
+        {market && `${market}/USD · `}Run {formatNumber.format(BigInt(nonce))}
+      </h3>
+      <div className="run-playfield">
+        <div
+          className="run-canvas"
+          ref={mount}
+          role="application"
+          tabIndex={control && playing && artReady ? 0 : -1}
+          aria-label="Game playfield"
+        />
+        {hasWorld && frame && cat && power && visible && (
+          <RunHud
+            frame={frame}
+            cat={cat}
+            catLevel={visible.run.catLevel}
+            power={power}
+            market={market}
+            prices={prices}
+            nonce={nonce}
+          />
+        )}
+        {close && !finish && (
           <button
-            className="run-control"
+            className="pixel-button run-close"
             type="button"
-            onClick={terminal && runSettled ? runSettled : close}
+            onClick={close}
           >
-            {terminal ? "Done" : "Close viewer"}
+            Close viewer
           </button>
         )}
-      </div>
-      {hasWorld && frame && (
-        <div className="run-playfield">
-          <div
-            className="run-canvas"
-            ref={mount}
-            role="application"
-            tabIndex={control && playing && artReady ? 0 : -1}
-            aria-label="Game playfield"
-          />
-          <dl className="run-hud">
-            <div>
-              <dt>Level</dt>
-              <dd>{formatNumber.format(runLevel(frame.activeTicks))}</dd>
-            </div>
-            <div>
-              <dt>Score</dt>
-              <dd>{formatNumber.format(frame.score)}</dd>
-            </div>
-            <div>
-              <dt>Coins</dt>
-              <dd>{formatNumber.format(frame.totalCoins)}</dd>
-            </div>
-            <div>
-              <dt>Speed</dt>
-              <dd>{speed.toFixed(2)}×</dd>
-            </div>
-            <div className="run-checkpoint">
-              <dt id={`checkpoint-${nonce}`}>Checkpoint</dt>
-              <dd>
-                <progress
-                  aria-labelledby={`checkpoint-${nonce}`}
-                  value={checkpoint}
-                  max={RULES_V1.checkpointTicks}
-                />
-              </dd>
-            </div>
-          </dl>
-          {market && <RunMarket market={market} prices={prices} />}
-          {playing && artReady && (
-            <p className="run-rotate">Rotate to landscape to play</p>
-          )}
-          {statusPanel && (
-            <div className="run-overlay">
-              <div aria-live="polite">
-                <h4>
-                  {artError
-                    ? "Artwork unavailable"
-                    : paused
-                      ? "Reconnecting…"
-                      : (resultTitle ??
-                        error ??
-                        (artReady ? status : "Loading the course…"))}
-                </h4>
-                {paused && (
-                  <p>
-                    {error ??
-                      (suspension && suspensionCopy[suspension]) ??
-                      "MagicBlock paused the run."}{" "}
-                    {recoveryAvailable
-                      ? "Returning the original wager."
-                      : canResume
-                        ? "Your run will continue from here when the feed recovers."
-                        : "Waiting for MagicBlock to resolve the run."}
-                  </p>
-                )}
-                {artError && <p>Reopen the run to reload its artwork.</p>}
-                {settlement && <p>{settlement}</p>}
-              </div>
-              {actionNotice && !terminal && <output>{actionNotice}</output>}
-            </div>
-          )}
-        </div>
-      )}
-      {!hasWorld && (
-        <div className="run-message" aria-live="polite">
-          <h4>
-            {resultTitle ??
-              error ??
-              (activating && base?.status === "recoveryPending"
-                ? "Starting on MagicBlock…"
-                : status)}
-          </h4>
-          {settlement && <p>{settlement}</p>}
-        </div>
-      )}
-      {playing && error && <output className="run-notice">{error}</output>}
-      {!terminal &&
-        playing &&
-        control &&
-        playKey &&
-        frame &&
-        visible &&
-        powerControl && (
-          <div className="run-deck">
-            <div className="run-earnings">
-              <span>Cash out</span>
-              <strong>
-                {qualified
-                  ? `${displayUsdc(grossPayout(visible.run.stake, frame.qualifiedCheckpoints, visible.run.maxGross).toString())} USDC`
-                  : "Locked"}
-              </strong>
-              <small>
-                {qualified
-                  ? `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}× earned`
-                  : "Reach a qualifying checkpoint"}
-              </small>
-            </div>
+        {(statusPanel || !hasWorld) && (
+          <RunPanel title={panelTitle}>
+            {hasWorld && paused && (
+              <p>
+                {error ??
+                  (suspension && suspensionCopy[suspension]) ??
+                  "MagicBlock paused the run."}{" "}
+                {recoveryAvailable
+                  ? "Returning the original wager."
+                  : canResume
+                    ? "Your run will continue from here when the feed recovers."
+                    : "Waiting for MagicBlock to resolve the run."}
+              </p>
+            )}
+            {hasWorld && artError && (
+              <p>Reopen the run to reload its artwork.</p>
+            )}
+            {settlement && <p className="run-panel-amount">{settlement}</p>}
+            {actionNotice && !terminal && <output>{actionNotice}</output>}
+            {finish && (
+              <button
+                type="button"
+                className="pixel-button"
+                data-tone="gold"
+                onClick={finish}
+              >
+                Done
+              </button>
+            )}
+          </RunPanel>
+        )}
+        {playing && artReady && (
+          <p className="run-rotate">
+            <span className="pixel-icon" data-icon="rotate-device" />
+            Rotate to landscape to play
+          </p>
+        )}
+        {toast && <output className="run-toast pixel-panel">{toast}</output>}
+        {!terminal &&
+          playing &&
+          control &&
+          playKey &&
+          visible &&
+          powerControl && (
             <RunControls
               rpc={control.rpc}
               run={control.run}
@@ -866,22 +707,12 @@ export default function RunStage({
               artReady={artReady}
               surface={mount}
               power={powerControl}
+              payout={payout}
               onInputs={predictionInput}
               rulesVersion={rulesVersion}
             />
-          </div>
-        )}
-      {playing && !control && (
-        <p className="run-notice">
-          Controls are available in the tab that authorized this run.
-        </p>
-      )}
-      {!terminal && finalizing && (
-        <p className="run-notice">Settling on Solana Devnet.</p>
-      )}
-      {!hasWorld && actionNotice && !terminal && (
-        <output className="run-notice">{actionNotice}</output>
-      )}
+          )}
+      </div>
     </section>
   );
 }

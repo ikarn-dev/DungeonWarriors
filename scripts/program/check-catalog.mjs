@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assetManifestBytes } from "../../apps/web/lib/game/assets.ts";
 import { CATALOG_V1 } from "../../apps/web/lib/game/catalog.ts";
 import { rpcConfigSchema } from "../../apps/web/lib/providers/config.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
@@ -7,10 +9,17 @@ import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
 import { checkGameAssets } from "../assets/check-assets.mjs";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
 
+// Catalog v2 (2026-11-22) republishes the unchanged v1 values with media v2.
+// Read-only by default: it simulates the next publication. `--publish` signs
+// with the configured admin only after the hosted site serves the same media.
+const TARGET = 2;
+const MEDIA_VERSION = 2;
+
 const { BN, BorshCoder, convertIdlToCamelCase } =
   requireWeb("@anchor-lang/core");
 const {
   Connection,
+  Keypair,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -25,8 +34,12 @@ const publicDir = fileURLToPath(
 const pda = (seed, ...parts) =>
   PublicKey.findProgramAddressSync([Buffer.from(seed), ...parts], program)[0];
 const configAddress = pda("game-config");
-const versionBytes = Buffer.from([1, 0, 0, 0]);
-const catalogAddress = pda("catalog", versionBytes);
+const versionSeed = (version) => {
+  const bytes = Buffer.alloc(4);
+  bytes.writeUInt32LE(version);
+  return bytes;
+};
+const catalogAddress = pda("catalog", versionSeed(TARGET));
 
 function catalogData(contentHash) {
   const {
@@ -39,6 +52,7 @@ function catalogData(contentHash) {
   } = CATALOG_V1;
   const catalog = {
     ...values,
+    catalogVersion: TARGET,
     cats: cats.map(({ id, rarity, power, ...stats }) => ({
       ...stats,
       id: { [id]: {} },
@@ -54,7 +68,7 @@ function catalogData(contentHash) {
     upgradePriceBaseUnits: new BN(upgradePriceBaseUnits.toString()),
   };
   const assetManifest = {
-    version: 1,
+    version: MEDIA_VERSION,
     contentHash: [...Buffer.from(contentHash, "hex")],
   };
   const expectedHash = createHash("sha256")
@@ -66,8 +80,23 @@ function catalogData(contentHash) {
   return { catalog, assetManifest, expectedHash };
 }
 
-async function inspectCatalog(env) {
-  const media = await checkGameAssets(publicDir, 1);
+// The live site must already serve the exact manifest the catalog will bind.
+async function hostedMediaMatches(origin, contentHash) {
+  const url = new URL(`/game-assets/v${MEDIA_VERSION}/manifest.json`, origin);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
+    redirect: "error",
+    cache: "no-store",
+  });
+  if (!response.ok) return false;
+  const digest = createHash("sha256")
+    .update(assetManifestBytes(await response.json()))
+    .digest("hex");
+  return digest === contentHash;
+}
+
+async function inspectCatalog(env, adminPath) {
+  const media = await checkGameAssets(publicDir, MEDIA_VERSION);
   check(media.ready, "ASSETS_NOT_READY");
   const { HELIUS_DEVNET_RPC_URL } = rpcConfigSchema.parse(env);
   const rpc = new Connection(HELIUS_DEVNET_RPC_URL, {
@@ -99,29 +128,29 @@ async function inspectCatalog(env) {
     const record = coder.accounts.decode("catalogVersion", info.data);
     return (
       record.schemaVersion === 1 &&
-      record.binding.version === 1 &&
+      record.binding.version === TARGET &&
       Buffer.from(record.binding.contentHash).toString("hex") ===
         expectedHash &&
-      record.assetManifest.version === 1 &&
+      record.assetManifest.version === MEDIA_VERSION &&
       Buffer.from(record.assetManifest.contentHash).toString("hex") ===
         media.binding.contentHash
     );
   };
   const result = {
+    network: "solana-devnet",
     catalog: catalogAddress.toBase58(),
     assetManifest: media.binding,
     catalogHash: expectedHash,
   };
-  if (config.catalog !== null) {
+  if (config.catalog?.version === TARGET) {
     check(
-      config.catalog.version === 1 &&
-        Buffer.from(config.catalog.contentHash).toString("hex") ===
-          expectedHash &&
-        matches(current),
+      Buffer.from(config.catalog.contentHash).toString("hex") ===
+        expectedHash && matches(current),
       "CATALOG_ALREADY_PUBLISHED_WITH_DIFFERENT_BINDING",
     );
     return { ...result, status: "published" };
   }
+  check(config.catalog?.version === TARGET - 1, "UNEXPECTED_CURRENT_CATALOG");
   check(current === null, "CATALOG_PDA_OCCUPIED");
   const ix = new TransactionInstruction({
     programId: program,
@@ -132,17 +161,20 @@ async function inspectCatalog(env) {
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: coder.instruction.encode("publishCatalog", {
-      args: { expectedCurrentVersion: 0, catalog, assetManifest },
+      args: {
+        expectedCurrentVersion: TARGET - 1,
+        catalog,
+        assetManifest,
+      },
     }),
   });
-  const { blockhash } = await rpc.getLatestBlockhash("finalized");
-  const tx = new VersionedTransaction(
-    new TransactionMessage({
-      payerKey: config.admin,
-      recentBlockhash: blockhash,
-      instructions: [ix],
-    }).compileToV0Message(),
-  );
+  const block = await rpc.getLatestBlockhash("finalized");
+  const message = new TransactionMessage({
+    payerKey: config.admin,
+    recentBlockhash: block.blockhash,
+    instructions: [ix],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(message);
   const { context, value } = await rpc.simulateTransaction(tx, {
     sigVerify: false,
     commitment: "finalized",
@@ -159,18 +191,45 @@ async function inspectCatalog(env) {
       }),
     "SIMULATED_CATALOG_MISMATCH",
   );
-  return {
-    ...result,
-    status: "simulated",
-    slot: context.slot,
-    computeUnits: value.unitsConsumed,
-  };
+  if (adminPath === undefined)
+    return {
+      ...result,
+      status: "simulated",
+      slot: context.slot,
+      computeUnits: value.unitsConsumed,
+    };
+  check(
+    await hostedMediaMatches(env.APP_ORIGIN, media.binding.contentHash),
+    "PUBLISH_THE_WEB_CLIENT_FIRST",
+  );
+  const admin = Keypair.fromSecretKey(
+    Uint8Array.from(JSON.parse(readFileSync(adminPath, "utf8"))),
+  );
+  check(admin.publicKey.equals(config.admin), "INVALID_ADMIN");
+  tx.sign([admin]);
+  const signature = await rpc.sendRawTransaction(tx.serialize(), {
+    preflightCommitment: "finalized",
+  });
+  const confirmed = await rpc.confirmTransaction(
+    { ...block, signature },
+    "finalized",
+  );
+  check(confirmed.value.err === null, "PUBLICATION_FAILED");
+  const published = await rpc.getAccountInfo(catalogAddress, "finalized");
+  check(matches(published), "PUBLISHED_CATALOG_MISMATCH");
+  return { ...result, status: "published", signature };
 }
 
 if (import.meta.main) {
+  const [mode, adminPath, extra] = process.argv.slice(2);
   try {
+    check(
+      mode === undefined ||
+        (mode === "--publish" && adminPath && extra === undefined),
+      "USAGE",
+    );
     process.stdout.write(
-      `${JSON.stringify(await inspectCatalog(process.env))}\n`,
+      `${JSON.stringify(await inspectCatalog(process.env, adminPath))}\n`,
     );
   } catch (error) {
     const code =

@@ -107,6 +107,33 @@ fn v2_quiet_and_moving_markets_have_reachable_obstacles_and_higher_speed() {
 }
 
 #[test]
+fn v2_quiet_course_requires_jumps_and_keeps_speed_progressing_past_seven_times() {
+    let cat = CatId::Collector;
+    let stats = cat_stats(cat, 1).unwrap();
+    let start =
+        initialize_world_for_rules(initial(cat, 1, 0).frame, &stats, sample(0), &RULES_V2).unwrap();
+    let mut idle = start.clone();
+    for _ in 0..180 {
+        idle = step_world_for_rules(&idle, &stats, &[], sample(0), &RULES_V2).unwrap();
+        if idle.frame.terminal_reason.is_some() {
+            break;
+        }
+    }
+    assert_eq!(
+        idle.frame.terminal_reason,
+        Some(purrps_game::protocol::TerminalReason::Crash)
+    );
+    let mut played = start;
+    for _ in 0..(16 * u64::from(RULES_V2.checkpoint_ticks)) {
+        played = step_world_for_rules(&played, &stats, &controller(&played), sample(0), &RULES_V2)
+            .unwrap();
+        assert_eq!(played.frame.phase, RunPhase::Active);
+    }
+    assert!(played.frame.qualified_checkpoints >= 14);
+    assert!(played.frame.runner.automatic_speed_subpixels_per_tick > 2_800);
+}
+
+#[test]
 fn generated_required_route_is_reachable_for_every_cat_and_level_without_powers() {
     let mut trace = if std::env::var("PURRPS_WORLD_TRACE").as_deref() == Ok("1") {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
