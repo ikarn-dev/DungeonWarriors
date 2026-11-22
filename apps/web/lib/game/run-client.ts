@@ -65,16 +65,25 @@ export async function prepareSponsoredPlay(
   key?: Keypair,
   sign?: (tx: VersionedTransaction) => Promise<VersionedTransaction>,
 ): Promise<SponsoredPlayTransaction> {
+  // Live run state also carries the retry limit. Only send the fields the
+  // transaction API accepts on both prepare and submit.
+  const sponsor = intent.playSponsor;
+  const request = sponsor
+    ? {
+        ...intent,
+        playSponsor: { sponsor: sponsor.sponsor, floor: sponsor.floor },
+      }
+    : intent;
   const prepared = preparedSchema.parse(
-    await webApi("/api/tx/prepare", intent, signal),
+    await webApi("/api/tx/prepare", request, signal),
   );
   let tx = VersionedTransaction.deserialize(decodeBase64(prepared.transaction));
-  validatePreparedGame(tx, wallet, intent, prepared);
+  validatePreparedGame(tx, wallet, request, prepared);
   if (sign) tx = await sign(tx);
   signal.throwIfAborted();
   if (key) tx.sign([key]);
   return {
-    intent,
+    intent: request,
     transaction: encodeBase64(tx.serialize()),
     network: prepared.network,
     lastValidBlockHeight: prepared.lastValidBlockHeight,

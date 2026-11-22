@@ -72,12 +72,14 @@ test("a version without a manifest leaves the scene pending", async () => {
   assert.ok(result.missing.includes("coin-spin"));
 });
 test("all first scene SVGs are valid and bound by the bundled manifest", async () => {
-  const result = await checkGameAssets(
-    fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    2,
+  const publicDirectory = fileURLToPath(
+    new URL("../../../apps/web/public", import.meta.url),
   );
-  assert.equal(result.ready, true);
-  assert.equal(result.checkedFiles, 37);
+  for (const version of [1, 2]) {
+    const result = await checkGameAssets(publicDirectory, version);
+    assert.equal(result.ready, true);
+    assert.equal(result.checkedFiles, 37);
+  }
 });
 test("active SVG content is rejected even when its digest matches", async () =>
   fixture(async ({ root, folder, image, save }) => {

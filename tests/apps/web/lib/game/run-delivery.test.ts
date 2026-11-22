@@ -1,5 +1,11 @@
 import { readFileSync } from "node:fs";
-import { type AccountInfo, type Connection, PublicKey } from "@solana/web3.js";
+import {
+  type AccountInfo,
+  type Connection,
+  PublicKey,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { describe, expect, it, vi } from "vitest";
 import { Predictor } from "../../../../../apps/web/lib/game/predictor";
 import {
@@ -7,7 +13,11 @@ import {
   decodeRunAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
-import { confirmGameAction } from "../../../../../apps/web/lib/game/run-client";
+import {
+  confirmGameAction,
+  prepareSponsoredPlay,
+  submitSponsoredPlay,
+} from "../../../../../apps/web/lib/game/run-client";
 import {
   RunState,
   subscribeRun,
@@ -21,6 +31,11 @@ import {
   mergeRunPrices,
   runPricePath,
 } from "../../../../../apps/web/lib/game/run-price";
+import {
+  type GameIntent,
+  gameInstructions,
+  gameIntentSchema,
+} from "../../../../../apps/web/lib/game/run-transactions";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses.ts";
 
 const identity = {
@@ -45,6 +60,68 @@ const run = (name = "active") =>
   decodeRunAccount(identity, address.run[0], info(name));
 const escrow = (name = "reserved") =>
   decodeEscrowAccount(identity, address.escrow[0], info(name));
+
+it("sends a valid settlement intent when live run state includes a sponsor retry limit", async () => {
+  const liveSponsor = {
+    sponsor: new PublicKey(new Uint8Array(32).fill(2)).toBase58(),
+    floor: "250000000",
+    maxAttempts: 3,
+  };
+  const intent = {
+    operation: "game",
+    sponsored: false,
+    playSponsor: liveSponsor,
+    action: { kind: "requestCompletion", nonce: "1", market: "BTC" },
+  } satisfies GameIntent;
+  const { payer, instructions, operationId } = gameInstructions(
+    identity.owner,
+    intent,
+  );
+  const blockhash = PublicKey.default.toBase58();
+  const tx = new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message(),
+  );
+  const transaction = Buffer.from(tx.serialize()).toString("base64");
+  const prepared = {
+    transaction,
+    blockhash,
+    operationId,
+    network: "er",
+    lastValidBlockHeight: 123,
+  };
+  const submitted = { signature: "2".repeat(87), network: "er" };
+  const fetchTx = vi.fn((url: string, request: RequestInit) => {
+    const payload = JSON.parse(String(request.body));
+    const value = gameIntentSchema.parse(
+      url === "/api/tx/prepare" ? payload : payload.intent,
+    );
+    expect(value.playSponsor).toEqual({
+      sponsor: liveSponsor.sponsor,
+      floor: liveSponsor.floor,
+    });
+    return Promise.resolve(
+      Response.json(url === "/api/tx/prepare" ? prepared : submitted),
+    );
+  });
+  vi.stubGlobal("fetch", fetchTx);
+  try {
+    const { signal } = new AbortController();
+    const pending = await prepareSponsoredPlay(identity.owner, intent, signal);
+    await expect(submitSponsoredPlay(pending, signal)).resolves.toMatchObject(
+      submitted,
+    );
+    expect(fetchTx.mock.calls.map(([url]) => url)).toEqual([
+      "/api/tx/prepare",
+      "/api/tx/submit",
+    ]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 it("keeps checking the original bet signature when base finality is slow", async () => {
   const pending = {

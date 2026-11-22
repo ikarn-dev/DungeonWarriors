@@ -589,34 +589,42 @@ export default function RunStage({
           multiplier: `${earnedMultiplierBps(frame.qualifiedCheckpoints) / 10_000}×`,
         }
       : null;
-  const statusPanel = !artReady || !playing;
+  const settling =
+    phase === "terminalRecorded" ||
+    finalizing ||
+    base?.status === "settlementReady";
   const resultTitle =
-    base?.result?.outcome === "loss" ||
-    visible?.run.observation.terminalReason === "crash"
-      ? "Run over"
-      : base?.result?.outcome === "win"
-        ? "Cash out complete"
-        : base?.result?.outcome === "technicalRefund"
-          ? "Wager refunded"
-          : null;
-  const panelTitle = !hasWorld
-    ? (resultTitle ??
-      error ??
-      (activating && base?.status === "recoveryPending"
-        ? "Starting on MagicBlock…"
-        : status))
-    : artError
+    base?.result?.outcome === "win"
+      ? "Cash out complete"
+      : base?.result?.outcome === "technicalRefund"
+        ? "Wager refunded"
+        : base?.result?.outcome === "loss" ||
+            (settling && visible?.run.observation.terminalReason === "crash")
+          ? "Run over"
+          : settling
+            ? labels.settlementReady
+            : null;
+  const statusPanel =
+    !hasWorld || !artReady || !playing || resultTitle !== null;
+  const showArtError = hasWorld && artError && resultTitle === null;
+  const panelTitle =
+    resultTitle ??
+    (showArtError
       ? "Artwork unavailable"
-      : paused
+      : paused && hasWorld
         ? "Reconnecting…"
-        : (resultTitle ?? error ?? (artReady ? status : "Loading the course…"));
+        : (error ??
+          (!hasWorld && activating && base?.status === "recoveryPending"
+            ? "Starting on MagicBlock…"
+            : !hasWorld || artReady
+              ? status
+              : "Loading the course…")));
   const finish = terminal && runSettled ? runSettled : undefined;
   const toast =
     (playing && error) ||
     (playing && !control
       ? "Controls are available in the tab that authorized this run."
-      : null) ||
-    (!terminal && finalizing ? "Settling on Solana Devnet." : null);
+      : null);
 
   if (!present) return null;
 
@@ -653,9 +661,9 @@ export default function RunStage({
             Close viewer
           </button>
         )}
-        {(statusPanel || !hasWorld) && (
+        {statusPanel && (
           <RunPanel title={panelTitle}>
-            {hasWorld && paused && (
+            {hasWorld && paused && resultTitle === null && (
               <p>
                 {error ??
                   (suspension && suspensionCopy[suspension]) ??
@@ -667,9 +675,7 @@ export default function RunStage({
                     : "Waiting for MagicBlock to resolve the run."}
               </p>
             )}
-            {hasWorld && artError && (
-              <p>Reopen the run to reload its artwork.</p>
-            )}
+            {showArtError && <p>Reopen the run to reload its artwork.</p>}
             {settlement && <p className="run-panel-amount">{settlement}</p>}
             {actionNotice && !terminal && <output>{actionNotice}</output>}
             {finish && (

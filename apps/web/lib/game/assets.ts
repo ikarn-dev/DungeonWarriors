@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// Media version bound by the current published catalog (2026-11-22). Every
-// screen and run renders from it; retired versions are not bundled.
+// Media used by the lobby. Runs load the exact version and hash published
+// by the on-chain catalog, so those assets must also be bundled.
 export const MEDIA_ROOT = "/game-assets/v2";
 
 export const FIRST_SCENE_ASSETS = [
