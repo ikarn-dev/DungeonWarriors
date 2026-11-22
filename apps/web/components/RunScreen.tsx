@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
+import { type ReactNode, type RefObject, useId } from "react";
 import { displayUsdc } from "../lib/game/custody-client";
 import { MARKETS } from "../lib/solana/addresses";
 
@@ -15,7 +15,6 @@ export function RunGameDialog({
   shown,
   busy,
   title,
-  inRun,
   onClose,
   onBack,
   children,
@@ -24,7 +23,6 @@ export function RunGameDialog({
   shown: boolean;
   busy: boolean;
   title: string;
-  inRun: boolean;
   onClose: () => void;
   onBack: () => void;
   children: ReactNode;
@@ -37,29 +35,19 @@ export function RunGameDialog({
       onCancel={(event) => {
         if (busy) event.preventDefault();
       }}
-      className={
-        inRun
-          ? "run-dialog"
-          : "m-0 h-dvh max-h-none w-full max-w-none bg-[#f4f0e3] text-[#173b32] backdrop:bg-[#173b32]/70"
-      }
+      className="run-dialog"
     >
       {shown && (
-        <section
-          className={
-            inRun
-              ? "run-dialog-layout"
-              : "mx-auto grid min-h-full max-w-6xl content-center gap-5 px-4 py-5 sm:px-8"
-          }
-        >
+        <section className="run-dialog-layout">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-semibold">{title}</h2>
             <button
               type="button"
-              className={inRun ? "run-control" : button}
+              className="run-control"
               disabled={busy}
               onClick={onBack}
             >
-              {inRun ? "← Lobby" : "Back to lobby"}
+              ← Lobby
             </button>
           </div>
           {children}
@@ -69,35 +57,77 @@ export function RunGameDialog({
   );
 }
 
-export function RunReady({
+export function RunBet({
   market,
   setMarket,
   amount,
   setAmount,
-  remaining,
   cap,
   stake,
+  available,
   busy,
   continuing,
   allowed,
+  loading,
+  quoteError,
   onStart,
+  onRetryQuote,
 }: {
   market: Market;
   setMarket: (value: Market) => void;
   amount: string;
   setAmount: (value: string) => void;
-  remaining: bigint | undefined;
   cap: bigint | null;
   stake: bigint | null;
+  available: bigint;
   busy: boolean;
   continuing: boolean;
   allowed: boolean;
+  loading: boolean;
+  quoteError: string | undefined;
   onStart: () => void;
+  onRetryQuote: () => void;
 }) {
+  const hint = useId();
+  const invalid = amount !== "" && (stake === null || stake > available);
+  let detail: ReactNode = null;
+  if (!continuing) {
+    if (quoteError) detail = quoteError;
+    else if (loading) detail = "Checking run availability…";
+    else if (amount !== "" && stake === null)
+      detail = "Enter a positive USDC amount.";
+    else if (stake !== null && stake > available)
+      detail = (
+        <>
+          Available in PURRPS{" "}
+          <span className="font-mono tabular-nums">
+            {displayUsdc(available.toString())} USDC
+          </span>
+        </>
+      );
+    else if (cap !== null && stake !== null)
+      detail =
+        cap > stake ? (
+          <>
+            Maximum payout{" "}
+            <span className="font-mono tabular-nums">
+              {displayUsdc(cap.toString())} USDC
+            </span>
+          </>
+        ) : (
+          "The vault cannot back a profit at this amount."
+        );
+  }
   return (
-    <section
-      className="grid gap-4 rounded-xl border border-[#cbd3be] bg-[#fffaf0] p-5 sm:p-7"
-      aria-label="Run setup"
+    <form
+      className="grid gap-3"
+      aria-label="Bet and run"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (busy) return;
+        if (continuing || allowed) onStart();
+        else if (quoteError) onRetryQuote();
+      }}
     >
       <fieldset
         className="grid gap-4 sm:grid-cols-2"
@@ -123,39 +153,37 @@ export function RunReady({
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          Wager (Devnet USDC)
+          Bet (Devnet USDC)
           <input
-            className={field}
+            className={`${field} font-mono tabular-nums`}
             value={amount}
             inputMode="decimal"
+            autoComplete="off"
+            aria-invalid={invalid}
+            aria-describedby={detail ? hint : undefined}
             onChange={(event) => setAmount(event.target.value)}
           />
         </label>
       </fieldset>
-      {remaining !== undefined && !continuing && (
-        <p className="text-sm">
-          Play allowance remaining {displayUsdc(remaining.toString())} USDC
-        </p>
-      )}
-      {cap !== null && stake !== null && (
-        <p className="text-sm">
-          {cap > stake
-            ? `Maximum gross payout ${displayUsdc(cap.toString())} USDC`
-            : "The vault cannot back a profit at this wager."}
+      {detail && (
+        <p id={hint} className="text-sm" aria-live="polite">
+          {detail}
         </p>
       )}
       <button
-        type="button"
+        type="submit"
         data-primary
         className={button}
-        disabled={busy || (!continuing && !allowed)}
-        onClick={onStart}
+        disabled={busy || (!continuing && !allowed && !quoteError)}
       >
-        {continuing ? "Continue run" : "Start"}
+        {busy && continuing
+          ? "Starting run…"
+          : continuing
+            ? "Continue run"
+            : quoteError
+              ? "Retry"
+              : "Bet and run"}
       </button>
-      {remaining === undefined && !continuing && (
-        <p className="text-sm">Return to the lobby to enable sponsored play.</p>
-      )}
-    </section>
+    </form>
   );
 }

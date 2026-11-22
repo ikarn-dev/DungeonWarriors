@@ -7,6 +7,7 @@ import {
   decodeRunAccount,
   runAddresses,
 } from "../../../../../apps/web/lib/game/run-accounts";
+import { confirmGameAction } from "../../../../../apps/web/lib/game/run-client";
 import {
   RunState,
   subscribeRun,
@@ -39,6 +40,39 @@ const run = (name = "active") =>
   decodeRunAccount(identity, address.run[0], info(name));
 const escrow = (name = "reserved") =>
   decodeEscrowAccount(identity, address.escrow[0], info(name));
+
+it("keeps checking the original bet signature when base finality is slow", async () => {
+  const pending = {
+    signature: "2".repeat(87),
+    network: "base",
+    lastValidBlockHeight: 123,
+  } as const;
+  let reads = 0;
+  const fetchStatus = vi.fn((_url: string, _request: RequestInit) =>
+    Promise.resolve(
+      Response.json({
+        status:
+          ++reads === 7 ? { confirmationStatus: "finalized", err: null } : null,
+        resolution: "pending",
+      }),
+    ),
+  );
+  vi.useFakeTimers();
+  vi.stubGlobal("fetch", fetchStatus);
+  try {
+    const result = confirmGameAction(pending, new AbortController().signal, 18);
+    await vi.runAllTimersAsync();
+    await expect(result).resolves.toBe("confirmed");
+    expect(fetchStatus).toHaveBeenCalledTimes(7);
+    for (const [url, request] of fetchStatus.mock.calls) {
+      expect(url).toBe("/api/tx/status");
+      expect(request.body).toBe(JSON.stringify(pending));
+    }
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
 
 describe("Rust account delivery", () => {
   it("decodes real Rust Borsh/IDL bytes into the predictor without losing precision", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Keypair, type VersionedTransaction } from "@solana/web3.js";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
 import { parseUsdc } from "../lib/game/custody-client";
@@ -28,7 +28,7 @@ import {
 } from "../lib/game/web-api";
 import type { MARKETS } from "../lib/solana/addresses";
 import { u64Input } from "../lib/solana/program";
-import { RunGameDialog, RunReady } from "./RunScreen";
+import { RunBet, RunGameDialog } from "./RunScreen";
 import RunStage from "./RunStage";
 
 type Market = (typeof MARKETS)[number]["market"];
@@ -37,28 +37,18 @@ type Offer = Extract<
   { status: "ready" }
 >;
 type Flight = { prepared: SponsoredPlayTransaction; signature?: GameSignature };
-type Permission = {
-  key: Keypair;
-  nonce: string;
-  expires: number;
-  remaining: bigint;
-};
 type Launch = {
-  nonce: string;
-  market: Market;
-  reserve: Extract<GameIntent["action"], { kind: "reserveRun" }>;
+  key: Keypair;
+  rent: { token: string; authorization: string };
+  reserve: Extract<GameIntent["action"], { kind: "reserveRun" }> & {
+    expiresAtSeconds: number;
+  };
   sponsor: PlaySponsor;
-  step: number;
+  step: "authorize" | "reserve" | "activate";
   flight: Flight | null;
 };
-const messages = [
-  "Reserving your wager and connecting to MagicBlock…",
-  "Starting the run…",
-];
 const button =
   "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50";
-const field =
-  "min-h-11 rounded-md border border-[#cbd3be] bg-white px-3 text-[#173b32]";
 const rejected = new Set([
   "INVALID_SIGNATURE",
   "INVALID_REQUEST",
@@ -87,17 +77,17 @@ async function readOffer(signal: AbortSignal) {
   return entry;
 }
 
-function currentPermission(value: Permission | null) {
-  return value &&
-    value.expires > Math.floor(Date.now() / 1000) &&
-    value.remaining > 0n
-    ? value
-    : null;
+function positiveAmount(value: string) {
+  try {
+    return parseUsdc(value);
+  } catch {
+    return null;
+  }
 }
 
 async function confirmFlight(flight: Flight, signal: AbortSignal) {
   flight.signature ??= await submitSponsoredPlay(flight.prepared, signal);
-  return confirmGameAction(flight.signature, signal);
+  return confirmGameAction(flight.signature, signal, 18);
 }
 
 export default function RunEntry({
@@ -121,150 +111,64 @@ export default function RunEntry({
   const [open, setOpen] = useState(false);
   const [market, setMarket] = useState<Market>("SOL");
   const [amount, setAmount] = useState("");
-  const [allowance, setAllowance] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [offer, setOffer] = useState<Offer | null>(null);
-  const [permission, setPermission] = useState<Permission | null>(null);
-  const authorization = useRef<{
-    permission: Permission;
-    flight: Flight;
-  } | null>(null);
+  const [terms, setTerms] = useState<{ offer?: Offer; error?: string }>();
+  const [quoteRequest, setQuoteRequest] = useState(0);
   const launch = useRef<Launch | null>(null);
   const recovery = useRef<Flight | null>(null);
   const [runningNonce, setRunningNonce] = useState<string | null>(null);
-  const permitted = currentPermission(permission);
   const cat = state.cats.find((owned) => owned.id === state.selected);
   const recovered =
     state.nextRunNonce !== state.settledRuns
       ? (BigInt(state.nextRunNonce) - 1n).toString()
       : null;
   const viewer = runningNonce ?? (launch.current === null ? recovered : null);
+  const offer = terms?.offer;
+  const sponsor = launch.current?.sponsor ?? offer?.playSponsor;
   const available = BigInt(offer?.available ?? state.available);
   const stake = positiveAmount(amount);
-  const limit = positiveAmount(allowance);
   const cap =
     stake !== null && offer
       ? quotedGross(stake, BigInt(offer.houseHeadroom), offer.maxMultiplierBps)
       : null;
-  const allowed =
+  const allowed = !!(
+    sign &&
+    cat &&
     stake !== null &&
     cap !== null &&
     cap > stake &&
-    stake <= available &&
-    permitted !== null &&
-    stake <= permitted.remaining;
+    stake <= available
+  );
 
-  function positiveAmount(value: string) {
-    try {
-      return parseUsdc(value);
-    } catch {
-      return null;
-    }
-  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Wallet, finalized refreshes and manual retries invalidate the displayed quote.
+  useEffect(() => {
+    const controller = new AbortController();
+    void readOffer(controller.signal).then(
+      (offer) => {
+        if (!controller.signal.aborted) setTerms({ offer });
+      },
+      (error) => {
+        if (!controller.signal.aborted) setTerms({ error: shownError(error) });
+      },
+    );
+    return () => controller.abort();
+  }, [wallet, state.slot, quoteRequest]);
 
-  async function enable(signal: AbortSignal) {
-    if (!sign) return;
-    try {
-      if (authorization.current === null) {
-        if (limit === null || limit > BigInt(state.available)) return;
-        setNotice("Approve your play allowance in Phantom…");
-        const next = await readOffer(signal);
-        if (!next.playSponsor || limit > BigInt(next.available))
-          throw new WebApiError("RUN_SCOPE_MISMATCH");
-        const key = Keypair.generate();
-        const inputKey = key.publicKey.toBase58();
-        const rent = z
-          .object({ token: u64Input, authorization: u64Input })
-          .parse(
-            await webApi(
-              "/api/chain/state",
-              { kind: "playSessionRent", nonce: next.sessionNonce, inputKey },
-              signal,
-            ),
-          );
-        const expires = next.clockSeconds + PLAY_SESSION_SECONDS;
-        const intent = {
-          operation: "game",
-          sponsored: false,
-          playSponsor: next.playSponsor,
-          action: {
-            kind: "authorizeSession",
-            nonce: next.sessionNonce,
-            inputKey,
-            expiresAtSeconds: expires,
-            allowance: limit.toString(),
-            rent,
-          },
-        } satisfies GameIntent;
-        authorization.current = {
-          permission: {
-            key,
-            nonce: next.sessionNonce,
-            expires,
-            remaining: limit,
-          },
-          flight: {
-            prepared: await prepareSponsoredPlay(
-              wallet,
-              intent,
-              signal,
-              key,
-              sign,
-            ),
-          },
-        };
-      }
-      setNotice("Confirming your play allowance…");
-      const status = await confirmFlight(authorization.current.flight, signal);
-      if (status === "pending") {
-        setNotice("Check the pending play approval to continue.");
-        return;
-      }
-      if (status === "failed") {
-        authorization.current = null;
-        throw new WebApiError("TRANSACTION_FAILED");
-      }
-      setPermission(authorization.current.permission);
-      authorization.current = null;
-      setNotice(null);
-    } catch (error) {
-      if (knownFailure(error)) authorization.current = null;
-      if (!signal.aborted) setNotice(shownError(error));
-    }
-  }
-
-  function openGame() {
-    dialog.current?.showModal();
-    setOpen(true);
-    setNotice(null);
-    void work(async (signal) => {
-      try {
-        setOffer(await readOffer(signal));
-      } catch (error) {
-        if (!signal.aborted) setNotice(shownError(error));
-      }
-    });
-  }
+  useEffect(() => {
+    if (open && dialog.current && !dialog.current.open)
+      dialog.current.showModal();
+  }, [open]);
 
   async function start(signal: AbortSignal) {
-    const play = launch.current ? permission : permitted;
-    if (!play || !cat) return;
-    if (
-      launch.current &&
-      launch.current.step > 0 &&
-      play.expires <= Math.floor(Date.now() / 1000)
-    ) {
-      setRunningNonce(launch.current.nonce);
-      setNotice(null);
-      return;
-    }
+    if (!sign || !cat) return;
+    setNotice(null);
     try {
       if (launch.current === null) {
         if (!allowed || stake === null || cap === null || !offer) return;
         if (
           matchMedia("(orientation: portrait) and (pointer: coarse)").matches
         ) {
-          setNotice("Rotate your device to landscape to start.");
+          setNotice("Rotate to landscape to start.");
           return;
         }
         const definingCatalogVersion = state.definingCatalogs[cat.id];
@@ -275,39 +179,46 @@ export default function RunEntry({
           state.catalogVersion === null
         )
           throw new WebApiError("ASSETS_NOT_READY");
-        setNotice("Checking the run terms…");
+
+        setNotice("Checking your bet…");
         const next = await readOffer(signal);
-        setOffer(next);
         if (
           !next.playSponsor ||
           next.nonce !== offer.nonce ||
+          next.nonce !== state.nextRunNonce ||
           stake > BigInt(next.available)
         ) {
+          setTerms({ offer: next });
           await refresh(signal);
-          setNotice("Your account changed. Review the updated terms.");
+          setNotice("Your account changed. Review the updated bet.");
           return;
         }
-        if (
-          quotedGross(
-            stake,
-            BigInt(next.houseHeadroom),
-            next.maxMultiplierBps,
-          ) < cap
-        ) {
-          setNotice("The vault payout cap changed. Review it before starting.");
+        const updatedCap = quotedGross(
+          stake,
+          BigInt(next.houseHeadroom),
+          next.maxMultiplierBps,
+        );
+        if (updatedCap < cap) {
+          setTerms({ offer: next });
+          setNotice("The maximum payout changed. Review the updated bet.");
           return;
         }
-        if (
-          play.expires - next.clockSeconds <=
-          RULES_V1.activationTimeoutSeconds
-        ) {
-          setPermission(null);
-          setNotice(
-            "Your play allowance is expiring. Enable a new allowance in the lobby.",
-          );
-          return;
-        }
-        const binding = await readRunMedia(definingCatalogVersion, signal);
+        const key = Keypair.generate();
+        const inputKey = key.publicKey.toBase58();
+        const [binding, rent] = await Promise.all([
+          readRunMedia(definingCatalogVersion, signal),
+          webApi(
+            "/api/chain/state",
+            {
+              kind: "playSessionRent",
+              nonce: next.sessionNonce,
+              inputKey,
+            },
+            signal,
+          ).then((value) =>
+            z.object({ token: u64Input, authorization: u64Input }).parse(value),
+          ),
+        ]);
         const assets = await fetch(
           `/game-assets/v${binding.version}/manifest.json`,
           { signal },
@@ -320,18 +231,19 @@ export default function RunEntry({
           import("phaser"),
         ]);
         signal.throwIfAborted();
+        const expiresAtSeconds = next.clockSeconds + PLAY_SESSION_SECONDS;
         launch.current = {
-          nonce: next.nonce,
-          market,
+          key,
           sponsor: next.playSponsor,
-          step: 0,
+          step: "authorize",
           flight: null,
+          rent,
           reserve: {
             kind: "reserveRun",
             nonce: next.nonce,
-            sessionNonce: play.nonce,
-            inputKey: play.key.publicKey.toBase58(),
-            expiresAtSeconds: play.expires,
+            sessionNonce: next.sessionNonce,
+            inputKey,
+            expiresAtSeconds,
             inventoryVersion: state.inventoryVersion.toString(),
             rulesVersion: state.rulesVersion,
             catalogVersion: state.catalogVersion,
@@ -347,78 +259,98 @@ export default function RunEntry({
         };
       }
       const setup = launch.current;
-      while (setup.step < messages.length) {
+      for (;;) {
         signal.throwIfAborted();
-        setNotice(messages[setup.step] ?? null);
-        if (!setup.flight) {
-          let action: GameIntent["action"] = setup.reserve;
-          if (setup.step > 0) {
-            const run = await readRunIdentity(wallet, setup.nonce, signal);
-            if (
-              run.inputKey !== play.key.publicKey.toBase58() ||
-              !run.delegationInitiated
-            )
+        const { step, reserve } = setup;
+        if (setup.flight === null) {
+          const now = Math.floor(Date.now() / 1000);
+          if (
+            step === "reserve" &&
+            reserve.expiresAtSeconds - now <= RULES_V1.activationTimeoutSeconds
+          ) {
+            launch.current = null;
+            setNotice("Approval expired. Start the bet again.");
+            return;
+          }
+          let action: GameIntent["action"] =
+            step === "authorize"
+              ? {
+                  kind: "authorizeSession",
+                  nonce: reserve.sessionNonce,
+                  inputKey: reserve.inputKey,
+                  expiresAtSeconds: reserve.expiresAtSeconds,
+                  allowance: reserve.stake,
+                  rent: setup.rent,
+                }
+              : reserve;
+          if (step === "activate") {
+            const run = await readRunIdentity(wallet, reserve.nonce, signal);
+            if (run.inputKey !== reserve.inputKey || !run.delegationInitiated)
               throw new WebApiError("RUN_SCOPE_MISMATCH");
-            if (
-              BigInt(run.activationDeadlineSeconds) <=
-              BigInt(Math.floor(Date.now() / 1000))
-            ) {
-              setRunningNonce(setup.nonce);
+            if (BigInt(run.activationDeadlineSeconds) <= BigInt(now)) {
+              setRunningNonce(reserve.nonce);
+              setOpen(true);
               setNotice(null);
               return;
             }
-            const identity = {
-              nonce: setup.nonce,
+            action = {
+              kind: "activateRun",
+              nonce: reserve.nonce,
               delegationEpoch: run.delegationEpoch,
               inputKey: run.inputKey,
+              market: reserve.market,
             };
-            action = { kind: "activateRun", ...identity, market: setup.market };
           }
-          const intent = {
-            operation: "game",
-            sponsored: false,
-            playSponsor: setup.sponsor,
-            action,
-          } as const;
+          setNotice(
+            step === "authorize"
+              ? "Approve your bet in your wallet."
+              : "Starting your run…",
+          );
           setup.flight = {
             prepared: await prepareSponsoredPlay(
               wallet,
-              intent,
+              {
+                operation: "game",
+                sponsored: false,
+                playSponsor: setup.sponsor,
+                action,
+              },
               signal,
-              play.key,
+              setup.key,
+              step === "authorize" ? sign : undefined,
             ),
           };
         }
         const status = await confirmFlight(setup.flight, signal);
         if (status === "pending") {
-          setNotice(
-            "The transaction is pending. Continue this run to check it.",
-          );
+          setNotice("Still confirming. Continue to check the same bet.");
           return;
         }
         setup.flight = null;
         if (status === "failed") throw new WebApiError("TRANSACTION_FAILED");
-        if (setup.step === 0) {
-          setPermission({
-            ...play,
-            remaining: play.remaining - BigInt(setup.reserve.stake),
-          });
+        if (step === "activate") {
+          setRunningNonce(reserve.nonce);
+          setOpen(true);
+          setNotice(null);
+          await refresh(signal);
+          return;
         }
-        setup.step++;
+        setup.step = step === "authorize" ? "reserve" : "activate";
       }
-      setRunningNonce(setup.nonce);
-      setNotice(null);
-      await refresh(signal);
     } catch (error) {
       const setup = launch.current;
-      if (setup && (knownFailure(error) || setup.flight === null)) {
+      if (
+        setup &&
+        (setup.flight === null ||
+          (!setup.flight.signature && knownFailure(error)))
+      ) {
         setup.flight = null;
-        if (setup.step === 0) launch.current = null;
+        if (setup.step !== "activate") launch.current = null;
       }
       if (!signal.aborted)
         setNotice(
-          setup?.step === 1
-            ? "MagicBlock could not start this run yet. Continue to retry the same run."
+          setup?.step === "activate"
+            ? "Continue to start your existing run."
             : shownError(error),
         );
     }
@@ -434,51 +366,34 @@ export default function RunEntry({
       className="grid gap-3 border-t border-[#cbd3be] pt-4"
       aria-label="Play"
     >
-      {!permitted && viewer === null && !launch.current && (
-        <>
-          <label className="grid gap-1 text-sm">
-            Play allowance (Devnet USDC)
-            <input
-              className={field}
-              inputMode="decimal"
-              value={allowance}
-              onChange={(event) => setAllowance(event.target.value)}
-              disabled={blocked || authorization.current !== null}
-            />
-          </label>
-          <p className="text-sm">
-            Approve the total you can wager for the next 30 minutes. PURRPS
-            covers run fees.
-          </p>
-          <button
-            type="button"
-            data-primary
-            className={button}
-            disabled={
-              blocked ||
-              !sign ||
-              (authorization.current === null &&
-                (limit === null ||
-                  limit > BigInt(state.available) ||
-                  !state.allowReservations))
-            }
-            onClick={() => void work(enable)}
-          >
-            {authorization.current
-              ? "Check play approval"
-              : "Enable sponsored play"}
-          </button>
-        </>
-      )}
-      {(permitted || viewer !== null || launch.current !== null) && (
+      {viewer === null ? (
+        <RunBet
+          market={market}
+          setMarket={setMarket}
+          amount={amount}
+          setAmount={setAmount}
+          cap={cap}
+          stake={stake}
+          available={available}
+          busy={blocked}
+          continuing={launch.current !== null}
+          allowed={allowed}
+          loading={!terms}
+          quoteError={terms?.error}
+          onStart={() => void work(start)}
+          onRetryQuote={() => {
+            setTerms(undefined);
+            setQuoteRequest((request) => request + 1);
+          }}
+        />
+      ) : (
         <button
           type="button"
-          data-primary
           className={button}
           disabled={blocked}
-          onClick={openGame}
+          onClick={() => setOpen(true)}
         >
-          {viewer || launch.current ? "Open run" : "Run"}
+          Open run
         </button>
       )}
       {!open && notice && <output className="text-sm">{notice}</output>}
@@ -487,28 +402,26 @@ export default function RunEntry({
         shown={open || runningNonce !== null}
         busy={blocked}
         title={cat ? CAT_NAMES[cat.id] : "PURRPS"}
-        inRun={viewer !== null}
         onClose={() => setOpen(false)}
         onBack={close}
       >
-        {viewer !== null ? (
+        {viewer !== null && (
           <RunStage
             key={viewer}
             wallet={wallet}
             nonce={viewer}
-            playKey={runningNonce ? permission?.key : undefined}
+            playKey={runningNonce ? launch.current?.key : undefined}
             runSettled={() => {
               launch.current = null;
               recovery.current = null;
               setRunningNonce(null);
+              setAmount("");
               close();
               void work(refresh);
             }}
             submitAction={
-              offer?.playSponsor
+              sponsor
                 ? async (action, onSignature, signal) => {
-                    if (!offer.playSponsor)
-                      throw new WebApiError("SPONSOR_BUDGET_UNAVAILABLE");
                     try {
                       recovery.current ??= {
                         prepared: await prepareSponsoredPlay(
@@ -516,12 +429,12 @@ export default function RunEntry({
                           {
                             operation: "game",
                             sponsored: false,
-                            playSponsor: offer.playSponsor,
+                            playSponsor: sponsor,
                             action,
                           },
                           signal,
                           action.kind === "resumeRun"
-                            ? permission?.key
+                            ? launch.current?.key
                             : undefined,
                         ),
                       };
@@ -540,29 +453,6 @@ export default function RunEntry({
                 : undefined
             }
           />
-        ) : (
-          <RunReady
-            market={market}
-            setMarket={setMarket}
-            amount={amount}
-            setAmount={setAmount}
-            remaining={permitted?.remaining}
-            cap={
-              launch.current?.reserve.maxGross === undefined
-                ? cap
-                : BigInt(launch.current.reserve.maxGross)
-            }
-            stake={stake}
-            busy={blocked}
-            continuing={launch.current !== null}
-            allowed={allowed}
-            onStart={() => void work(start)}
-          />
-        )}
-        {notice && (
-          <output className="text-sm" aria-live="polite">
-            {notice}
-          </output>
         )}
       </RunGameDialog>
     </section>

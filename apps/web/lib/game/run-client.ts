@@ -228,8 +228,9 @@ export async function sendGameAction(
 export async function confirmGameAction(
   pending: GameSignature,
   signal: AbortSignal,
+  checks = 6,
 ) {
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < checks; attempt++) {
     signal.throwIfAborted();
     const { status, resolution } = await webApi<{
       status: { confirmationStatus: string; err: unknown } | null;
@@ -242,7 +243,7 @@ export async function confirmGameAction(
     ) {
       return status.err === null ? "confirmed" : "failed";
     }
-    if (attempt < 5)
+    if (attempt < checks - 1)
       await new Promise<void>((resolve) => setTimeout(resolve, 3200));
   }
   return "pending";
