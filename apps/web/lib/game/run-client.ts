@@ -11,22 +11,6 @@ import { decodeBase64, encodeBase64, WebApiError, webApi } from "./web-api";
 
 export const PLAY_SESSION_SECONDS = 30 * 60;
 
-export async function readRunMedia(catalog: number, signal: AbortSignal) {
-  const value = await webApi(
-    "/api/chain/state",
-    { kind: "catalogMedia", version: catalog },
-    signal,
-  );
-  return z
-    .object({
-      media: z.object({
-        version: z.number().int().positive(),
-        contentHash: z.string().regex(/^[0-9a-f]{64}$/),
-      }),
-    })
-    .parse(value).media;
-}
-
 export const runEntrySchema = z.object({
   commitment: z.literal("finalized"),
   entry: z.discriminatedUnion("status", [

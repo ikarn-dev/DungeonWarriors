@@ -6,7 +6,13 @@ import type { PlayerIntent } from "../lib/game/protocol";
 import { RULES_V1 } from "../lib/game/rules";
 import { sendRunInput } from "../lib/game/run-input";
 
-const button = "run-control";
+const button = "pixel-button run-control";
+const powerIcons = {
+  magnet: "magnet",
+  doubleJump: "double-jump",
+  shield: "shield",
+  extraDash: "extra-dash",
+} as const;
 const binding: Record<string, PlayerIntent> = {
   ArrowLeft: { kind: "move", axis: "left" },
   ArrowRight: { kind: "move", axis: "right" },
@@ -27,6 +33,7 @@ export default function RunControls({
   artReady,
   surface,
   power,
+  payout,
   onInputs,
   rulesVersion,
 }: {
@@ -38,7 +45,15 @@ export default function RunControls({
   playing: boolean;
   artReady: boolean;
   surface: RefObject<HTMLDivElement | null>;
-  power: { name: string; ready: boolean; detail: string };
+  power: {
+    id: keyof typeof powerIcons;
+    name: string;
+    ready: boolean;
+    active: boolean;
+    remaining: number;
+    detail: string;
+  };
+  payout: { amount: string; multiplier: string } | null;
   onInputs: (sequence: bigint, actions: readonly PlayerIntent[]) => void;
   rulesVersion: number;
 }) {
@@ -258,9 +273,16 @@ export default function RunControls({
     };
   }, [rpc, run, playKey, surface, onInputs, rulesVersion]);
 
+  function playAction(kind: "dash" | "boost" | "jump", byPointer: boolean) {
+    enqueue.current({ kind });
+    // Keep Space available for the next jump after clicking a control.
+    if (byPointer) surface.current?.focus({ preventScroll: true });
+  }
+
+  const controlsOff = paused || !playing || !artReady;
   return (
     <fieldset className="run-controls" aria-label="Run controls" ref={root}>
-      <div className="run-control-row">
+      <div className="run-pad" data-pad="move">
         {(["left", "right"] as const).map((axis) => (
           <button
             key={axis}
@@ -268,7 +290,7 @@ export default function RunControls({
             className={button}
             aria-label={axis === "left" ? "Move left" : "Move right"}
             data-direction
-            disabled={paused || !playing || !artReady}
+            disabled={controlsOff}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               enqueue.current({ kind: "move", axis });
@@ -287,49 +309,94 @@ export default function RunControls({
                 enqueue.current({ kind: "move", axis: "neutral" });
             }}
           >
-            <span aria-hidden="true">{axis === "left" ? "←" : "→"}</span>
+            <span className="pixel-icon" data-icon={axis} aria-hidden="true" />
           </button>
         ))}
-        {(["jump", "dash", "boost"] as const).map((kind) => (
-          <button
-            type="button"
-            key={kind}
-            className={button}
-            disabled={
-              paused ||
-              !playing ||
-              !artReady ||
-              (kind === "boost" && !power.ready)
-            }
-            onClick={(event) => {
-              enqueue.current({ kind });
-              // Pointer users can jump with Space again after using a power.
-              if (event.detail > 0)
-                surface.current?.focus({ preventScroll: true });
-            }}
-          >
-            {kind === "jump" ? "Jump" : kind === "dash" ? "Dash" : power.name}
-          </button>
-        ))}
+      </div>
+      <div className="run-pad" data-pad="cash">
         <button
           type="button"
-          className={button}
-          data-cash-out
+          className="pixel-button run-cash"
+          data-tone={eligible ? "gold" : undefined}
           disabled={!eligible || cashOut || !playing}
           onClick={() => enqueue.current({ kind: "cashOut" })}
         >
-          {cashOut ? "Cash-out requested" : "Cash Out"}
+          <span
+            className="pixel-icon"
+            data-icon={eligible ? "cash-out" : "lock"}
+            aria-hidden="true"
+          />
+          <span className="run-cash-text">
+            <span>
+              {cashOut
+                ? "Cash-out requested"
+                : eligible
+                  ? "Cash out"
+                  : "Cash out locked"}
+            </span>
+            <strong>
+              {payout
+                ? `${payout.amount} · ${payout.multiplier}`
+                : "Reach a checkpoint"}
+            </strong>
+          </span>
         </button>
       </div>
+      <div className="run-pad" data-pad="action">
+        <button
+          type="button"
+          className={button}
+          data-tone="blue"
+          disabled={controlsOff}
+          onClick={(event) => playAction("dash", event.detail > 0)}
+        >
+          <span className="pixel-icon" data-icon="dash" aria-hidden="true" />
+          <span className="run-control-label">Dash</span>
+        </button>
+        <button
+          type="button"
+          className={button}
+          data-tone={power.id}
+          data-active={power.active || undefined}
+          disabled={controlsOff || !power.ready}
+          aria-describedby={`power-${run.toBase58()}`}
+          onClick={(event) => playAction("boost", event.detail > 0)}
+        >
+          <span
+            className="run-cooldown"
+            aria-hidden="true"
+            style={{ transform: `scaleY(${power.remaining})` }}
+          />
+          <span
+            className="pixel-icon"
+            data-icon={powerIcons[power.id]}
+            aria-hidden="true"
+          />
+          <span className="run-control-label">{power.name}</span>
+        </button>
+        <button
+          type="button"
+          className={button}
+          data-tone="green"
+          data-size="large"
+          disabled={controlsOff}
+          onClick={(event) => playAction("jump", event.detail > 0)}
+        >
+          <span className="pixel-icon" data-icon="jump" aria-hidden="true" />
+          <span className="run-control-label">Jump</span>
+        </button>
+      </div>
+      <p className="run-controls-note">
+        <span id={`power-${run.toBase58()}`}>
+          {power.name}: {power.detail}
+        </span>
+        {message && <output>{message}</output>}
+      </p>
       {playing && !paused && artReady && (
-        <>
-          <p className="run-notice">{power.detail}</p>
-          <p className="run-keyboard">
-            ← / → Move · ↑ Jump · Shift Dash · B Power · C Cash out
-          </p>
-        </>
+        <p className="run-keyboard">
+          ← / → Move · ↑ Jump · Shift Dash · B Power · C Cash out
+        </p>
       )}
-      {message && <output className="text-sm">{message}</output>}
     </fieldset>
   );
 }

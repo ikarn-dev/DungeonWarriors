@@ -13,7 +13,6 @@ import {
   type GameSignature,
   PLAY_SESSION_SECONDS,
   prepareSponsoredPlay,
-  readRunMedia,
   runEntrySchema,
   type SponsoredPlayTransaction,
   submitSponsoredPlay,
@@ -122,14 +121,13 @@ export default function RunEntry({
   const [terms, setTerms] = useState<{ offer?: Offer; error?: string }>();
   const [quoteRequest, setQuoteRequest] = useState(0);
   const launch = useRef<Launch | null>(null);
-  const warm = useRef<{ catalog: number; artwork: Promise<RunArtwork> } | null>(
+  const warm = useRef<{ cat: string; artwork: Promise<RunArtwork> } | null>(
     null,
   );
   const [runningNonce, setRunningNonce] = useState<string | null>(null);
   const cat = state.cats.find((owned) => owned.id === state.selected);
   const selectedCat = cat?.id;
-  const definingCatalog = cat ? state.definingCatalogs[cat.id] : undefined;
-  const { assetBinding, catalogVersion } = state;
+  const { assetBinding } = state;
   const mediaVersion = assetBinding?.version;
   const mediaHash = assetBinding?.contentHash;
   const recovered =
@@ -154,22 +152,21 @@ export default function RunEntry({
   );
   const starting = viewer !== null && launch.current?.step === "activate";
 
+  // Runs render with the current catalog's media, whatever catalog defined the cat.
   useEffect(() => {
-    if (!definingCatalog || !selectedCat) return;
+    if (!selectedCat || !mediaVersion || !mediaHash) return;
     const controller = new AbortController();
-    const binding =
-      definingCatalog === catalogVersion && mediaVersion && mediaHash
-        ? Promise.resolve({ version: mediaVersion, contentHash: mediaHash })
-        : readRunMedia(definingCatalog, controller.signal);
-    const artwork = binding.then((binding) =>
-      loadRunArtwork(binding, controller.signal, selectedCat),
+    const artwork = loadRunArtwork(
+      { version: mediaVersion, contentHash: mediaHash },
+      controller.signal,
+      selectedCat,
     );
-    warm.current = { catalog: definingCatalog, artwork };
+    warm.current = { cat: selectedCat, artwork };
     void artwork.catch(() => {
       if (warm.current?.artwork === artwork) warm.current = null;
     });
     return () => controller.abort();
-  }, [mediaVersion, mediaHash, catalogVersion, definingCatalog, selectedCat]);
+  }, [mediaVersion, mediaHash, selectedCat]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Wallet, finalized refreshes and manual retries invalidate the displayed quote.
   useEffect(() => {
@@ -205,6 +202,7 @@ export default function RunEntry({
         const definingCatalogVersion = state.definingCatalogs[cat.id];
         if (
           !definingCatalogVersion ||
+          !assetBinding ||
           state.inventoryVersion === null ||
           state.rulesVersion === null ||
           state.catalogVersion === null
@@ -238,11 +236,9 @@ export default function RunEntry({
         const inputKey = key.publicKey.toBase58();
         const preloaded = warm.current;
         const [artwork, rent] = await Promise.all([
-          preloaded && preloaded.catalog === definingCatalogVersion
+          preloaded && preloaded.cat === cat.id
             ? preloaded.artwork
-            : readRunMedia(definingCatalogVersion, signal).then((binding) =>
-                loadRunArtwork(binding, signal, cat.id),
-              ),
+            : loadRunArtwork(assetBinding, signal, cat.id),
           webApi(
             "/api/chain/state",
             {
@@ -478,6 +474,7 @@ export default function RunEntry({
             activating={starting}
             autoDeliver
             present={open}
+            media={assetBinding}
             onFinalized={() => {
               if (dialog.current?.open) {
                 setRunningNonce(viewer);
@@ -497,15 +494,20 @@ export default function RunEntry({
             }}
           />
         )}
-        {starting && notice && <output className="run-notice">{notice}</output>}
-        {starting && !blocked && (
-          <button
-            type="button"
-            className="run-control"
-            onClick={() => void work(start)}
-          >
-            Continue run
-          </button>
+        {starting && (notice || !blocked) && (
+          <div className="run-dialog-notice pixel-panel">
+            {notice && <output>{notice}</output>}
+            {!blocked && (
+              <button
+                type="button"
+                className="pixel-button"
+                data-tone="green"
+                onClick={() => void work(start)}
+              >
+                Continue run
+              </button>
+            )}
+          </div>
         )}
       </RunGameDialog>
     </section>

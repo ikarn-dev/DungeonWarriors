@@ -66,10 +66,6 @@ export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("balances") }).strict(),
   z.object({ kind: z.literal("walletFunds") }).strict(),
   z.object({ kind: z.literal("runEntry") }).strict(),
-  z.strictObject({
-    kind: z.literal("catalogMedia"),
-    version: z.number().int().min(1).max(0xffffffff),
-  }),
   z.object({ kind: z.literal("leaderboard") }).strict(),
   z.object({ kind: z.literal("draw"), nonce: u64Input }).strict(),
   z.object({ kind: z.literal("run"), nonce: u64Input }).strict(),
@@ -559,34 +555,6 @@ export async function readState(
     throw new ApiError("WRONG_NETWORK", 503);
   if (input.kind === "history") return readHistory(rpc, owner, input);
   if (input.kind === "runEntry") return readRunEntry(rpc, owner);
-  if (input.kind === "catalogMedia") {
-    const version = Buffer.alloc(4);
-    version.writeUInt32LE(input.version);
-    const { context, value } = await rpc.getAccountInfoAndContext(
-      pda("catalog", version),
-      "finalized",
-    );
-    const catalog = account<Accounts["catalogVersion"]>(
-      "catalogVersion",
-      value,
-    );
-    if (
-      !catalog ||
-      catalog.schemaVersion !== 1 ||
-      catalog.binding.version !== input.version
-    )
-      throw invalidAccount();
-    return {
-      ...stateContext(context.slot),
-      media: {
-        version: catalog.assetManifest.version,
-        contentHash: Buffer.from(catalog.assetManifest.contentHash).toString(
-          "hex",
-        ),
-      },
-    };
-  }
-
   if (input.kind === "walletFunds") {
     const { slot, ...walletFunds } = await readWalletFunds(rpc, owner);
     return { ...stateContext(slot), walletFunds };

@@ -16,7 +16,7 @@ export default function RunMarket({
   const latest = prices.at(-1);
   if (!latest) return null;
   return (
-    <div className="run-market" data-course="progressive-course-v2">
+    <div className="run-market pixel-panel" data-course="progressive-course-v2">
       <div className="flex items-baseline justify-between gap-2">
         <span>{market}/USD</span>
         <strong
@@ -39,8 +39,8 @@ export default function RunMarket({
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
           />
         )}
       </svg>

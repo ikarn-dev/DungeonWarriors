@@ -1,8 +1,9 @@
 import Image from "next/image";
+import { MEDIA_ROOT } from "../lib/game/assets";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 import style from "./StarterExperience.module.css";
 
-const art = "/game-assets/v1";
+const art = MEDIA_ROOT;
 
 export default function StarterCapsule({
   state,

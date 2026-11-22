@@ -629,6 +629,7 @@ export default function StarterPanel() {
                     key={`account:${address}`}
                     wallet={address}
                     blocked={blocked}
+                    media={state?.assetBinding ?? null}
                     transfer={(kind, amount) =>
                       perform((signal) =>
                         transact(

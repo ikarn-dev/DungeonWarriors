@@ -56,10 +56,12 @@ const labels = ["Available in PURRPS", "Wagers in play", "Pending purchases"];
 export default function AccountPanel({
   wallet,
   blocked,
+  media,
   transfer,
 }: {
   wallet: string;
   blocked: boolean;
+  media: { version: number; contentHash: string } | null;
   transfer: (kind: "deposit" | "withdraw", amount: string) => Promise<void>;
 }) {
   const [view, setView] = useState<null | {
@@ -275,6 +277,7 @@ export default function AccountPanel({
               key={watchedRun}
               nonce={watchedRun}
               wallet={wallet}
+              media={media}
               close={() => setWatchedRun(null)}
               runSettled={() => {
                 setWatchedRun(null);

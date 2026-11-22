@@ -65,7 +65,7 @@ async function fixture(work) {
 test("a version without a manifest leaves the scene pending", async () => {
   const result = await checkGameAssets(
     fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    2,
+    3,
   );
   assert.equal(result.ready, false);
   assert.equal(result.reason, "USER_ASSETS_PENDING");
@@ -74,7 +74,7 @@ test("a version without a manifest leaves the scene pending", async () => {
 test("all first scene SVGs are valid and bound by the bundled manifest", async () => {
   const result = await checkGameAssets(
     fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    1,
+    2,
   );
   assert.equal(result.ready, true);
   assert.equal(result.checkedFiles, 37);

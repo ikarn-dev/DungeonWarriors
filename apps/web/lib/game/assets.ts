@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Media version bound by the current published catalog (2026-11-22). Every
+// screen and run renders from it; retired versions are not bundled.
+export const MEDIA_ROOT = "/game-assets/v2";
+
 export const FIRST_SCENE_ASSETS = [
   "background-forest-far",
   "background-forest-near",
