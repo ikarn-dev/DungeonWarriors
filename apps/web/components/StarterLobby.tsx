@@ -23,15 +23,11 @@ import {
   webApi,
   webErrorMessage,
 } from "../lib/game/web-api";
-import AccountPanel from "./AccountPanel";
-import CapsuleShop from "./CapsuleShop";
-import CatCollection from "./CatCollection";
-import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
+import type { LobbyTab } from "./LobbyMenu";
 import LobbyScene from "./LobbyScene";
+import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
 import { WalletChip } from "./LobbyWallet";
-import RunEntry from "./RunEntry";
-import WalletFunds from "./WalletFunds";
 import { signInWallet } from "./wallet-sign-in";
 
 const preparedSchema = z
@@ -61,10 +57,10 @@ export default function StarterPanel() {
   const authenticated = address !== null && sessionWallet === address;
   const restoring = address !== null && checkedWallet !== address;
   const [state, setState] = useState<LobbyState | null>(null);
-  const [walletFundsRevision, setWalletFundsRevision] = useState<number>();
+  const [accountRevision, setAccountRevision] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<LobbyTab>("play");
-  const [message, setMessage] = useState("Connect a wallet to begin.");
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{
     signature: string;
@@ -83,7 +79,7 @@ export default function StarterPanel() {
         if (!signal?.aborted) setState(decodeLobbyState(value, address));
       } finally {
         if (!signal?.aborted)
-          setWalletFundsRevision((previous) => (previous ?? 0) + 1);
+          setAccountRevision((previous) => (previous ?? 0) + 1);
       }
     },
     [address],
@@ -96,11 +92,11 @@ export default function StarterPanel() {
     setCheckedWallet(null);
     setRestoreFailed(false);
     setState(null);
-    setWalletFundsRevision(undefined);
+    setAccountRevision(undefined);
     setPending(null);
     setError(null);
     if (address === null) {
-      setMessage("Connect a wallet to begin.");
+      setMessage(null);
       return;
     }
     const controller = new AbortController();
@@ -117,11 +113,11 @@ export default function StarterPanel() {
         );
         if (controller.signal.aborted) return;
         if (session.wallet !== walletAddress) {
-          setMessage("Sign in with this wallet to continue.");
+          setMessage(null);
           return;
         }
         setSessionWallet(walletAddress);
-        setMessage("Signed in. Account reads use finalized Devnet state.");
+        setMessage(null);
         await reload(signal).catch((failure: unknown) => {
           if (
             failure instanceof WebApiError &&
@@ -137,7 +133,7 @@ export default function StarterPanel() {
           failure.code === "AUTH_REQUIRED"
         ) {
           setSessionWallet(null);
-          setMessage("Sign in with this wallet to continue.");
+          setMessage(null);
         } else {
           setRestoreFailed(true);
           setMessage("Couldn't restore your session. Try again.");
@@ -164,7 +160,7 @@ export default function StarterPanel() {
       if (controller.signal.aborted) return;
       if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED") {
         setSessionWallet(null);
-        setMessage("Sign in with this wallet to continue.");
+        setMessage(null);
       }
       setError(
         failure instanceof WebApiError
@@ -184,7 +180,7 @@ export default function StarterPanel() {
     if (!(await signInWallet(address, wallet.signMessage, signal))) return;
     setSessionWallet(address);
     await reload(signal);
-    setMessage("Signed in. Account reads use finalized Devnet state.");
+    setMessage(null);
   }
   async function reconcile(signature: string, signal: AbortSignal) {
     for (let attempt = 0; attempt < 20 && !signal.aborted; attempt++) {
@@ -199,9 +195,7 @@ export default function StarterPanel() {
         }
         if (result.status.err !== null)
           throw new WebApiError("TRANSACTION_FAILED");
-        setMessage(
-          "Transaction finalized. Ownership is shown only after its onchain grant.",
-        );
+        setMessage("Transaction confirmed.");
         return;
       }
       await pause(3000, signal);
@@ -286,7 +280,7 @@ export default function StarterPanel() {
         else
           setMessage(
             next.pendingDraw === null
-              ? "The capsule result is finalized."
+              ? "Your capsule draw is complete."
               : "Draw remains pending. Refresh to recover this same request.",
           );
       } catch {
@@ -299,6 +293,12 @@ export default function StarterPanel() {
       clearTimeout(timer);
     };
   }, [authenticated, address, state?.pendingDraw]);
+  // Confirmations are transient; pending and error states stay until resolved.
+  useEffect(() => {
+    if (message === null || pending !== null) return;
+    const timer = setTimeout(() => setMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [message, pending]);
   const blocked = busy || pending !== null;
   const copy = () =>
     void perform(async () => {
@@ -321,12 +321,6 @@ export default function StarterPanel() {
   const scene = owned.length
     ? [...owned].sort((a, b) => first(a) - first(b))
     : CATALOG_V1.cats.map(({ id }) => id);
-  const selected = state?.cats.find(({ id }) => id === state.selected) ?? null;
-  const status = restoring
-    ? "Restoring your session…"
-    : busy
-      ? "Waiting for wallet or chain response…"
-      : message;
   return (
     <>
       <LobbyScene cats={scene} />
@@ -340,93 +334,17 @@ export default function StarterPanel() {
       )}
       <div className="lobby-body" aria-busy={busy}>
         {ready && address !== null && state !== null ? (
-          <LobbyMenu
+          <LobbySections
+            state={state}
+            address={address}
+            sign={wallet.signTransaction}
+            blocked={blocked}
+            accountRevision={accountRevision}
             tab={tab}
-            onTab={setTab}
-            cursor={state.selected}
-            panels={{
-              play: (
-                <>
-                  {selected && <LobbyHero cat={selected} />}
-                  <RunEntry
-                    key={`run:${address}`}
-                    state={state}
-                    wallet={address}
-                    blocked={blocked}
-                    sign={wallet.signTransaction}
-                    work={perform}
-                    refresh={reload}
-                  />
-                </>
-              ),
-              cats: (
-                <CatCollection
-                  state={state}
-                  blocked={blocked}
-                  onSelect={(cat) =>
-                    void perform(async (signal) => {
-                      if (state.inventoryVersion === null) return;
-                      await transact(
-                        {
-                          operation: "selectCat",
-                          inventoryVersion: state.inventoryVersion.toString(),
-                          cat,
-                          sponsored: false,
-                        },
-                        signal,
-                      );
-                    })
-                  }
-                />
-              ),
-              shop: (
-                <CapsuleShop
-                  key={`shop:${address}`}
-                  state={state}
-                  wallet={address}
-                  blocked={blocked}
-                  action={(action) =>
-                    void perform((signal) =>
-                      transact(
-                        { operation: "game", sponsored: false, action },
-                        signal,
-                      ),
-                    )
-                  }
-                />
-              ),
-              account: (
-                <div className="lobby-stack">
-                  <WalletFunds key={address} revision={walletFundsRevision} />
-                  <button
-                    type="button"
-                    className="pixel-button"
-                    disabled={busy}
-                    onClick={() => void perform((signal) => reload(signal))}
-                  >
-                    Refresh account
-                  </button>
-                  <AccountPanel
-                    key={`account:${address}`}
-                    wallet={address}
-                    blocked={blocked}
-                    media={state.assetBinding}
-                    transfer={(kind, amount) =>
-                      perform((signal) =>
-                        transact(
-                          {
-                            operation: "game",
-                            sponsored: false,
-                            action: { kind, amount },
-                          },
-                          signal,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-              ),
-            }}
+            setTab={setTab}
+            perform={perform}
+            transact={transact}
+            reload={reload}
           />
         ) : (
           <LobbyStart
@@ -479,22 +397,24 @@ export default function StarterPanel() {
           />
         )}
       </div>
-      <footer className="lobby-status">
-        <output aria-live="polite">{status}</output>
-        {error !== null && <p role="alert">{webErrorMessage(error)}</p>}
-        {pending !== null && (
-          <button
-            type="button"
-            className="pixel-button"
-            disabled={busy}
-            onClick={() =>
-              void perform((signal) => reconcile(pending.signature, signal))
-            }
-          >
-            Check transaction
-          </button>
-        )}
-      </footer>
+      {(message || error !== null || pending !== null) && (
+        <footer className="lobby-status">
+          {message && <output aria-live="polite">{message}</output>}
+          {error !== null && <p role="alert">{webErrorMessage(error)}</p>}
+          {pending !== null && (
+            <button
+              type="button"
+              className="pixel-button"
+              disabled={busy}
+              onClick={() =>
+                void perform((signal) => reconcile(pending.signature, signal))
+              }
+            >
+              Check transaction
+            </button>
+          )}
+        </footer>
+      )}
     </>
   );
 }

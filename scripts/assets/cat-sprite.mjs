@@ -1,8 +1,9 @@
 import { CATS, ink, shared } from "./cat-palettes.mjs";
-import { Grid, gridPaths } from "./pixel-grid.mjs";
+import { Grid, gridPaths, scale2x } from "./pixel-grid.mjs";
 
-// Side-view runner on a 24x24 cell grid (2 logical px per cell). Feet rest on
-// row 18 so the outline ends exactly on the 48x48 frame's (24, 40) anchor.
+// Side-view runner drawn on a 24x24 cell grid, then doubled with Scale2x to a
+// 48x48 grid of 1 logical px cells for smoother edges. Feet rest on row 18 so
+// the outline ends exactly on the 48x48 frame's (24, 40) anchor.
 const FOOT = 18;
 const HIP = 15;
 
@@ -262,14 +263,46 @@ function head(grid, cat, pose) {
   }
 }
 
-function streaks(grid, pose) {
+// Rounded eyes, nose and mouth at the doubled resolution (rows shifted by 1).
+function face(fine, cat, pose) {
+  const y0 = pose.headBob + pose.bob;
+  const x0 = pose.lean + (pose.streaks ? 1 : 0);
+  const palette = {
+    k: shared.eye,
+    w: shared.glint,
+    f: cat.fur,
+    m: cat.mask,
+    i: ink,
+    p: shared.pink,
+  };
+  if (pose.eyes === "open")
+    for (const ex of [13, 17])
+      fine.stamp(
+        2 * (ex + x0),
+        2 * (7 + y0) + 1,
+        ["fkkf", "kwkk", "kkkk", "fkkf"],
+        palette,
+      );
+  fine.stamp(2 * (16 + x0), 2 * (9 + y0) + 1, ["pp", "mm"], palette);
+  if (pose.mouth === "open")
+    fine.stamp(2 * (15 + x0), 2 * (10 + y0) + 1, ["imiimi", "mippim"], palette);
+}
+
+// Thin speed lines at the doubled resolution.
+function streaks(fine, pose) {
   if (!pose.streaks) return;
   for (const [y, from, to] of [
     [7, 0, 3],
     [11, 0, 2],
     [14, 1, 3],
   ])
-    grid.rect(from, y + pose.bob, to - from + 1, 1, "#ffffffb0");
+    fine.rect(
+      from * 2,
+      (y + pose.bob) * 2 + 1,
+      (to - from + 1) * 2,
+      1,
+      "#ffffffb0",
+    );
 }
 
 export function catFrame(id, pose) {
@@ -283,13 +316,21 @@ export function catFrame(id, pose) {
   scarf(grid, cat, pose);
   head(grid, cat, pose);
   badge(grid, cat, pose);
-  grid.outline(ink);
+  // Double first, then outline at the fine grid: a 1-cell line reads cleaner.
+  // One row down keeps the outline's lower edge on the y = 40 anchor.
+  const fine = new Grid(48, 48);
+  const doubled = scale2x(grid);
+  for (let y = 0; y < 47; y++)
+    for (let x = 0; x < 48; x++)
+      fine.set(x, y + 1, doubled.get(x, y) ?? undefined);
+  face(fine, cat, pose);
+  fine.outline(ink);
   if (pose.flash)
-    grid.cells = grid.cells.map((c) =>
+    fine.cells = fine.cells.map((c) =>
       c === null || c === ink ? c : "#fff3f0",
     );
-  streaks(grid, pose);
-  return gridPaths(grid, 2);
+  streaks(fine, pose);
+  return gridPaths(fine, 1);
 }
 
 function run(frame) {

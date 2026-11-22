@@ -100,6 +100,29 @@ export class Grid {
   }
 }
 
+// Scale2x (EPX): doubles the grid and rounds stair-stepped edges, so art
+// keeps its pixel character with half-size cells and cleaner curves.
+export function scale2x(grid) {
+  const next = new Grid(grid.width * 2, grid.height * 2);
+  for (let y = 0; y < grid.height; y++)
+    for (let x = 0; x < grid.width; x++) {
+      const p = grid.get(x, y);
+      const a = grid.get(x, y - 1);
+      const b = grid.get(x + 1, y);
+      const c = grid.get(x - 1, y);
+      const d = grid.get(x, y + 1);
+      next.cells[2 * y * next.width + 2 * x] =
+        c === a && c !== d && a !== b ? a : p;
+      next.cells[2 * y * next.width + 2 * x + 1] =
+        a === b && a !== c && b !== d ? b : p;
+      next.cells[(2 * y + 1) * next.width + 2 * x] =
+        d === c && d !== b && c !== a ? c : p;
+      next.cells[(2 * y + 1) * next.width + 2 * x + 1] =
+        b === d && b !== a && d !== c ? d : p;
+    }
+  return next;
+}
+
 // Row-merged rectangles grouped by color: compact, crisp at integer zoom.
 export function gridPaths(grid, scale = 2, offsetX = 0, offsetY = 0) {
   const byColor = new Map();

@@ -46,8 +46,6 @@ type Launch = {
   flight: Flight | null;
   approval?: GameSignature;
 };
-const button =
-  "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50";
 const rejected = new Set([
   "INVALID_SIGNATURE",
   "INVALID_REQUEST",
@@ -421,10 +419,7 @@ export default function RunEntry({
   }
 
   return (
-    <section
-      className="grid gap-3 border-t border-[#cbd3be] pt-4"
-      aria-label="Play"
-    >
+    <section className="lobby-stack" aria-label="Play">
       {viewer === null ? (
         <RunBet
           market={market}
@@ -446,14 +441,18 @@ export default function RunEntry({
           }}
         />
       ) : (
-        <button
-          type="button"
-          className={button}
-          disabled={blocked}
-          onClick={() => setOpen(true)}
-        >
-          Open run
-        </button>
+        <div className="lobby-banner">
+          <p>Run #{viewer} is still in progress.</p>
+          <button
+            type="button"
+            className="pixel-button"
+            data-tone="gold"
+            disabled={blocked}
+            onClick={() => setOpen(true)}
+          >
+            Continue run
+          </button>
+        </div>
       )}
       {!open && notice && <output className="text-sm">{notice}</output>}
       <RunGameDialog

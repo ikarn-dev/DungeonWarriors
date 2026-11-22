@@ -15,8 +15,10 @@ export default function CatCollection({
   onSelect: (cat: CatId) => void;
 }) {
   return (
-    <div className="lobby-stack">
-      <h2>Your cats</h2>
+    <div className="lobby-section">
+      <header className="lobby-section-head">
+        <h2>Cats</h2>
+      </header>
       {state.cats.length === 0 ? (
         <p>No finalized cats yet.</p>
       ) : (

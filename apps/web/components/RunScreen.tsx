@@ -92,7 +92,7 @@ export function RunBet({
   let detail: ReactNode = null;
   if (!continuing) {
     if (quoteError) detail = quoteError;
-    else if (loading) detail = "Checking run availability…";
+    else if (loading) detail = null;
     else if (amount !== "" && stake === null)
       detail = "Enter a positive USDC amount.";
     else if (stake !== null && stake > available)

@@ -1,7 +1,8 @@
 /* Full-screen lobby: pixel scene, title, menu and section panels. */
 .lobby {
-  /* Art scale: each 2 px art cell stays a whole number of CSS pixels. */
+  /* Scenery scale keeps each 2 px art cell whole; cats (1 px cells) use --ck. */
   --k: 2;
+  --ck: 3;
   --ground: calc(40px * var(--k));
   position: relative;
   isolation: isolate;
@@ -19,16 +20,19 @@
 @media (min-height: 46rem) {
   .lobby {
     --k: 2.5;
+    --ck: 3.5;
   }
 }
 @media (min-height: 58rem) {
   .lobby {
     --k: 3;
+    --ck: 4;
   }
 }
 @media (max-height: 30rem) {
   .lobby {
     --k: 1.5;
+    --ck: 2.5;
   }
 }
 
@@ -61,10 +65,10 @@
 .lobby-cat {
   position: absolute;
   left: 0;
-  /* Feet sit 8 art px above the frame bottom and 2 below the grass top. */
-  bottom: calc(var(--ground) - 10px * var(--k));
-  width: calc(48px * var(--k));
-  height: calc(48px * var(--k));
+  /* Feet sit 8 px above the frame bottom and 2 scenery px below the grass top. */
+  bottom: calc(var(--ground) - 2px * var(--k) - 8px * var(--ck));
+  width: calc(48px * var(--ck));
+  height: calc(48px * var(--ck));
   background-repeat: no-repeat;
   image-rendering: pixelated;
   visibility: hidden;
@@ -136,6 +140,7 @@
   overflow: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   align-items: start;
   justify-items: center;
   padding: calc(var(--px) * 2);
@@ -164,25 +169,26 @@
   text-decoration: none;
 }
 
+/* Every section shares one panel size; long content scrolls inside it. */
 .lobby-menu-layout {
   display: grid;
-  grid-template-columns: 13rem minmax(0, 46rem);
+  grid-template-columns: 13rem min(48rem, calc(100% - 14.5rem));
+  grid-template-rows: minmax(0, 1fr);
   justify-content: center;
-  align-items: start;
   gap: 1.5rem;
   width: 100%;
+  height: 100%;
 }
 .lobby-menu {
   display: grid;
-  gap: 1rem;
-  position: sticky;
-  top: 0;
+  align-content: start;
+  gap: 0.75rem;
 }
 .lobby-menu-item {
   justify-content: flex-start;
-  min-height: 3.25rem;
+  min-height: 3rem;
   padding-inline: 0.5rem 1rem;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
 }
 .lobby-cursor {
   display: inline-grid;
@@ -192,6 +198,9 @@
 }
 .lobby-panel {
   min-width: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 1.25rem 1.5rem;
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.9375rem;
@@ -354,12 +363,12 @@
   }
   .lobby-menu-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 1rem;
   }
   .lobby-menu {
-    position: static;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.625rem;
   }
   .lobby-menu-item {
     justify-content: center;

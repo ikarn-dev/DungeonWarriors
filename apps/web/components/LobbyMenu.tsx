@@ -4,12 +4,20 @@ import { MEDIA_ROOT } from "../lib/game/assets";
 import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 
-export type LobbyTab = "play" | "cats" | "shop" | "account";
+export type LobbyTab =
+  | "play"
+  | "cats"
+  | "shop"
+  | "wallet"
+  | "history"
+  | "leaderboard";
 const TABS = [
   ["play", "Play"],
   ["cats", "Cats"],
   ["shop", "Shop"],
-  ["account", "Account"],
+  ["wallet", "Wallet"],
+  ["history", "History"],
+  ["leaderboard", "Leaderboard"],
 ] as const;
 
 // Title-screen style menu. Every section stays mounted so an open run, a

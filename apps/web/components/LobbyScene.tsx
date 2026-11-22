@@ -77,7 +77,7 @@ export default function LobbyScene({
     if (!root || !sheets || roster === "") return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const readScale = () =>
-      Number(getComputedStyle(root).getPropertyValue("--k")) || 3;
+      Number(getComputedStyle(root).getPropertyValue("--ck")) || 3;
     let scale = readScale();
     const measure = () => {
       scale = readScale();
@@ -107,8 +107,10 @@ export default function LobbyScene({
     });
     measure();
     const paint = (w: Walker, frame: number) => {
-      const px = Math.round(w.x / scale) * scale;
-      const py = Math.round(w.y / scale) * scale;
+      // Whole device pixels keep motion smooth without blurring the sprite.
+      const dpr = window.devicePixelRatio || 1;
+      const px = Math.round(w.x * dpr) / dpr;
+      const py = Math.round(w.y * dpr) / dpr;
       w.el.style.transform = `translate3d(${px}px, ${-py}px, 0) scaleX(${w.facing})`;
       w.el.style.backgroundPosition = `${-frame * FRAME * scale}px 0`;
       w.el.style.visibility = "visible";

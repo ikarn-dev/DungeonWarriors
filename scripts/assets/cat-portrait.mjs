@@ -1,8 +1,9 @@
 import { CATS, ink, shared } from "./cat-palettes.mjs";
-import { Grid, gridPaths } from "./pixel-grid.mjs";
+import { Grid, gridPaths, scale2x } from "./pixel-grid.mjs";
 
-// Seated, front-facing portrait on a 48x48 cell grid (2 logical px per cell),
-// drawn after the reference avatars. Mirrored features use x' = 47 - x.
+// Seated, front-facing portrait drawn on a 48x48 cell grid after the reference
+// avatars, then doubled with Scale2x to 96x96 one-pixel cells. Mirrored
+// features use x' = 47 - x.
 const mirror = (x) => 47 - x;
 
 function triangle(grid, [ax, ay], [bx, by], [cx, cy], color) {
@@ -190,5 +191,5 @@ export function catPortrait(id) {
   extras(grid, cat);
   badge(grid, cat, id);
   grid.outline(ink);
-  return gridPaths(grid, 2);
+  return gridPaths(scale2x(grid), 1);
 }
