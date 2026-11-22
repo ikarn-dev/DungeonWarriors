@@ -5,10 +5,6 @@ import { displayUsdc } from "../lib/game/custody-client";
 import { MARKETS } from "../lib/solana/addresses";
 
 type Market = (typeof MARKETS)[number]["market"];
-const button =
-  "min-h-11 rounded-md border border-current px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50";
-const field =
-  "min-h-11 rounded-md border border-[#cbd3be] bg-white px-3 text-[#173b32]";
 
 export function RunGameDialog({
   dialog,
@@ -88,6 +84,7 @@ export function RunBet({
   onRetryQuote: () => void;
 }) {
   const hint = useId();
+  const input = useId();
   const invalid = amount !== "" && (stake === null || stake > available);
   let detail: ReactNode = null;
   if (!continuing) {
@@ -96,20 +93,13 @@ export function RunBet({
     else if (amount !== "" && stake === null)
       detail = "Enter a positive USDC amount.";
     else if (stake !== null && stake > available)
-      detail = (
-        <>
-          Available in PURRPS{" "}
-          <span className="font-mono tabular-nums">
-            {displayUsdc(available.toString())} USDC
-          </span>
-        </>
-      );
+      detail = "More than your available balance.";
     else if (cap !== null && stake !== null)
       detail =
         cap > stake ? (
           <>
             Maximum payout{" "}
-            <span className="font-mono tabular-nums">
+            <span className="lobby-figure">
               {displayUsdc(cap.toString())} USDC
             </span>
           </>
@@ -119,7 +109,7 @@ export function RunBet({
   }
   return (
     <form
-      className="grid gap-3"
+      className="lobby-bet"
       aria-label="Bet and run"
       onSubmit={(event) => {
         event.preventDefault();
@@ -128,51 +118,54 @@ export function RunBet({
         else if (quoteError) onRetryQuote();
       }}
     >
-      <fieldset
-        className="grid gap-4 sm:grid-cols-2"
-        disabled={busy || continuing}
-      >
-        <label className="grid gap-1 text-sm">
-          Market
-          <select
-            className={field}
-            value={market}
-            onChange={(event) => {
-              const selected = MARKETS.find(
-                (item) => item.market === event.target.value,
-              );
-              if (selected) setMarket(selected.market);
-            }}
+      <fieldset className="lobby-markets" disabled={busy || continuing}>
+        <legend>Market</legend>
+        {MARKETS.map((item) => (
+          <button
+            key={item.market}
+            type="button"
+            className="pixel-button"
+            data-tone={market === item.market ? "gold" : undefined}
+            aria-pressed={market === item.market}
+            onClick={() => setMarket(item.market)}
           >
-            {MARKETS.map(({ market }) => (
-              <option key={market} value={market}>
-                {market}/USD
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">
-          Bet (Devnet USDC)
+            <strong>{item.market}</strong>
+            <span>/USD</span>
+          </button>
+        ))}
+      </fieldset>
+      <div className="lobby-amount-field">
+        <div className="lobby-amount-head">
+          <label htmlFor={input}>Bet</label>
+          <span>
+            Available{" "}
+            <span className="lobby-figure">
+              {displayUsdc(available.toString())} USDC
+            </span>
+          </span>
+        </div>
+        <div className="lobby-amount" data-invalid={invalid || undefined}>
           <input
-            className={`${field} font-mono tabular-nums`}
+            id={input}
             value={amount}
             inputMode="decimal"
             autoComplete="off"
+            placeholder="0.00"
+            disabled={busy || continuing}
             aria-invalid={invalid}
-            aria-describedby={detail ? hint : undefined}
+            aria-describedby={hint}
             onChange={(event) => setAmount(event.target.value)}
           />
-        </label>
-      </fieldset>
-      {detail && (
-        <p id={hint} className="text-sm" aria-live="polite">
+          <span aria-hidden="true">USDC</span>
+        </div>
+        <p id={hint} className="lobby-amount-note" aria-live="polite">
           {detail}
         </p>
-      )}
+      </div>
       <button
         type="submit"
-        data-primary
-        className={button}
+        className="pixel-button lobby-bet-submit"
+        data-tone="gold"
         disabled={busy || (!continuing && !allowed && !quoteError)}
       >
         {busy && continuing

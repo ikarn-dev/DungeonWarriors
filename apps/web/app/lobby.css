@@ -278,13 +278,42 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel-lo);
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink);
+}
+.lobby-hero-art {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 5.5rem;
+  height: 5.5rem;
+  background: var(--panel);
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink),
+    inset 0 -6px 0 0 var(--panel-hi);
 }
 .lobby-hero img,
 .lobby-card img {
   image-rendering: pixelated;
 }
-.lobby-hero p {
-  margin: 0.25rem 0 0;
+.lobby-hero-copy {
+  display: grid;
+  gap: 0.375rem;
+}
+.lobby-hero-copy p {
+  margin: 0;
+}
+.lobby-hero-tags {
+  display: flex;
+  gap: 0.625rem;
 }
 .lobby-rarity {
   display: inline-block;

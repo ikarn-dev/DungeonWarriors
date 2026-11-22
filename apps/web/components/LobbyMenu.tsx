@@ -1,8 +1,9 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { MEDIA_ROOT } from "../lib/game/assets";
-import type { CatId } from "../lib/game/catalog";
+import { type CatId, catStats } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
+import { POWER_LABELS } from "./RunHud";
 
 export type LobbyTab =
   | "play"
@@ -81,22 +82,29 @@ export function LobbyHero({
 }: {
   readonly cat: LobbyState["cats"][number];
 }) {
+  const stats = catStats(cat.id, cat.level);
   return (
     <div className="lobby-hero">
-      <Image
-        unoptimized
-        src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
-        alt=""
-        width={96}
-        height={96}
-      />
-      <div>
+      <span className="lobby-hero-art">
+        <Image
+          unoptimized
+          src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
+          alt=""
+          width={80}
+          height={80}
+        />
+      </span>
+      <div className="lobby-hero-copy">
         <h2>{CAT_NAMES[cat.id]}</h2>
-        <p>
+        <p className="lobby-hero-tags">
           <span className="lobby-rarity" data-rarity={cat.rarity}>
             {cat.rarity}
-          </span>{" "}
-          Level {cat.level}
+          </span>
+          <span className="lobby-rarity">Lv {cat.level}</span>
+        </p>
+        <p>
+          {POWER_LABELS[stats.power]} · {stats.powerCooldownTicks / 60}s
+          cooldown
         </p>
       </div>
     </div>

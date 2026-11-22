@@ -113,7 +113,7 @@ export default function RunEntry({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
-  const [market, setMarket] = useState<Market>("SOL");
+  const [market, setMarket] = useState<Market>("BTC");
   const [amount, setAmount] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [terms, setTerms] = useState<{ offer?: Offer; error?: string }>();

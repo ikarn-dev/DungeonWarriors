@@ -284,6 +284,109 @@
   font-size: 0.875rem;
 }
 
+/* Play: market picker, bet amount and start. */
+.lobby-bet {
+  display: grid;
+  gap: 1rem;
+}
+.lobby-markets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.875rem;
+  min-width: 0;
+  margin: 0;
+  padding: var(--px);
+  border: 0;
+}
+.lobby-markets legend,
+.lobby-amount-head {
+  margin-bottom: 0.5rem;
+  color: var(--soft);
+  font-size: 0.875rem;
+}
+.lobby-markets .pixel-button {
+  flex-direction: column;
+  gap: 0.125rem;
+  min-height: 3.5rem;
+}
+.lobby-markets strong {
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.lobby-markets span {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+.lobby-amount-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.lobby-amount-head label {
+  color: var(--soft);
+}
+.lobby-figure {
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+.lobby-amount {
+  display: flex;
+  align-items: center;
+  margin-inline: var(--px);
+  background: var(--panel-lo);
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink),
+    inset 0 var(--px) 0 0 #0b0a14;
+}
+.lobby-amount:focus-within {
+  outline: var(--px) solid var(--gold-hi);
+  outline-offset: calc(var(--px) * 2);
+}
+.lobby-amount[data-invalid] {
+  box-shadow:
+    0 -2px 0 0 #ff6b6b,
+    0 2px 0 0 #ff6b6b,
+    -2px 0 0 0 #ff6b6b,
+    2px 0 0 0 #ff6b6b,
+    inset 0 var(--px) 0 0 #0b0a14;
+}
+.lobby-amount input {
+  flex: 1;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0 1rem;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.25rem;
+}
+.lobby-amount input:focus-visible {
+  outline: none;
+}
+.lobby-amount input::placeholder {
+  color: #6b6590;
+}
+.lobby-amount > span {
+  padding-right: 1rem;
+  color: var(--soft);
+  font-family: var(--font-pixel), sans-serif;
+}
+.lobby-amount-note {
+  min-height: 1.375rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+.lobby-bet-submit {
+  width: 100%;
+  min-height: 3.25rem;
+  font-size: 1.125rem;
+}
+
 @media (max-width: 40rem) {
   .lobby-transfer-row {
     grid-template-columns: 1fr 1fr;
