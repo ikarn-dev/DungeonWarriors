@@ -1,24 +1,8 @@
 /* In-game screen: full-viewport pixel HUD over the Phaser canvas. */
 .run-dialog,
 .run-stage {
-  --px: 3px;
-  --ink: #1e1626;
-  --panel: #2a2745;
-  --panel-hi: #45407a;
-  --panel-lo: #19172d;
-  --cream: #fff4d6;
-  --soft: #cfc8ee;
-  --gold: #ffc531;
-  --gold-hi: #ffe58a;
-  --gold-lo: #c9851a;
-  --sky: #3e95e6;
   --btn: clamp(3.25rem, 12dvh, 4.5rem);
   --btn-large: clamp(4.25rem, 16dvh, 6rem);
-  --icon: 24px;
-  --edge-top: max(0.5rem, env(safe-area-inset-top));
-  --edge-right: max(0.75rem, env(safe-area-inset-right));
-  --edge-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  --edge-left: max(0.75rem, env(safe-area-inset-left));
   color: var(--cream);
   font-family: var(--font-pixel), var(--font-geist-sans), sans-serif;
 }

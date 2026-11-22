@@ -1,7 +1,27 @@
-/* Pixel UI primitives shared by the in-game HUD and controls. */
+/* Pixel UI primitives shared by the lobby, the in-game HUD and controls. */
+:root {
+  --px: 3px;
+  --ink: #1e1626;
+  --panel: #2a2745;
+  --panel-hi: #45407a;
+  --panel-lo: #19172d;
+  --cream: #fff4d6;
+  --soft: #cfc8ee;
+  --gold: #ffc531;
+  --gold-hi: #ffe58a;
+  --gold-lo: #c9851a;
+  --sky: #3e95e6;
+  --icon: 24px;
+  --edge-top: max(0.5rem, env(safe-area-inset-top));
+  --edge-right: max(0.75rem, env(safe-area-inset-right));
+  --edge-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  --edge-left: max(0.75rem, env(safe-area-inset-left));
+}
+
 /* Notched pixel frame: orthogonal outer shadows leave the corners open. */
 .pixel-panel,
-.pixel-button {
+.pixel-button,
+:where(.lobby-panel) button {
   --face: var(--panel);
   --face-hi: var(--panel-hi);
   --face-lo: var(--panel-lo);
@@ -15,7 +35,8 @@
     inset 0 calc(var(--px) * -1) 0 0 var(--face-lo);
 }
 
-.pixel-button {
+.pixel-button,
+:where(.lobby-panel) button {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -36,7 +57,8 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.pixel-button:not(:disabled):active {
+.pixel-button:not(:disabled):active,
+:where(.lobby-panel) button:not(:disabled):active {
   transform: translateY(var(--px));
   box-shadow:
     0 calc(var(--px) * -1) 0 0 var(--ink),
@@ -45,22 +67,26 @@
     var(--px) 0 0 0 var(--ink),
     inset 0 var(--px) 0 0 var(--face-lo);
 }
-.pixel-button:disabled {
+.pixel-button:disabled,
+:where(.lobby-panel) button:disabled {
   filter: grayscale(0.7) brightness(0.8);
   opacity: 0.75;
 }
 .pixel-button:focus-visible,
+:where(.lobby-panel) button:focus-visible,
 .run-canvas:focus-visible {
   outline: var(--px) solid var(--gold-hi);
   outline-offset: calc(var(--px) * 2);
 }
 @media (hover: hover) {
-  .pixel-button:not(:disabled):hover {
+  .pixel-button:not(:disabled):hover,
+  :where(.lobby-panel) button:not(:disabled):hover {
     filter: brightness(1.12);
   }
 }
 
-.pixel-button[data-tone="gold"] {
+.pixel-button[data-tone="gold"],
+:where(.lobby-panel) button[data-primary] {
   --face: var(--gold);
   --face-hi: var(--gold-hi);
   --face-lo: var(--gold-lo);

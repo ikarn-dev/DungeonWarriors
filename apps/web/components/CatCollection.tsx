@@ -1,6 +1,10 @@
+import Image from "next/image";
 import { MEDIA_ROOT } from "../lib/game/assets";
-import type { CatId } from "../lib/game/catalog";
+import { type CatId, catStats } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
+import { POWER_LABELS } from "./RunHud";
+
+const level = new Intl.NumberFormat("en-US");
 export default function CatCollection({
   state,
   blocked,
@@ -11,53 +15,53 @@ export default function CatCollection({
   onSelect: (cat: CatId) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">Your cats</h2>
+    <div className="lobby-stack">
+      <h2>Your cats</h2>
       {state.cats.length === 0 ? (
         <p>No finalized cats yet.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {state.cats.map((cat) => (
-            <li
-              key={cat.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-current/30 p-4"
-            >
-              <div className="flex items-center gap-3">
+        <ul className="lobby-cards">
+          {state.cats.map((cat) => {
+            const stats = catStats(cat.id, cat.level);
+            const chosen = state.selected === cat.id;
+            return (
+              <li
+                key={cat.id}
+                className="lobby-card"
+                data-chosen={chosen || undefined}
+              >
                 <Image
                   unoptimized
                   src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
-                  width={56}
-                  height={56}
+                  width={96}
+                  height={96}
                   alt=""
                 />
-                <div>
-                  <p className="font-medium">{CAT_NAMES[cat.id]}</p>
-                  <p className="text-sm capitalize">
-                    {cat.rarity} · Level{" "}
-                    <span className="font-mono tabular-nums">
-                      {new Intl.NumberFormat("en-US").format(cat.level)}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="min-h-11 rounded-md border border-current px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={
-                  blocked ||
-                  state.pendingDraw !== null ||
-                  state.selected === cat.id
-                }
-                onClick={() => onSelect(cat.id)}
-              >
-                {state.selected === cat.id ? "Selected" : "Select cat"}
-              </button>
-            </li>
-          ))}
+                <h3>{CAT_NAMES[cat.id]}</h3>
+                <p>
+                  <span className="lobby-rarity" data-rarity={cat.rarity}>
+                    {cat.rarity}
+                  </span>{" "}
+                  Level {level.format(cat.level)}
+                </p>
+                <p>
+                  {POWER_LABELS[stats.power]} · {stats.powerCooldownTicks / 60}s
+                  cooldown
+                </p>
+                <button
+                  type="button"
+                  className="pixel-button"
+                  data-tone={chosen ? undefined : "green"}
+                  disabled={blocked || state.pendingDraw !== null || chosen}
+                  onClick={() => onSelect(cat.id)}
+                >
+                  {chosen ? "Selected" : "Select cat"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
   );
 }
-
-import Image from "next/image";

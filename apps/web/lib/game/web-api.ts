@@ -74,3 +74,18 @@ export const encodeBase64 = (value: Uint8Array) =>
   btoa(String.fromCharCode(...value));
 export const decodeBase64 = (value: string) =>
   Uint8Array.from(atob(value), (byte) => byte.charCodeAt(0));
+
+// Resolves after the delay, or immediately once the signal aborts.
+export function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", cancel);
+      resolve();
+    }, ms);
+    function cancel() {
+      clearTimeout(timer);
+      resolve();
+    }
+    signal.addEventListener("abort", cancel, { once: true });
+  });
+}

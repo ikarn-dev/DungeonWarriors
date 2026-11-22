@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./run-pixel.css";
 @import "./run-game.css";
+@import "./lobby.css";
 
 :root {
   --background: #ffffff;

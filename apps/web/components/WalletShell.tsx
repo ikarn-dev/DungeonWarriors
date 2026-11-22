@@ -5,8 +5,8 @@ import {
   type WalletProviderProps,
 } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
-import StarterCapsule from "./StarterCapsule";
-import style from "./StarterExperience.module.css";
+import { CATALOG_V1 } from "../lib/game/catalog";
+import LobbyScene from "./LobbyScene";
 import StarterPanel from "./StarterLobby";
 
 const wallets: WalletProviderProps["wallets"] = [];
@@ -15,10 +15,14 @@ export default function WalletShell() {
   useEffect(() => setEndpoint(`${window.location.origin}/api/rpc/devnet`), []);
   if (endpoint === null)
     return (
-      <div className={style.grid}>
-        <StarterCapsule state={null} />
-        <output className={style.controls}>Loading wallet controls…</output>
-      </div>
+      <>
+        <LobbyScene cats={CATALOG_V1.cats.map(({ id }) => id)} />
+        <div className="lobby-body">
+          <output className="lobby-start pixel-panel">
+            Loading wallet controls…
+          </output>
+        </div>
+      </>
     );
   return (
     <ConnectionProvider endpoint={endpoint}>
