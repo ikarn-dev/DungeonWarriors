@@ -15,13 +15,36 @@ export function refresh(power: PowerState, tick: bigint): void {
   power.charges = 1;
 }
 
+function armNative(power: PowerState, stats: CatStats, tick: bigint) {
+  if (tick >= power.readyAtTick) {
+    refresh(power, tick);
+    power.readyAtTick = addCounter(tick, BigInt(stats.powerCooldownTicks));
+  }
+}
+
+function jump(
+  runner: SimulationFrame["runner"],
+  power: PowerState,
+  tick: bigint,
+) {
+  if (runner.grounded || active(power, tick)) {
+    if (!runner.grounded) power.charges = 0;
+    runner.vySubpixelsPerTick = RULES_V1.physics.jumpVelocitySubpixelsPerTick;
+    runner.grounded = false;
+  }
+}
+
 export function command(
   frame: SimulationFrame,
   stats: CatStats,
   tick: bigint,
   action: PlayerIntent,
+  intuitivePowers = false,
 ): void {
   const runner = frame.runner;
+  const alreadyJumped =
+    !runner.grounded &&
+    runner.vySubpixelsPerTick === RULES_V1.physics.jumpVelocitySubpixelsPerTick;
   switch (action.kind) {
     case "move":
       runner.axis = action.axis;
@@ -35,25 +58,41 @@ export function command(
     case "boost": {
       const power = frame.powers[stats.power];
       if (tick >= power.readyAtTick) {
-        refresh(power, tick);
-        power.readyAtTick = addCounter(tick, BigInt(stats.powerCooldownTicks));
+        armNative(power, stats, tick);
+        if (
+          intuitivePowers &&
+          stats.power === "doubleJump" &&
+          !runner.grounded &&
+          !alreadyJumped
+        )
+          jump(runner, power, tick);
       }
       break;
     }
     case "jump": {
       const doubleJump = frame.powers.doubleJump;
-      if (runner.grounded || active(doubleJump, tick)) {
-        if (!runner.grounded) doubleJump.charges = 0;
-        runner.vySubpixelsPerTick =
-          RULES_V1.physics.jumpVelocitySubpixelsPerTick;
-        runner.grounded = false;
-      }
+      if (intuitivePowers && alreadyJumped) break;
+      if (
+        intuitivePowers &&
+        !runner.grounded &&
+        stats.power === "doubleJump" &&
+        !active(doubleJump, tick)
+      )
+        armNative(doubleJump, stats, tick);
+      jump(runner, doubleJump, tick);
       break;
     }
     case "dash": {
       const extraDash = frame.powers.extraDash;
       if (tick < runner.dashEndsAtTick) break;
       const regular = tick >= runner.dashReadyAtTick;
+      if (
+        intuitivePowers &&
+        !regular &&
+        stats.power === "extraDash" &&
+        !active(extraDash, tick)
+      )
+        armNative(extraDash, stats, tick);
       if (regular || active(extraDash, tick)) {
         if (regular)
           runner.dashReadyAtTick = addCounter(

@@ -1,7 +1,7 @@
 "use client";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
 import {
@@ -58,7 +58,12 @@ const submittedSchema = z
 export default function StarterPanel() {
   const wallet = useWallet();
   const address = wallet.publicKey?.toBase58() ?? null;
-  const [authenticated, setAuthenticated] = useState(false);
+  const [sessionWallet, setSessionWallet] = useState<string | null>(null);
+  const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const authenticated = address !== null && sessionWallet === address;
+  const restoring = address !== null && checkedWallet !== address;
   const [state, setState] = useState<LobbyState | null>(null);
   const [walletFundsRevision, setWalletFundsRevision] = useState<number>();
   const [busy, setBusy] = useState(false);
@@ -69,35 +74,87 @@ export default function StarterPanel() {
     starter: boolean;
   } | null>(null);
   const work = useRef<AbortController | null>(null);
+  const reload = useCallback(
+    async (signal?: AbortSignal) => {
+      if (address === null) return;
+      try {
+        const value = await webApi<unknown>(
+          "/api/chain/state",
+          { kind: "wallet" },
+          signal,
+        );
+        if (!signal?.aborted) setState(decodeLobbyState(value, address));
+      } finally {
+        if (!signal?.aborted)
+          setWalletFundsRevision((previous) => (previous ?? 0) + 1);
+      }
+    },
+    [address],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Retry explicitly rechecks the same wallet's cookie.
   useEffect(() => {
     work.current?.abort();
     setBusy(false);
-    setAuthenticated(false);
+    setSessionWallet(null);
+    setCheckedWallet(null);
+    setRestoreFailed(false);
     setState(null);
     setWalletFundsRevision(undefined);
     setPending(null);
     setError(null);
-    setMessage(
-      address === null
-        ? "Connect a wallet to begin."
-        : "Sign in with this wallet to continue.",
-    );
-    return () => work.current?.abort();
-  }, [address]);
-  async function reload(signal?: AbortSignal) {
-    if (address === null) return;
-    try {
-      const value = await webApi<unknown>(
-        "/api/chain/state",
-        { kind: "wallet" },
-        signal,
-      );
-      if (!signal?.aborted) setState(decodeLobbyState(value, address));
-    } finally {
-      if (!signal?.aborted)
-        setWalletFundsRevision((previous) => (previous ?? 0) + 1);
+    if (address === null) {
+      setMessage("Connect a wallet to begin.");
+      return;
     }
-  }
+    const controller = new AbortController();
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(8000),
+    ]);
+    async function restore(walletAddress: string) {
+      try {
+        const session = await webApi<{ wallet: string }>(
+          "/api/auth/session",
+          undefined,
+          signal,
+        );
+        if (controller.signal.aborted) return;
+        if (session.wallet !== walletAddress) {
+          setMessage("Sign in with this wallet to continue.");
+          return;
+        }
+        setSessionWallet(walletAddress);
+        setMessage("Signed in. Account reads use finalized Devnet state.");
+        await reload(signal).catch((failure: unknown) => {
+          if (
+            failure instanceof WebApiError &&
+            failure.code === "AUTH_REQUIRED"
+          )
+            throw failure;
+          if (!controller.signal.aborted) setError("ACCOUNT_STATE_UNAVAILABLE");
+        });
+      } catch (failure) {
+        if (controller.signal.aborted) return;
+        if (
+          failure instanceof WebApiError &&
+          failure.code === "AUTH_REQUIRED"
+        ) {
+          setSessionWallet(null);
+          setMessage("Sign in with this wallet to continue.");
+        } else {
+          setRestoreFailed(true);
+          setMessage("Couldn't restore your session. Try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setCheckedWallet(walletAddress);
+      }
+    }
+    void restore(address);
+    return () => {
+      controller.abort();
+      work.current?.abort();
+    };
+  }, [address, reload, restoreAttempt]);
   async function perform(action: (signal: AbortSignal) => Promise<void>) {
     if (work.current !== null && !work.current.signal.aborted) return;
     const controller = new AbortController();
@@ -107,14 +164,16 @@ export default function StarterPanel() {
     try {
       await action(controller.signal);
     } catch (failure) {
-      if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
-        setAuthenticated(false);
-      if (!controller.signal.aborted)
-        setError(
-          failure instanceof WebApiError
-            ? failure.code
-            : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
-        );
+      if (controller.signal.aborted) return;
+      if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED") {
+        setSessionWallet(null);
+        setMessage("Sign in with this wallet to continue.");
+      }
+      setError(
+        failure instanceof WebApiError
+          ? failure.code
+          : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
+      );
     } finally {
       if (work.current === controller) {
         work.current = null;
@@ -153,7 +212,8 @@ export default function StarterPanel() {
       },
       signal,
     );
-    setAuthenticated(true);
+    if (signal.aborted) return;
+    setSessionWallet(address);
     await reload(signal);
     setMessage("Signed in. Account reads use finalized Devnet state.");
   }
@@ -357,7 +417,7 @@ export default function StarterPanel() {
               <button
                 type="button"
                 className={button}
-                disabled={busy}
+                disabled={busy || restoring}
                 onClick={() =>
                   void perform(async (signal) => {
                     if (authenticated)
@@ -370,20 +430,29 @@ export default function StarterPanel() {
               </button>
             </div>
           )}
-          {wallet.connected && !authenticated && (
+          {wallet.connected && !authenticated && !restoring && (
             <button
               type="button"
               className={button}
               data-primary
-              disabled={busy || wallet.signMessage === undefined}
-              onClick={() => void perform(signIn)}
+              disabled={
+                busy || (!restoreFailed && wallet.signMessage === undefined)
+              }
+              onClick={() => {
+                if (restoreFailed) setRestoreAttempt((attempt) => attempt + 1);
+                else void perform(signIn);
+              }}
             >
-              Sign in to PURRPS
+              {restoreFailed ? "Retry session" : "Sign in to PURRPS"}
             </button>
           )}
         </div>
         <output aria-live="polite" className="text-sm">
-          {busy ? "Waiting for wallet or chain response…" : message}
+          {restoring
+            ? "Restoring your session…"
+            : busy
+              ? "Waiting for wallet or chain response…"
+              : message}
         </output>
         {error !== null && (
           <p role="alert" className="break-words text-sm">

@@ -74,6 +74,7 @@ export const RULES_V1 = {
 export const RULES_V2 = {
   ...RULES_V1,
   rulesVersion: 2,
+  maxSpeedBps: 31_600,
   generation: {
     ...RULES_V1.generation,
     flatBandBps: 0,
@@ -148,11 +149,15 @@ export function runLevel(activeTicks: bigint): bigint {
   return checkedU64(activeTicks) / BigInt(RULES_V1.checkpointTicks) + 1n;
 }
 
-export function speedBps(activeTicks: bigint): number {
+export function speedBps(
+  activeTicks: bigint,
+  rules: GameplayRules = RULES_V1,
+): number {
   const steps = runLevel(activeTicks) - 1n;
+  const maximum = BigInt(rules.maxSpeedBps);
   return Math.min(
-    10_000 + Number(steps > 7n ? 7n : steps) * RULES_V1.speedStepBps,
-    RULES_V1.maxSpeedBps,
+    10_000 + Number(steps > maximum ? maximum : steps) * rules.speedStepBps,
+    rules.maxSpeedBps,
   );
 }
 

@@ -16,11 +16,14 @@ export default function RunMarket({
   const latest = prices.at(-1);
   if (!latest) return null;
   return (
-    <div className="run-market">
+    <div className="run-market" data-course="progressive-course-v2">
       <div className="flex items-baseline justify-between gap-2">
         <span>{market}/USD</span>
-        <strong className="font-mono tabular-nums">
-          ${formatRunPrice(latest)}
+        <strong
+          className="font-mono tabular-nums"
+          title={`$${formatRunPrice(latest)}`}
+        >
+          ${formatRunPrice(latest, true)}
         </strong>
       </div>
       <svg

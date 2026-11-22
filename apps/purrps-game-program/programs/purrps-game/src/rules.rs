@@ -175,6 +175,7 @@ pub const RULES_V1: GameRules = GameRules {
 // Preserve existing runs while making small market changes legible in new runs.
 pub const RULES_V2: GameRules = GameRules {
     rules_version: 2,
+    max_speed_bps: 31_600,
     generation: GenerationRules {
         flat_band_bps: 0,
         sharp_move_bps: 5,
@@ -221,8 +222,13 @@ pub fn run_level(active_ticks: u64) -> u64 {
 }
 
 pub fn speed_bps(active_ticks: u64) -> u16 {
-    let steps = (run_level(active_ticks) - 1).min(7) as u16;
-    (10_000 + steps * RULES_V1.speed_step_bps).min(RULES_V1.max_speed_bps)
+    speed_bps_for_rules(active_ticks, &RULES_V1)
+}
+
+pub(crate) fn speed_bps_for_rules(active_ticks: u64, rules: &GameRules) -> u16 {
+    let maximum = u64::from(rules.max_speed_bps);
+    let steps = (run_level(active_ticks) - 1).min(maximum);
+    (10_000 + steps * u64::from(rules.speed_step_bps)).min(maximum) as u16
 }
 
 pub fn earned_multiplier_bps(qualified_checkpoints: u64) -> u32 {

@@ -301,7 +301,12 @@ export default function RunControls({
               !artReady ||
               (kind === "boost" && !power.ready)
             }
-            onClick={() => enqueue.current({ kind })}
+            onClick={(event) => {
+              enqueue.current({ kind });
+              // Pointer users can jump with Space again after using a power.
+              if (event.detail > 0)
+                surface.current?.focus({ preventScroll: true });
+            }}
           >
             {kind === "jump" ? "Jump" : kind === "dash" ? "Dash" : power.name}
           </button>

@@ -117,6 +117,9 @@ it("plots only consumed price observations, retaining precision and showing gaps
   expect(series).toEqual([start, later, afterGap]);
   expect(runPricePath(series)).toBe("M2 34 L41 18 M158 2");
   expect(formatRunPrice(start)).toBe("20.000123");
+  const live = { sequence: 1n, price: 6_062_100_350_011n, exponent: 8 };
+  expect(formatRunPrice(live)).toBe("60,621.00350011");
+  expect(formatRunPrice(live, true)).toBe("60,621.00");
 });
 
 describe("Rust account delivery", () => {

@@ -707,17 +707,32 @@ export default function RunStage({
     : 1;
   const power = visible?.run.stats.power;
   const state = power && frame?.powers[power];
+  const pickedUp = frame
+    ? (Object.keys(powers) as (keyof typeof powers)[])
+        .filter(
+          (name) =>
+            name !== power &&
+            frame.powers[name].charges > 0 &&
+            frame.powers[name].endsAtTick > frame.activeTicks,
+        )
+        .map((name) => `${powers[name][0]} active`)
+    : [];
   const powerControl =
     power && state && frame
       ? {
           name: powers[power][0],
           ready: state.readyAtTick <= frame.activeTicks,
-          detail:
+          detail: [
             state.charges > 0 && state.endsAtTick > frame.activeTicks
-              ? powers[power][1]
+              ? `${powers[power][0]} active. ${powers[power][1]}.`
               : state.readyAtTick > frame.activeTicks
                 ? `${powers[power][0]} ready in ${Math.ceil(Number(state.readyAtTick - frame.activeTicks) / RULES_V1.ticksPerSecond)}s`
-                : `${powers[power][0]} ready`,
+                : rulesVersion === 2 &&
+                    (power === "doubleJump" || power === "extraDash")
+                  ? powers[power][1]
+                  : `${powers[power][0]} ready`,
+            ...pickedUp,
+          ].join(" · "),
         }
       : null;
   const statusPanel = !artReady || !playing;

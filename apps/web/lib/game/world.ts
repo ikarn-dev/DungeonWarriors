@@ -109,12 +109,12 @@ function prepare(
   }
   const p = RULES_V1.physics;
   const rules = gameRules.generation;
+  const progressive = gameRules.rulesVersion === 2;
   const maximum = BigInt(p.maxRequiredRiseSubpixels);
-  const movement =
-    gameRules.rulesVersion === 2
-      ? ((sample.previousPrice - sample.price) * 10_000n * maximum) /
-        (sample.previousPrice * BigInt(rules.maxSampleChangeBps))
-      : BigInt(terrainStepSubpixels(change));
+  const movement = progressive
+    ? ((sample.previousPrice - sample.price) * 10_000n * maximum) /
+      (sample.previousPrice * BigInt(rules.maxSampleChangeBps))
+    : BigInt(terrainStepSubpixels(change));
   const terrainStep = Number(
     movement < -maximum ? -maximum : movement > maximum ? maximum : movement,
   );
@@ -172,15 +172,20 @@ function prepare(
       const x = coordinate(g.nextXSubpixels + Math.trunc(width / 2));
       const surface = surfaceAt(ramp, x);
       if (surface === null) throw new SimulationError("INVALID_WORLD");
-      const y = coordinate(surface - p.maxRequiredRiseSubpixels - 8 * 256);
-      const optional: WorldEntity =
-        g.nextSegment % BigInt(rules.boosterStrideSegments) === 0n
-          ? {
-              ...entity("star", x, y, 8 * 256, 8 * 256),
-              kind: "booster",
-              power,
-            }
-          : entity("star", x, y, 8 * 256, 8 * 256);
+      const booster =
+        g.nextSegment % BigInt(rules.boosterStrideSegments) === 0n;
+      const pickupHeight =
+        progressive && booster
+          ? p.hitboxHeightSubpixels + 16 * 256
+          : p.maxRequiredRiseSubpixels + 8 * 256;
+      const y = coordinate(surface - pickupHeight);
+      const optional: WorldEntity = booster
+        ? {
+            ...entity("star", x, y, 8 * 256, 8 * 256),
+            kind: "booster",
+            power,
+          }
+        : entity("star", x, y, 8 * 256, 8 * 256);
       push(state, optional);
     }
     state.generation.nextXSubpixels = coordinate(g.nextXSubpixels + width);
@@ -188,7 +193,9 @@ function prepare(
     state.generation.nextSegment = addCounter(g.nextSegment, 1n);
   }
   const target = Math.trunc(
-    (p.runnerSpeedSubpixelsPerTick * speedBps(state.frame.activeTicks)) / 10000,
+    (p.runnerSpeedSubpixelsPerTick *
+      speedBps(state.frame.activeTicks, gameRules)) /
+      10000,
   );
   const coins = rules.designatedCoinTicks;
   const hazards = [
@@ -225,10 +232,13 @@ function prepare(
       if (surface === null) throw new SimulationError("INVALID_WORLD");
       if (
         !hazard ||
-        (gameRules.rulesVersion === 2 && index === 0) ||
+        (progressive && BigInt(index) <= checkpoint / 3n) ||
         Math.abs(change) >= rules.sharpMoveBps
       ) {
-        const size = hazard ? Math.trunc(p.hitboxWidthSubpixels / 2) : 8 * 256;
+        const size = hazard
+          ? Math.trunc(p.hitboxWidthSubpixels / 2) +
+            (progressive ? Number(checkpoint > 8n ? 8n : checkpoint) * 256 : 0)
+          : 8 * 256;
         const y = coordinate(
           surface -
             (hazard ? size : Math.trunc((p.hitboxHeightSubpixels + size) / 2)),
@@ -250,7 +260,7 @@ function prepare(
       else state.generation.spawnedCoinMask |= 1 << index;
     }
   }
-  validateWorldState(state);
+  validateWorldState(state, gameRules);
 }
 
 // Pure counterpart of Rust world::initialize_world; caller supplies authenticated run stats/source.
@@ -304,12 +314,12 @@ export function stepWorld(
   sample: PriceSample,
   gameRules: GameplayRules = RULES_V1,
 ): WorldState {
-  validateWorldState(state);
+  validateWorldState(state, gameRules);
   validateFrame(state.frame, stats);
   const result = structuredClone(state);
   if (state.frame.phase !== "active") return result;
   prepare(result, sample, gameRules);
-  const next = step(result.frame, result.entities, stats, actions);
+  const next = step(result.frame, result.entities, stats, actions, gameRules);
   result.frame = next.frame;
   result.entities = next.entities;
   return result;

@@ -1,10 +1,11 @@
 use super::{
-    collision::surface_at, step, validate_frame, validate_world, SimulationError, SimulationFrame,
+    collision::surface_at, step_for_rules, validate_frame, validate_world, SimulationError,
+    SimulationFrame,
 };
 use crate::{
     catalog::{CatStats, Power},
     protocol::{PlayerIntent, RunPhase},
-    rules::{price_change_bps, speed_bps, RULES_V1},
+    rules::{price_change_bps, speed_bps_for_rules, GameRules, RULES_V1},
     state::run::{EntityKind, GenerationState, WorldEntity, MAX_WORLD_ENTITIES},
 };
 
@@ -41,14 +42,14 @@ fn coin_distance(speed: i32, target: i32, ticks: u16) -> i64 {
         + (i64::from(ticks) - accelerating) * i64::from(target)
 }
 
-pub fn validate_state(state: &WorldState) -> Result<(), SimulationError> {
+fn validate_state(state: &WorldState, rules: &GameRules) -> Result<(), SimulationError> {
     validate_world(&state.entities)?;
     let g = state.generation;
     let p = RULES_V1.physics;
     let width = RULES_V1.generation.segment_width_subpixels;
     let checkpoint = state.frame.active_ticks / u64::from(RULES_V1.checkpoint_ticks);
     let target = i64::from(p.runner_speed_subpixels_per_tick)
-        * i64::from(speed_bps(state.frame.active_ticks))
+        * i64::from(speed_bps_for_rules(state.frame.active_ticks, rules))
         / 10_000;
     if g.checkpoint > checkpoint
         || checkpoint - g.checkpoint > 1
@@ -159,7 +160,7 @@ fn rebase(state: &mut WorldState) -> Result<(), SimulationError> {
 fn prepare(
     state: &mut WorldState,
     sample: PriceSample,
-    game_rules: &crate::rules::GameRules,
+    game_rules: &GameRules,
 ) -> Result<(), SimulationError> {
     let change = price_change_bps(
         sample.previous_price,
@@ -170,7 +171,8 @@ fn prepare(
     .map_err(|_| SimulationError::InvalidObservation)?;
     let p = RULES_V1.physics;
     let rules = game_rules.generation;
-    let terrain_step = if game_rules.rules_version == 2 {
+    let progressive = game_rules.rules_version == 2;
+    let terrain_step = if progressive {
         let maximum = i128::from(p.max_required_rise_subpixels);
         let change = i128::from(sample.previous_price) - i128::from(sample.price);
         (change * 10_000 * maximum
@@ -227,17 +229,20 @@ fn prepare(
                 Power::Shield,
                 Power::ExtraDash,
             ][(g.next_segment / u64::from(rules.booster_stride_segments) % 4) as usize];
-            let kind = if g.next_segment % u64::from(rules.booster_stride_segments) == 0 {
+            let booster = g.next_segment % u64::from(rules.booster_stride_segments) == 0;
+            let kind = if booster {
                 EntityKind::Booster(power)
             } else {
                 EntityKind::Star
             };
             let x = coordinate(i64::from(g.next_x_subpixels) + i64::from(width / 2))?;
-            let y = coordinate(
-                surface_at(&ramp, i64::from(x)).unwrap()
-                    - i64::from(p.max_required_rise_subpixels)
-                    - 8 * 256,
-            )?;
+            let pickup_height = if progressive && booster {
+                p.hitbox_height_subpixels + 16 * 256
+            } else {
+                p.max_required_rise_subpixels + 8 * 256
+            };
+            let y =
+                coordinate(surface_at(&ramp, i64::from(x)).unwrap() - i64::from(pickup_height))?;
             push(state, entity(kind, x, y, 8 * 256, 8 * 256))?;
         }
         state.generation.next_x_subpixels =
@@ -249,7 +254,7 @@ fn prepare(
             .ok_or(SimulationError::NumericOverflow)?;
     }
     let target = (i64::from(p.runner_speed_subpixels_per_tick)
-        * i64::from(speed_bps(state.frame.active_ticks))
+        * i64::from(speed_bps_for_rules(state.frame.active_ticks, game_rules))
         / 10_000) as i32;
     // Hazards sit between required coin opportunities, allowing a base jump and landing.
     let coins = rules.designated_coin_ticks;
@@ -285,13 +290,18 @@ fn prepare(
                 continue;
             };
             let surface = surface_at(tile, i64::from(x)).unwrap();
-            // The first obstacle in v2 is always present. Price moves can add two more.
+            // Keep jump windows between coins. Later levels add baseline obstacles.
             if !hazard
-                || (game_rules.rules_version == 2 && index == 0)
+                || (progressive && index <= (checkpoint / 3).min(2) as usize)
                 || change.abs() >= i32::from(rules.sharp_move_bps)
             {
                 let size = if hazard {
                     p.hitbox_width_subpixels / 2
+                        + if progressive {
+                            checkpoint.min(8) as i32 * 256
+                        } else {
+                            0
+                        }
                 } else {
                     8 * 256
                 };
@@ -326,7 +336,7 @@ fn prepare(
             }
         }
     }
-    validate_state(state)
+    validate_state(state, game_rules)
 }
 
 pub fn initialize_world(
@@ -341,7 +351,7 @@ pub fn initialize_world_for_rules(
     frame: SimulationFrame,
     stats: &CatStats,
     sample: PriceSample,
-    game_rules: &crate::rules::GameRules,
+    game_rules: &GameRules,
 ) -> Result<WorldState, SimulationError> {
     validate_frame(&frame, stats)?;
     if frame.active_ticks != 0
@@ -395,16 +405,16 @@ pub fn step_world_for_rules(
     stats: &CatStats,
     actions: &[PlayerIntent],
     sample: PriceSample,
-    game_rules: &crate::rules::GameRules,
+    game_rules: &GameRules,
 ) -> Result<WorldState, SimulationError> {
-    validate_state(state)?;
+    validate_state(state, game_rules)?;
     validate_frame(&state.frame, stats)?;
     let mut result = state.clone();
     if state.frame.phase != RunPhase::Active {
         return Ok(result);
     }
     prepare(&mut result, sample, game_rules)?;
-    let next = step(&result.frame, &result.entities, stats, actions)?;
+    let next = step_for_rules(&result.frame, &result.entities, stats, actions, game_rules)?;
     result.frame = next.frame;
     result.entities = next.entities;
     Ok(result)
