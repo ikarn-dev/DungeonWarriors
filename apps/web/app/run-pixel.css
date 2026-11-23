@@ -67,6 +67,9 @@
     var(--px) 0 0 0 var(--ink),
     inset 0 var(--px) 0 0 var(--face-lo);
 }
+.pixel-button:not(:disabled) {
+  cursor: pointer;
+}
 .pixel-button:disabled,
 :where(.lobby-panel) button:disabled {
   filter: grayscale(0.7) brightness(0.8);
@@ -83,6 +86,21 @@
   :where(.lobby-panel) button:not(:disabled):hover {
     filter: brightness(1.12);
   }
+}
+
+/* Rounded variant: same tones, a soft ink ring instead of notched corners. */
+.pixel-button[data-shape="round"] {
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 2px 0 0 var(--face-hi),
+    inset 0 -3px 0 0 var(--face-lo);
+}
+.pixel-button[data-shape="round"]:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 2px 0 0 var(--face-lo);
 }
 
 .pixel-button[data-tone="gold"],

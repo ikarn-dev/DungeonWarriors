@@ -170,13 +170,6 @@ function extras(grid, cat) {
     triangle(grid, [37, 15], [45, 13], [44, 19], cat.band);
     triangle(grid, [37, 17], [44, 20], [41, 23], cat.scarfDark);
   }
-  if (cat.tuft)
-    grid.stamp(
-      20,
-      1,
-      ["......ww", "....www.", "..wwww..", ".wwwwww.", "..wwwww."],
-      { w: cat.mask },
-    );
 }
 
 export function catPortrait(id) {

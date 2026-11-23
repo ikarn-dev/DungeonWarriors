@@ -22,6 +22,7 @@ class LobbyMusic {
   private readonly holds = new Set<string>();
   private playing: Playing | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private lastHop = -Infinity;
 
   // Browsers allow audio only after a user gesture; call this from one.
   unlock() {
@@ -52,9 +53,35 @@ class LobbyMusic {
     if (this.synth && this.active())
       this.synth.blip(this.synth.ctx.currentTime);
   }
-  meow() {
+  powerDown() {
     if (this.synth && this.active())
-      this.synth.meow(this.synth.ctx.currentTime + 0.02, true);
+      this.synth.powerDown(this.synth.ctx.currentTime);
+  }
+  hover() {
+    if (this.synth && this.active())
+      this.synth.hover(this.synth.ctx.currentTime);
+  }
+  // Start: the game jingle followed by a short meow.
+  start() {
+    if (!this.synth || !this.active()) return;
+    const now = this.synth.ctx.currentTime;
+    this.synth.jingle(now);
+    this.synth.meow(now + 0.32, true);
+  }
+  // Plays even while muting, so the toggle always answers.
+  cue(on: boolean) {
+    if (!this.synth) return;
+    void this.synth.ctx.resume();
+    this.synth.cue(on, this.synth.ctx.currentTime + 0.02);
+  }
+  // A lobby cat hopped. Meows are rationed so several cats never overlap,
+  // and panned to where the cat is on screen (-1 left, 1 right).
+  hop(pan: number) {
+    if (!this.synth || !this.active()) return;
+    const now = this.synth.ctx.currentTime;
+    if (now - this.lastHop < 2.5 || Math.random() > 0.6) return;
+    this.lastHop = now;
+    this.synth.meow(now + 0.02, Math.random() < 0.5, pan);
   }
 
   private active() {
@@ -111,7 +138,11 @@ class LobbyMusic {
         if (step.kick) synth.kick(at);
         if (step.hat) synth.hat(at);
         if (Math.random() < step.meowChance)
-          synth.meow(at + track.stepSeconds, Math.random() < 0.4);
+          synth.meow(
+            at + track.stepSeconds,
+            Math.random() < 0.4,
+            Math.random() - 0.5,
+          );
       }
       playing.next += track.stepSeconds;
       playing.step = (playing.step + 1) % track.steps.length;

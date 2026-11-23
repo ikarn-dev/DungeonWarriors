@@ -19,7 +19,6 @@ importers:
         specifier: workspace:*
         version: link:packages/config
 
-
   apps/web:
     dependencies:
       '@anchor-lang/core':
@@ -61,6 +60,9 @@ importers:
       server-only:
         specifier: 0.0.1
         version: 0.0.1
+      sonner:
+        specifier: 2.0.8
+        version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -258,7 +260,6 @@ packages:
     peerDependenciesMeta:
       workerd:
         optional: true
-
 
   '@cloudflare/workerd-darwin-64@1.20261113.1':
     resolution: {integrity: sha512-UcShHyWJVZNbuI8jL3F5QZXMrJm7oScge33D5p3hAyhIIkoVj72+bior+VcUcr1SBWkh5w3Umnrx179WE7Wvpw==}
@@ -634,7 +635,6 @@ packages:
     resolution: {integrity: sha512-RQgQ4uQ+pLbqXfOmieB91ejmLwvSgv9nLx6sT6sD83s7umBypgg+OIBOBbEUiJXrfpnp9j0mRhYYdzp9uqq3lA==}
     engines: {node: '>=12'}
 
-
   '@jest/schemas@29.6.3':
     resolution: {integrity: sha512-mo5j5X+jIZmJQveBKeS/clAueipV7KgiX1vMgCxam1RNYiqE1w62n0/tJJnHtjW8ZHcQco5gY85jA3mi0L+nSA==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
@@ -907,7 +907,6 @@ packages:
 
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
-
 
   '@react-native-async-storage/async-storage@1.24.0':
     resolution: {integrity: sha512-W4/vbwUOYOjco0x3toB8QCr7EjIP6nE9G7o8PMguvvjYT5Awg09lyV4enACRx4s++PPulBiBSjL0KTFx2u0Z/g==}
@@ -2066,9 +2065,6 @@ packages:
   '@types/node@12.20.55':
     resolution: {integrity: sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==}
 
-  '@types/node@20.19.43':
-    resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
-
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
@@ -2293,7 +2289,6 @@ packages:
   ci-info@3.9.0:
     resolution: {integrity: sha512-NIxF55hv4nSqQswkAeiOi1r83xy8JldOFDTWiug55KBu9Jnblncd2U6ViHmYgHf01TPZS77NJBhBMKdWj9HQMQ==}
     engines: {node: '>=8'}
-
 
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
@@ -2619,7 +2614,6 @@ packages:
     resolution: {integrity: sha512-BhBvN2MBpWTaSHdWRb/bwdZJ1WaehQ2L1KngkCkfLUGF0mAWAT1sQUQacEmQ0jXkFw/czDXPNQSL5u2/Krsz1w==}
     peerDependencies:
       ws: '*'
-
 
   jayson@4.3.0:
     resolution: {integrity: sha512-AauzHcUcqs8OBnCHOkJY280VaTiCm57AbuO7lqzcw7JapGj50BisE3xhksye4zlTSR1+1tAz67wLTl8tEH1obQ==}
@@ -3246,6 +3240,16 @@ packages:
     resolution: {integrity: sha512-PcByqNyT/38F2kDNi006HAMRJaULuBzq/FOsw3qdZvX/GA9W/jamDaRskgHjubHiftXK5sIFxLNkvrXUwcof6Q==}
     engines: {node: '>= 0.4'}
 
+  sonner@2.0.8:
+    resolution: {integrity: sha512-UM/ByIoFra8yzV75n1o0Puu0bw5U/9UNnDacrJNspekBewIfsQ3D6ez1nvlWpt7aTsO6rujQtifBpycwIivqlg==}
+    peerDependencies:
+      '@types/react': ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
@@ -3365,7 +3369,6 @@ packages:
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
 
-
   tslib@2.9.1:
     resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
 
@@ -3383,9 +3386,6 @@ packages:
 
   uncrypto@0.1.3:
     resolution: {integrity: sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q==}
-
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
@@ -3630,7 +3630,6 @@ packages:
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
 
-
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
@@ -3820,14 +3819,15 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.2':
     optional: true
 
-  '@cloudflare/kv-asset-handler@0.5.0': {}
+  '@cloudflare/kv-asset-handler@0.5.0':
+    optional: true
 
   '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261113.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20261113.1
-
+    optional: true
 
   '@cloudflare/workerd-darwin-64@1.20261113.1':
     optional: true
@@ -3844,11 +3844,13 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20261113.1':
     optional: true
 
-  '@cloudflare/workers-types@5.20261114.1': {}
+  '@cloudflare/workers-types@5.20261114.1':
+    optional: true
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+    optional: true
 
   '@emnapi/core@2.0.0-beta.2':
     dependencies:
@@ -3949,7 +3951,8 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@img/colour@1.1.0': {}
+  '@img/colour@1.1.0':
+    optional: true
 
   '@img/sharp-darwin-arm64@0.35.5':
     optionalDependencies:
@@ -4059,7 +4062,6 @@ snapshots:
 
   '@isaacs/ttlcache@1.4.1': {}
 
-
   '@jest/schemas@29.6.3':
     dependencies:
       '@sinclair/typebox': 0.27.12
@@ -4069,7 +4071,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 20.19.43
+      '@types/node': 24.19.2
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -4101,6 +4103,7 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.3
       '@jridgewell/sourcemap-codec': 1.6.0
+    optional: true
 
   '@magicblock-labs/ephemeral-rollups-sdk@0.17.3(bufferutil@4.2.0)(utf-8-validate@6.0.6)':
     dependencies:
@@ -4262,15 +4265,17 @@ snapshots:
   '@poppinss/colors@4.1.6':
     dependencies:
       kleur: 4.1.5
+    optional: true
 
   '@poppinss/dumper@0.6.5':
     dependencies:
       '@poppinss/colors': 4.1.6
       '@sindresorhus/is': 7.2.0
       supports-color: 10.2.2
+    optional: true
 
-  '@poppinss/exception@1.2.3': {}
-
+  '@poppinss/exception@1.2.3':
+    optional: true
 
   '@react-native-async-storage/async-storage@1.24.0(react-native@0.88.1(@babel/core@7.29.13(supports-color@10.2.2))(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(supports-color@10.2.2)(utf-8-validate@6.0.6))':
     dependencies:
@@ -4626,7 +4631,8 @@ snapshots:
 
   '@sinclair/typebox@0.27.12': {}
 
-  '@sindresorhus/is@7.2.0': {}
+  '@sindresorhus/is@7.2.0':
+    optional: true
 
   '@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.3.0(@solana/web3.js@1.99.0(bufferutil@4.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.2.0)(fastestsmallesttextencoderdecoder@1.0.22)(react-native@0.88.1(@babel/core@7.29.13(supports-color@10.2.2))(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(supports-color@10.2.2)(utf-8-validate@6.0.6))(typescript@5.9.3)(utf-8-validate@6.0.6)':
     dependencies:
@@ -5450,7 +5456,8 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@speed-highlight/core@1.2.24': {}
+  '@speed-highlight/core@1.2.24':
+    optional: true
 
   '@swc/helpers@0.5.23':
     dependencies:
@@ -5553,10 +5560,6 @@ snapshots:
       '@types/istanbul-lib-report': 3.0.3
 
   '@types/node@12.20.55': {}
-
-  '@types/node@20.19.43':
-    dependencies:
-      undici-types: 6.21.0
 
   '@types/node@24.19.2':
     dependencies:
@@ -5699,7 +5702,8 @@ snapshots:
     dependencies:
       file-uri-to-path: 1.0.0
 
-  blake3-wasm@2.1.5: {}
+  blake3-wasm@2.1.5:
+    optional: true
 
   bn.js@4.12.5: {}
 
@@ -5768,7 +5772,6 @@ snapshots:
 
   ci-info@3.9.0: {}
 
-
   client-only@0.0.1: {}
 
   cliui@6.0.0:
@@ -5814,7 +5817,8 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  cookie@1.1.1: {}
+  cookie@1.1.1:
+    optional: true
 
   cross-spawn@7.0.6:
     dependencies:
@@ -5877,7 +5881,8 @@ snapshots:
       graceful-fs: 4.2.12
       tapable: 2.3.4
 
-  error-stack-parser-es@1.0.5: {}
+  error-stack-parser-es@1.0.5:
+    optional: true
 
   error-stack-parser@2.1.4:
     dependencies:
@@ -5919,6 +5924,7 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.2
       '@esbuild/win32-ia32': 0.28.2
       '@esbuild/win32-x64': 0.28.2
+    optional: true
 
   escalade@3.2.0: {}
 
@@ -6069,7 +6075,6 @@ snapshots:
     dependencies:
       ws: 7.5.14(bufferutil@4.2.0)(utf-8-validate@6.0.6)
 
-
   jayson@4.3.0(bufferutil@4.2.0)(utf-8-validate@6.0.6):
     dependencies:
       '@types/connect': 3.4.38
@@ -6093,7 +6098,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 20.19.43
+      '@types/node': 24.19.2
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.12
@@ -6110,7 +6115,7 @@ snapshots:
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.19.2
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -6127,7 +6132,8 @@ snapshots:
 
   json5@2.2.3: {}
 
-  kleur@4.1.5: {}
+  kleur@4.1.5:
+    optional: true
 
   leven@3.1.0: {}
 
@@ -6450,6 +6456,7 @@ snapshots:
       - '@types/node'
       - bufferutil
       - utf-8-validate
+    optional: true
 
   minimalistic-assert@1.0.1: {}
 
@@ -6579,9 +6586,11 @@ snapshots:
       lru-cache: 11.5.3
       minipass: 7.1.3
 
-  path-to-regexp@6.3.0: {}
+  path-to-regexp@6.3.0:
+    optional: true
 
-  pathe@2.0.3: {}
+  pathe@2.0.3:
+    optional: true
 
   phaser@4.2.1:
     dependencies:
@@ -6850,6 +6859,7 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
       '@types/node': 24.19.2
+    optional: true
 
   shebang-command@2.0.0:
     dependencies:
@@ -6858,6 +6868,13 @@ snapshots:
   shebang-regex@3.0.0: {}
 
   shell-quote@1.12.0: {}
+
+  sonner@2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+    optionalDependencies:
+      '@types/react': 19.3.0
 
   source-map-js@1.2.2: {}
 
@@ -6909,7 +6926,8 @@ snapshots:
 
   superstruct@2.0.2: {}
 
-  supports-color@10.2.2: {}
+  supports-color@10.2.2:
+    optional: true
 
   supports-color@7.2.0:
     dependencies:
@@ -6949,7 +6967,6 @@ snapshots:
 
   tr46@0.0.3: {}
 
-
   tslib@2.9.1: {}
 
   tweetnacl@1.0.3: {}
@@ -6960,17 +6977,17 @@ snapshots:
 
   uncrypto@0.1.3: {}
 
-  undici-types@6.21.0: {}
-
   undici-types@7.24.6: {}
 
   undici-types@8.12.4: {}
 
-  undici@7.30.1: {}
+  undici@7.30.1:
+    optional: true
 
   unenv@2.0.0-rc.24:
     dependencies:
       pathe: 2.0.3
+    optional: true
 
   unpipe@1.0.0: {}
 
@@ -7055,6 +7072,7 @@ snapshots:
       '@cloudflare/workerd-linux-64': 1.20261113.1
       '@cloudflare/workerd-linux-arm64': 1.20261113.1
       '@cloudflare/workerd-windows-64': 1.20261113.1
+    optional: true
 
   wrangler@4.162.0(@cloudflare/workers-types@5.20261114.1)(@types/node@24.19.2)(bufferutil@4.2.0)(utf-8-validate@6.0.6):
     dependencies:
@@ -7075,6 +7093,7 @@ snapshots:
       - bufferutil
       - kerberos
       - utf-8-validate
+    optional: true
 
   wrap-ansi@6.2.0:
     dependencies:
@@ -7097,6 +7116,7 @@ snapshots:
     optionalDependencies:
       bufferutil: 4.2.0
       utf-8-validate: 6.0.6
+    optional: true
 
   ws@8.23.0(bufferutil@4.2.0)(utf-8-validate@6.0.6):
     optionalDependencies:
@@ -7144,6 +7164,7 @@ snapshots:
     dependencies:
       '@poppinss/exception': 1.2.3
       error-stack-parser-es: 1.0.5
+    optional: true
 
   youch@4.1.0-beta.10:
     dependencies:
@@ -7152,7 +7173,7 @@ snapshots:
       '@speed-highlight/core': 1.2.24
       cookie: 1.1.1
       youch-core: 0.3.3
-
+    optional: true
 
   zod@4.6.7: {}
 

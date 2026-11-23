@@ -1,0 +1,272 @@
+/* Play card, wallet pill and pixel toasts. */
+.bet-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem 0.5rem 0.5rem;
+  border-radius: 0.875rem;
+  background: var(--panel-lo);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.bet-hero img {
+  flex: none;
+  border-radius: 0.625rem;
+  background: var(--panel);
+  box-shadow: inset 0 -4px 0 0 var(--panel-hi);
+  image-rendering: pixelated;
+}
+.bet-hero-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+.bet-hero-copy p {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+}
+.bet-hero .lobby-rarity {
+  border-radius: 0.375rem;
+}
+.bet-power {
+  display: grid;
+  justify-items: end;
+  margin: 0 0 0 auto;
+  color: var(--cream);
+  font-size: 0.875rem;
+  text-align: right;
+}
+.bet-power span {
+  color: var(--soft);
+  font-size: 0.8125rem;
+}
+
+.bet-card {
+  display: grid;
+  gap: 0.875rem;
+}
+.bet-row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+.bet-label {
+  padding-top: 0.75rem;
+  color: var(--soft);
+  font-size: 0.875rem;
+}
+.bet-markets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.625rem;
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  border: 0;
+}
+.bet-markets .pixel-button {
+  gap: 0.125rem;
+  min-height: 2.75rem;
+  font-size: 1rem;
+}
+.bet-markets span {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.bet-amount {
+  display: flex;
+  align-items: center;
+  margin: 2px;
+  border-radius: 0.75rem;
+  background: var(--panel-lo);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 3px 0 0 #0b0a14;
+}
+.bet-amount:focus-within {
+  outline: var(--px) solid var(--gold-hi);
+  outline-offset: 3px;
+}
+.bet-amount[data-invalid] {
+  box-shadow:
+    0 0 0 2px #ff6b6b,
+    inset 0 3px 0 0 #0b0a14;
+}
+.bet-amount input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+.bet-amount input:focus-visible {
+  outline: none;
+}
+.bet-amount input::placeholder {
+  color: #6b6590;
+}
+.bet-amount > span {
+  padding-right: 0.875rem;
+  color: var(--soft);
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 0.875rem;
+}
+.bet-note {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: 1.25rem;
+  margin: 0.5rem 2px 0;
+  font-size: 0.8125rem;
+}
+.bet-submit {
+  width: 100%;
+  min-height: 3rem;
+  font-size: 1.0625rem;
+}
+.lobby-figure {
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wallet pill in the navbar. */
+.lobby-wallet {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--edge-top) + 0.1875rem);
+  right: var(--edge-right);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1875rem;
+  border-radius: 999px;
+  background: #0b0a14b3;
+  box-shadow: inset 0 0 0 2px #ffffff1f;
+}
+.lobby-address {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.625rem 0 0.875rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.lobby-address svg {
+  color: var(--soft);
+}
+.lobby-disconnect {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow:
+    inset 0 0 0 2px var(--ink),
+    inset 0 -3px 0 0 var(--panel-lo);
+  color: var(--soft);
+  cursor: pointer;
+}
+.lobby-disconnect svg {
+  transition: transform 80ms steps(2);
+}
+.lobby-address:focus-visible,
+.lobby-disconnect:focus-visible {
+  outline: var(--px) solid var(--gold-hi);
+  outline-offset: 2px;
+}
+.lobby-disconnect:not(:disabled):active {
+  background: #5a2232;
+  color: #ffb3b3;
+}
+.lobby-disconnect:not(:disabled):active svg {
+  transform: translateY(2px) scale(0.85);
+}
+.lobby-disconnect:disabled {
+  opacity: 0.6;
+}
+@media (hover: hover) {
+  .lobby-address:hover {
+    background: #ffffff14;
+  }
+  .lobby-disconnect:not(:disabled):hover {
+    background: #3a1e2c;
+    color: #ff6b6b;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lobby-disconnect:not(:disabled):hover svg {
+    animation: pixel-wiggle 360ms steps(1) infinite;
+  }
+}
+@keyframes pixel-wiggle {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+/* Sonner toasts, unstyled and themed here. */
+.pixel-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0.625rem 1.125rem 0.625rem 0.875rem;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow:
+    0 0 0 var(--px) var(--ink),
+    inset 0 2px 0 0 var(--panel-hi),
+    0 6px 0 0 #0b0a1466;
+  color: var(--cream);
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 0.9375rem;
+}
+.pixel-toast-icon {
+  display: grid;
+  place-items: center;
+}
+.pixel-toast-title {
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .bet-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+  }
+  .bet-label {
+    padding-top: 0;
+  }
+  .bet-power span {
+    display: none;
+  }
+}

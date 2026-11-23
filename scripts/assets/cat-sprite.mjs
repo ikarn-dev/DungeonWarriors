@@ -229,12 +229,6 @@ function head(grid, cat, pose) {
     at(9, 5, cat.band);
     at(9, 3, cat.scarfDark);
   }
-  if (cat.tuft) {
-    at(15, 2, cat.mask);
-    at(15, 1, cat.mask);
-    at(16, 1, cat.mask);
-    at(16, 0 + (pose.headBob < 0 ? 1 : 0), cat.mask);
-  }
   // Eyes.
   for (const ex of [13, 17]) {
     if (pose.eyes === "open") {

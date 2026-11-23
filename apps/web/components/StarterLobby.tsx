@@ -2,6 +2,7 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
 import { CATALOG_V1 } from "../lib/game/catalog";
@@ -10,6 +11,7 @@ import {
   validatePreparedPlayerAction,
 } from "../lib/game/custody-client";
 import { decodeLobbyState, type LobbyState } from "../lib/game/lobby-state";
+import { RULES_V1 } from "../lib/game/rules";
 import {
   type LobbyIntent,
   validatePreparedTransaction,
@@ -27,6 +29,7 @@ import type { LobbyTab } from "./LobbyMenu";
 import LobbyScene from "./LobbyScene";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
+import LobbyToaster from "./LobbyToaster";
 import { WalletChip } from "./LobbyWallet";
 import { signInWallet } from "./wallet-sign-in";
 
@@ -47,6 +50,8 @@ const submittedSchema = z
     network: z.literal("base").default("base"),
   })
   .strict();
+const drawPollMs = 6_000;
+
 export default function StarterPanel() {
   const wallet = useWallet();
   const address = wallet.publicKey?.toBase58() ?? null;
@@ -64,6 +69,7 @@ export default function StarterPanel() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{
     signature: string;
+    lastValidBlockHeight: number;
     starter: boolean;
   } | null>(null);
   const work = useRef<AbortController | null>(null);
@@ -182,20 +188,32 @@ export default function StarterPanel() {
     await reload(signal);
     setMessage(null);
   }
-  async function reconcile(signature: string, signal: AbortSignal) {
+  async function reconcile(
+    signature: string,
+    lastValidBlockHeight: number,
+    signal: AbortSignal,
+  ) {
     for (let attempt = 0; attempt < 20 && !signal.aborted; attempt++) {
       const result = await webApi<{
         status: { confirmationStatus: string; err: unknown } | null;
-      }>("/api/tx/status", { signature }, signal);
-      if (result.status?.confirmationStatus === "finalized") {
+        resolution: string;
+      }>("/api/tx/status", { signature, lastValidBlockHeight }, signal);
+      if (
+        result.resolution === "expired" ||
+        result.status?.confirmationStatus === "finalized"
+      ) {
         try {
           await reload(signal);
         } finally {
           if (!signal.aborted) setPending(null);
         }
-        if (result.status.err !== null)
+        if (result.resolution === "expired") {
+          setMessage(null);
+          throw new WebApiError("BLOCKHASH_EXPIRED");
+        }
+        if (result.status?.err !== null)
           throw new WebApiError("TRANSACTION_FAILED");
-        setMessage("Transaction confirmed.");
+        toast.success("Transaction confirmed");
         return;
       }
       await pause(3000, signal);
@@ -253,46 +271,60 @@ export default function StarterPanel() {
     );
     setPending({
       signature: result.signature,
+      lastValidBlockHeight: prepared.lastValidBlockHeight,
       starter: intent.operation === "claimStarter",
     });
     setMessage("Waiting for Solana Devnet confirmation.");
-    await reconcile(result.signature, signal);
+    await reconcile(result.signature, prepared.lastValidBlockHeight, signal);
   }
+  const paidDraw = state?.starter === "fulfilled";
   useEffect(() => {
     if (!authenticated || address === null || state?.pendingDraw == null)
       return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     let attempts = 0;
+    const maxAttempts = paidDraw
+      ? Math.ceil((RULES_V1.paidDrawTimeoutSeconds * 1000) / drawPollMs) + 1
+      : 12;
     const poll = async () => {
+      attempts++;
       try {
         const value = await webApi<unknown>(
           "/api/chain/state",
           { kind: "wallet" },
-          controller.signal,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
         );
         if (controller.signal.aborted) return;
         const next = decodeLobbyState(value, address);
         setState(next);
-        attempts++;
-        if (next.pendingDraw !== null && attempts < 12)
-          timer = setTimeout(() => void poll(), 6000);
-        else
-          setMessage(
-            next.pendingDraw === null
-              ? "Your capsule draw is complete."
-              : "Draw remains pending. Refresh to recover this same request.",
-          );
-      } catch {
-        if (!controller.signal.aborted) setError("DRAW_STATUS_UNAVAILABLE");
+        if (next.pendingDraw === null) {
+          if (!paidDraw) toast.success("Capsule draw complete");
+          return;
+        }
+      } catch (failure) {
+        if (controller.signal.aborted) return;
+        if (
+          attempts >= maxAttempts ||
+          (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
+        ) {
+          setError("DRAW_STATUS_UNAVAILABLE");
+          return;
+        }
       }
+      if (attempts < maxAttempts)
+        timer = setTimeout(() => void poll(), drawPollMs);
+      else if (!paidDraw)
+        setMessage(
+          "Draw remains pending. Refresh to recover this same request.",
+        );
     };
-    timer = setTimeout(() => void poll(), 6000);
+    timer = setTimeout(() => void poll(), drawPollMs);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [authenticated, address, state?.pendingDraw]);
+  }, [authenticated, address, paidDraw, state?.pendingDraw]);
   // Confirmations are transient; pending and error states stay until resolved.
   useEffect(() => {
     if (message === null || pending !== null) return;
@@ -302,8 +334,9 @@ export default function StarterPanel() {
   const blocked = busy || pending !== null;
   const copy = () =>
     void perform(async () => {
-      if (address !== null) await navigator.clipboard.writeText(address);
-      setMessage("Wallet address copied.");
+      if (address === null) return;
+      await navigator.clipboard.writeText(address);
+      toast.success("Address copied");
     });
   const disconnect = () =>
     void perform(async (signal) => {
@@ -324,6 +357,7 @@ export default function StarterPanel() {
   return (
     <>
       <LobbyScene cats={scene} />
+      <LobbyToaster />
       {wallet.connected && address !== null && (
         <WalletChip
           address={address}
@@ -407,7 +441,13 @@ export default function StarterPanel() {
               className="pixel-button"
               disabled={busy}
               onClick={() =>
-                void perform((signal) => reconcile(pending.signature, signal))
+                void perform((signal) =>
+                  reconcile(
+                    pending.signature,
+                    pending.lastValidBlockHeight,
+                    signal,
+                  ),
+                )
               }
             >
               Check transaction

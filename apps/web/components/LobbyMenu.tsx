@@ -84,29 +84,27 @@ export function LobbyHero({
 }) {
   const stats = catStats(cat.id, cat.level);
   return (
-    <div className="lobby-hero">
-      <span className="lobby-hero-art">
-        <Image
-          unoptimized
-          src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
-          alt=""
-          width={80}
-          height={80}
-        />
-      </span>
-      <div className="lobby-hero-copy">
+    <div className="bet-hero">
+      <Image
+        unoptimized
+        src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
+        alt=""
+        width={56}
+        height={56}
+      />
+      <div className="bet-hero-copy">
         <h2>{CAT_NAMES[cat.id]}</h2>
-        <p className="lobby-hero-tags">
+        <p>
           <span className="lobby-rarity" data-rarity={cat.rarity}>
             {cat.rarity}
           </span>
           <span className="lobby-rarity">Lv {cat.level}</span>
         </p>
-        <p>
-          {POWER_LABELS[stats.power]} · {stats.powerCooldownTicks / 60}s
-          cooldown
-        </p>
       </div>
+      <p className="bet-power">
+        {POWER_LABELS[stats.power]}
+        <span>{stats.powerCooldownTicks / 60}s cooldown</span>
+      </p>
     </div>
   );
 }

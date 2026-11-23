@@ -4,6 +4,7 @@
 @import "./lobby.css";
 @import "./lobby-title.css";
 @import "./lobby-sections.css";
+@import "./lobby-play.css";
 
 :root {
   --background: #ffffff;

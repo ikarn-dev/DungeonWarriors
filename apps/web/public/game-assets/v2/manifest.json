@@ -239,8 +239,8 @@
     {
       "id": "cat-acrobat",
       "path": "/game-assets/v2/cat-acrobat.svg",
-      "sha256": "b92f9651a6aa5493394b0b0b9f2f0870e4e6de71c7d468ad69f268ef74142b57",
-      "bytes": 129488,
+      "sha256": "bfa1a50b5c42b767d3ef2c7d685c748e13d178224cd0ad2be117e77daf1310e6",
+      "bytes": 124168,
       "width": 1248,
       "height": 48,
       "frameWidth": 48,
@@ -464,8 +464,8 @@
     {
       "id": "cat-sprinter",
       "path": "/game-assets/v2/cat-sprinter.svg",
-      "sha256": "50108c172bf23904833b79bba90158e281ae59a3db441222cc25ad0e579a73e9",
-      "bytes": 127918,
+      "sha256": "8a5dee15f12d8225505ebd51afebc721374a2d2efd897366df340c32bf32bfcc",
+      "bytes": 122598,
       "width": 1248,
       "height": 48,
       "frameWidth": 48,
@@ -858,8 +858,8 @@
     {
       "id": "portrait-acrobat",
       "path": "/game-assets/v2/portrait-acrobat.svg",
-      "sha256": "7d2e55a54317650e657b28fc03a9bd986af22a51ae1d64719b258476ccf9cf50",
-      "bytes": 16681,
+      "sha256": "bb10219f38f49adf6e5e0fd325426bb04f3c54b25c3016b2663e4d7f5cdbd7c1",
+      "bytes": 16253,
       "width": 96,
       "height": 96,
       "frameWidth": 96,
@@ -912,8 +912,8 @@
     {
       "id": "portrait-sprinter",
       "path": "/game-assets/v2/portrait-sprinter.svg",
-      "sha256": "2e113572318d5ea3a3e7bdb9faeb64d9385f889caa11204c332fd2becfb044a2",
-      "bytes": 16924,
+      "sha256": "0ced8cbe7cff6473639ccf79b7a7c30802860f2fd81d1ba15add6d35415fa1f7",
+      "bytes": 16496,
       "width": 96,
       "height": 96,
       "frameWidth": 96,

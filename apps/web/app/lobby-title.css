@@ -21,13 +21,32 @@
     inset 0 0 0 2px #ffffff26,
     0 2px 0 0 #0b0a1459;
   color: var(--soft);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-pixel), sans-serif;
   font-size: 0.8125rem;
   white-space: nowrap;
 }
-.lobby-brand svg {
+/* A window onto the mark at the left of each logo lockup. */
+.lobby-brand-mark {
   flex: none;
-  image-rendering: pixelated;
+  display: block;
+  height: 18px;
+  overflow: hidden;
+}
+.lobby-brand[data-brand="solana"] .lobby-brand-mark {
+  width: 21px;
+}
+.lobby-brand[data-brand="magicblock"] .lobby-brand-mark {
+  width: 19px;
+}
+.lobby-brand-mark img {
+  display: block;
+  width: auto;
+  max-width: none;
+  height: 100%;
+}
+/* The supplied MagicBlock file is black; invert it to white on the badge. */
+.lobby-brand[data-brand="magicblock"] img {
+  filter: invert(1);
 }
 .lobby-brand strong {
   font-family: var(--font-pixel), sans-serif;
@@ -60,6 +79,24 @@
     inset 0 var(--px) 0 0 var(--gold-hi),
     inset 0 calc(var(--px) * -2) 0 0 var(--gold-lo),
     0 calc(var(--px) * 3) 0 0 #0b0a1466;
+}
+@media (hover: hover) {
+  .pixel-button.lobby-play:hover {
+    transform: translateY(-3px);
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .pixel-button.lobby-play:hover .pixel-icon {
+    animation: start-nudge 480ms steps(1) infinite;
+  }
+}
+@keyframes start-nudge {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
 }
 .pixel-button.lobby-play:active {
   transform: translateY(var(--px));

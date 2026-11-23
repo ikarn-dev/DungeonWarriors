@@ -1,4 +1,5 @@
 import {
+  BN,
   BorshAccountsCoder,
   convertIdlToCamelCase,
   type IdlAccounts,
@@ -46,6 +47,31 @@ export const CAT_NAMES: Record<CatId, string> = {
 const ids = ["collector", "acrobat", "guardian", "sprinter"] as const;
 const grades = ["common", "rare", "epic"] as const;
 const tag = (value: object) => Object.keys(value)[0];
+const enumFields = z.record(z.string(), z.unknown());
+const price = z.instanceof(BN).transform((value) => BigInt(value.toString()));
+const weight = z.number().int().positive();
+const shopCatalogSchema = z.object({
+  catPriceBaseUnits: price,
+  upgradePriceBaseUnits: price,
+  maxCatLevel: z.number().int().positive(),
+  cats: z
+    .array(
+      z.object({
+        id: enumFields.transform(tag).pipe(z.enum(ids)),
+        weight,
+      }),
+    )
+    .length(ids.length),
+  upgrades: z
+    .array(
+      z.object({
+        rarity: enumFields.transform(tag).pipe(z.enum(grades)),
+        weight,
+        levelGain: z.number().int().positive(),
+      }),
+    )
+    .length(grades.length),
+});
 function drawAddress(owner: PublicKey, nonce: bigint) {
   const bytes = new Uint8Array(8);
   new DataView(bytes.buffer).setBigUint64(0, nonce, true);
@@ -142,6 +168,7 @@ export function decodeLobbyState(input: unknown, wallet: string) {
   }
   let assetBinding: null | { version: number; contentHash: string } = null;
   let catalogVersion: number | null = null;
+  let shopCatalog: z.infer<typeof shopCatalogSchema> | null = null;
   if (cfg?.catalog != null) {
     const bytes = new Uint8Array(4);
     new DataView(bytes.buffer).setUint32(0, cfg.catalog.version, true);
@@ -161,6 +188,7 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     )
       throw new Error("INVALID_ACCOUNT_RESPONSE");
     catalogVersion = catalog.binding.version;
+    shopCatalog = shopCatalogSchema.parse(catalog.catalog);
     assetBinding = {
       version: catalog.assetManifest.version,
       contentHash: catalog.assetManifest.contentHash
@@ -192,6 +220,7 @@ export function decodeLobbyState(input: unknown, wallet: string) {
       ]),
     ),
     catalogVersion,
+    shopCatalog,
     assetBinding,
     cats,
     selected: selected as CatId | null,

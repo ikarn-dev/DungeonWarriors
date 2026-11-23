@@ -35,10 +35,12 @@ export class ChipSynth {
     this.out = ctx.createGain();
     this.out.gain.value = 0;
     this.out.connect(soften);
-    const bus = (level: number) => {
+    // Music buses follow the master fade; UI sounds bypass it so a cue still
+    // plays while the music fades in or out.
+    const bus = (level: number, direct = false) => {
       const gain = ctx.createGain();
-      gain.gain.value = level;
-      gain.connect(this.out);
+      gain.gain.value = direct ? level * MASTER : level;
+      gain.connect(direct ? soften : this.out);
       return gain;
     };
     this.bus = {
@@ -46,8 +48,8 @@ export class ChipSynth {
       arp: bus(0.06),
       bass: bus(0.22),
       drum: bus(0.12),
-      meow: bus(0.15),
-      ui: bus(0.08),
+      meow: bus(0.28),
+      ui: bus(0.08, true),
     };
     this.waves = { lead: pulseWave(ctx, 0.25), arp: pulseWave(ctx, 0.125) };
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -121,9 +123,62 @@ export class ChipSynth {
     osc.stop(at + 0.08);
   }
 
+  // Short square-wave note on the UI bus.
+  private chirp(
+    at: number,
+    from: number,
+    to: number,
+    seconds: number,
+    level = 0.8,
+  ) {
+    const osc = this.ctx.createOscillator();
+    osc.setPeriodicWave(this.waves.lead);
+    osc.frequency.setValueAtTime(from, at);
+    osc.frequency.exponentialRampToValueAtTime(to, at + seconds * 0.6);
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(level, at);
+    env.gain.exponentialRampToValueAtTime(0.001, at + seconds);
+    osc.connect(env).connect(this.bus.ui);
+    osc.start(at);
+    osc.stop(at + seconds + 0.02);
+  }
+
+  // Quiet rising chirp for hovering a primary button.
+  hover(at: number) {
+    this.chirp(at, 990, 1320, 0.06, 0.45);
+  }
+
+  // Four-note "game start" arpeggio: C6 E6 G6 C7.
+  jingle(at: number) {
+    [1047, 1319, 1568, 2093].forEach((hz, i) => {
+      this.chirp(at + i * 0.07, hz, hz, i === 3 ? 0.22 : 0.08, 0.7);
+    });
+  }
+
+  // Two notes up when sound turns on, two down when it turns off.
+  cue(on: boolean, at: number) {
+    const [first, second] = on ? [784, 1175] : [1175, 784];
+    this.chirp(at, first, first, 0.07);
+    this.chirp(at + 0.08, second, second, 0.12);
+  }
+
+  // Descending blip for disconnecting, like a console powering off.
+  powerDown(at: number) {
+    const osc = this.ctx.createOscillator();
+    osc.setPeriodicWave(this.waves.lead);
+    osc.frequency.setValueAtTime(880, at);
+    osc.frequency.exponentialRampToValueAtTime(196, at + 0.22);
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(0.9, at);
+    env.gain.exponentialRampToValueAtTime(0.001, at + 0.26);
+    osc.connect(env).connect(this.bus.ui);
+    osc.start(at);
+    osc.stop(at + 0.28);
+  }
+
   // A soft "mi-aow": a sawtooth through a moving band-pass formant, rising
   // then falling in pitch with a light vibrato. `short` gives a quick "mrrp".
-  meow(at: number, short = false) {
+  meow(at: number, short = false, pan = 0) {
     const ctx = this.ctx;
     const tune = 2 ** ((Math.random() * 4 - 2) / 12);
     const length = short ? 0.22 : 0.42;
@@ -152,7 +207,9 @@ export class ChipSynth {
     env.gain.linearRampToValueAtTime(1, at + 0.05);
     env.gain.setValueAtTime(1, at + length * 0.6);
     env.gain.linearRampToValueAtTime(0, at + length);
-    osc.connect(formant).connect(env).connect(this.bus.meow);
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+    osc.connect(formant).connect(env).connect(panner).connect(this.bus.meow);
     osc.start(at);
     vibrato.start(at);
     osc.stop(at + length + 0.05);

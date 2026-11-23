@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { lobbyMusic } from "../lib/audio/lobby-music";
 import { MEDIA_ROOT, parseAssetManifest } from "../lib/game/assets";
 import type { CatId } from "../lib/game/catalog";
 
@@ -150,7 +151,10 @@ export default function LobbyScene({
       const move = Math.min(Math.abs(w.target - w.x), w.speed * dt);
       w.x += move * w.facing;
       w.distance += move;
-      if (w.y === 0 && w.vy === 0 && Math.random() < dt * 0.25) w.vy = 380;
+      if (w.y === 0 && w.vy === 0 && Math.random() < dt * 0.25) {
+        w.vy = 380;
+        lobbyMusic.hop(span > 0 ? (w.x / span) * 2 - 1 : 0);
+      }
       if (Math.abs(w.target - w.x) < 1 && w.y === 0) {
         w.speed = 0;
         w.restUntil = now + random(900, 3200);

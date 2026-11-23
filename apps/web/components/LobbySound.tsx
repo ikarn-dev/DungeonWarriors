@@ -49,14 +49,25 @@ export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
       if (!(event.target instanceof Element)) return;
       const control = event.target.closest(".lobby a, .lobby button");
       if (!control || control.matches(":disabled, .lobby-sound")) return;
-      if (control.matches(".lobby-play")) lobbyMusic.meow();
+      if (control.matches(".lobby-play")) lobbyMusic.start();
       else if (control.matches(".pixel-button")) lobbyMusic.blip();
+    };
+    // Hover chirp for Start, mouse pointers only.
+    const over = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || !(event.target instanceof Element))
+        return;
+      const start = event.target.closest(".lobby-play");
+      const from = event.relatedTarget;
+      if (start && !(from instanceof Node && start.contains(from)))
+        lobbyMusic.hover();
     };
     window.addEventListener("pointerdown", press, true);
     window.addEventListener("keydown", press, true);
+    window.addEventListener("pointerover", over, true);
     return () => {
       window.removeEventListener("pointerdown", press, true);
       window.removeEventListener("keydown", press, true);
+      window.removeEventListener("pointerover", over, true);
     };
   }, []);
 
@@ -70,6 +81,7 @@ export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
       title={label}
       onClick={() => {
         lobbyMusic.unlock();
+        lobbyMusic.cue(!enabled);
         writeEnabled(!enabled);
       }}
     >
