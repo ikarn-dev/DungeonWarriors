@@ -124,6 +124,7 @@ export default function RunEntry({
     null,
   );
   const [runningNonce, setRunningNonce] = useState<string | null>(null);
+  const [resolvedNonce, setResolvedNonce] = useState<string | null>(null);
   const cat = state.cats.find((owned) => owned.id === state.selected);
   const selectedCat = cat?.id;
   const { assetBinding } = state;
@@ -133,7 +134,9 @@ export default function RunEntry({
     state.nextRunNonce !== state.settledRuns
       ? (BigInt(state.nextRunNonce) - 1n).toString()
       : null;
-  const viewer = runningNonce ?? (launch.current === null ? recovered : null);
+  const viewer =
+    runningNonce ??
+    (launch.current === null && recovered !== resolvedNonce ? recovered : null);
   const offer = terms?.offer;
   const available = BigInt(offer?.available ?? state.available);
   const stake = positiveAmount(amount);
@@ -449,9 +452,22 @@ export default function RunEntry({
     }
   }
 
+  function clearRun() {
+    launch.current = null;
+    setRunningNonce(null);
+    setAmount("");
+  }
+
   function close() {
     dialog.current?.close();
+  }
+
+  function onClose() {
     setOpen(false);
+    if (runningNonce !== null && runningNonce === resolvedNonce) {
+      clearRun();
+      void work(refresh);
+    }
   }
 
   return (
@@ -496,7 +512,7 @@ export default function RunEntry({
         shown={viewer !== null || open}
         busy={blocked}
         title={cat ? CAT_NAMES[cat.id] : "PURRPS"}
-        onClose={() => setOpen(false)}
+        onClose={onClose}
         onBack={close}
       >
         {viewer !== null && (
@@ -511,19 +527,14 @@ export default function RunEntry({
             present={open}
             media={assetBinding}
             onFinalized={() => {
+              setResolvedNonce(viewer);
               if (dialog.current?.open) {
                 setRunningNonce(viewer);
-              } else {
-                launch.current = null;
-                setRunningNonce(null);
-                setAmount("");
-              }
+              } else clearRun();
               void work(refresh);
             }}
             runSettled={() => {
-              launch.current = null;
-              setRunningNonce(null);
-              setAmount("");
+              clearRun();
               close();
               void work(refresh);
             }}

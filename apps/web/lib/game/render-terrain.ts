@@ -10,6 +10,11 @@ const TILE = 32;
 const BODY_KEY = "terrain-body";
 const BODY_WIDTH = TILE * 2;
 const GRASS_RISE = 2;
+const EDGE_WIDTH = 4;
+const SHADE_HEIGHT = 6;
+const STONE_EDGE = 0x1d192e;
+const STONE_BEVEL = 0x433a5f;
+const SUBPIXELS = 256;
 const mod = (value: number, size: number) => ((value % size) + size) % size;
 
 export type Surface = Extract<WorldEntity, { kind: "ramp" | "terrain" }>;
@@ -35,6 +40,7 @@ export function surfacePixels(track: readonly Surface[], xPixels: number) {
 export class TerrainColumns {
   private body: Phaser.GameObjects.Image[] = [];
   private grass: Phaser.GameObjects.Image[] = [];
+  private platformShade?: Phaser.GameObjects.Graphics;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -61,6 +67,8 @@ export class TerrainColumns {
       for (let x = 0; x < BODY_WIDTH; x += TILE)
         context.drawImage(source, x, y, TILE, TILE);
     canvas.refresh();
+    if (floatingPlatforms)
+      this.platformShade = scene.add.graphics().setDepth(2.5);
   }
 
   private ensure(count: number) {
@@ -130,9 +138,46 @@ export class TerrainColumns {
         .setPosition(screenX - grassX, y - GRASS_RISE)
         .setVisible(y - GRASS_RISE < height);
     }
+    if (this.platformShade)
+      this.drawPlatformShade(this.platformShade, track, view);
     for (let i = used; i < this.body.length; i++) {
       this.body[i]?.setVisible(false);
       this.grass[i]?.setVisible(false);
+    }
+  }
+
+  private drawPlatformShade(
+    shade: Phaser.GameObjects.Graphics,
+    track: readonly Surface[],
+    { width, left, yOffset, snap }: Parameters<TerrainColumns["draw"]>[1],
+  ) {
+    shade.clear();
+    for (const [index, tile] of track.entries()) {
+      const edge = tile.xSubpixels + tile.widthSubpixels;
+      const x = snap(tile.xSubpixels / SUBPIXELS - left);
+      const end = snap(edge / SUBPIXELS - left);
+      if (end <= 0 || x >= width) continue;
+      const previous = track[index - 1];
+      const next = track[index + 1];
+      const endY = surfaceAt(tile, edge) ?? tile.ySubpixels;
+      const bottom =
+        (Math.max(tile.ySubpixels, endY) + tile.heightSubpixels) / SUBPIXELS +
+        yOffset;
+      shade.fillStyle(STONE_BEVEL);
+      shade.fillRect(x, snap(bottom - SHADE_HEIGHT), end - x, SHADE_HEIGHT);
+      shade.fillStyle(STONE_EDGE);
+      shade.fillRect(x, snap(bottom - 2), end - x, 2);
+      if (
+        !previous ||
+        previous.xSubpixels + previous.widthSubpixels < tile.xSubpixels
+      ) {
+        const top = tile.ySubpixels / SUBPIXELS + yOffset;
+        shade.fillRect(x, snap(top), EDGE_WIDTH, bottom - top);
+      }
+      if (next && next.xSubpixels > edge) {
+        const top = endY / SUBPIXELS + yOffset;
+        shade.fillRect(end - EDGE_WIDTH, snap(top), EDGE_WIDTH, bottom - top);
+      }
     }
   }
 }
