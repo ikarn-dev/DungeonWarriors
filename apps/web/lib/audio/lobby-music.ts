@@ -19,6 +19,7 @@ class LobbyMusic {
   private synth: ChipSynth | null = null;
   private wanted: LobbyTrack | null = null;
   private enabled = false;
+  private summoning = false;
   private readonly holds = new Set<string>();
   private playing: Playing | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -38,6 +39,14 @@ class LobbyMusic {
   setTrack(track: LobbyTrack | null) {
     this.wanted = track;
     this.sync();
+  }
+  setSummoning(open: boolean) {
+    this.summoning = open;
+    this.sync();
+  }
+  reveal() {
+    if (!this.synth || !this.enabled || document.hidden) return;
+    this.synth.jingle(this.synth.ctx.currentTime);
   }
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
@@ -96,7 +105,12 @@ class LobbyMusic {
   private sync() {
     const synth = this.synth;
     if (!synth) return;
-    const target = this.active() ? this.wanted : null;
+    const target =
+      this.summoning && this.enabled && !document.hidden
+        ? "summon"
+        : this.active()
+          ? this.wanted
+          : null;
     if (target === (this.playing?.name ?? null)) return;
     const now = synth.ctx.currentTime;
     if (target === null) {

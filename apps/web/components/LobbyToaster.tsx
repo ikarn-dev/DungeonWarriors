@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { Toaster } from "sonner";
+import { webErrorMessage } from "../lib/game/web-api";
 import { type Fill, PixelMark } from "./PixelMark";
 
 const CHECK = [
@@ -37,5 +38,35 @@ export default function LobbyToaster() {
         },
       }}
     />
+  );
+}
+
+export function LobbyRequestStatus({
+  message,
+  error,
+  busy,
+  onCheck,
+}: {
+  message: string | null;
+  error: string | null;
+  busy: boolean;
+  onCheck: (() => void) | null;
+}) {
+  if (!message && error === null && !onCheck) return null;
+  return (
+    <footer className="lobby-status">
+      {message && <output aria-live="polite">{message}</output>}
+      {error !== null && <p role="alert">{webErrorMessage(error)}</p>}
+      {onCheck && (
+        <button
+          type="button"
+          className="pixel-button"
+          disabled={busy}
+          onClick={onCheck}
+        >
+          Check transaction
+        </button>
+      )}
+    </footer>
   );
 }

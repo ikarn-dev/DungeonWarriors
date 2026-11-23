@@ -5,6 +5,7 @@
 @import "./lobby-title.css";
 @import "./lobby-sections.css";
 @import "./lobby-play.css";
+@import "./capsule-reveal.css";
 
 :root {
   --background: #ffffff;

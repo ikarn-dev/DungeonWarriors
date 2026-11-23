@@ -3,17 +3,22 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { z } from "zod";
 import { verifyManifestBinding } from "../lib/game/assets";
 import { CATALOG_V1 } from "../lib/game/catalog";
 import {
   type PlayerIntent,
   validatePreparedPlayerAction,
 } from "../lib/game/custody-client";
-import { decodeLobbyState, type LobbyState } from "../lib/game/lobby-state";
+import {
+  type CapsuleKind,
+  decodeLobbyState,
+  type LobbyState,
+} from "../lib/game/lobby-state";
 import { RULES_V1 } from "../lib/game/rules";
 import {
   type LobbyIntent,
+  lobbyPreparedSchema,
+  lobbySubmittedSchema,
   validatePreparedTransaction,
 } from "../lib/game/transaction-intents";
 import {
@@ -23,34 +28,19 @@ import {
   readWebJson,
   WebApiError,
   webApi,
-  webErrorMessage,
 } from "../lib/game/web-api";
+import { useCapsuleReceipt } from "./account-data";
+import CapsuleReveal from "./CapsuleReveal";
 import type { LobbyTab } from "./LobbyMenu";
 import LobbyScene from "./LobbyScene";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
-import LobbyToaster from "./LobbyToaster";
+import LobbyToaster, { LobbyRequestStatus } from "./LobbyToaster";
 import { WalletChip } from "./LobbyWallet";
 import { signInWallet } from "./wallet-sign-in";
 
-const preparedSchema = z
-  .object({
-    transaction: z.string().max(1800),
-    blockhash: z.string(),
-    lastValidBlockHeight: z.number().int(),
-    operationId: z.string(),
-    network: z.literal("base").default("base"),
-  })
-  .strict();
-const submittedSchema = z
-  .object({
-    status: z.literal("requested"),
-    signature: z.string().min(64).max(88),
-    unknownResponse: z.boolean(),
-    network: z.literal("base").default("base"),
-  })
-  .strict();
 const drawPollMs = 6_000;
+type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 
 export default function StarterPanel() {
   const wallet = useWallet();
@@ -73,6 +63,21 @@ export default function StarterPanel() {
     starter: boolean;
   } | null>(null);
   const work = useRef<AbortController | null>(null);
+  const [drawView, setDrawView] = useState<DrawView | null>(null);
+  const visibleDraw =
+    authenticated && drawView?.owner === address ? drawView : null;
+  const drawCount = state?.nonce ?? 0n;
+  const latestPaid = drawCount > 1n ? drawCount - 1n : null;
+  const requestedNonce = visibleDraw?.nonce ?? latestPaid;
+  const readNonce =
+    requestedNonce !== null && requestedNonce < drawCount
+      ? requestedNonce
+      : null;
+  const { receipt, retryDraw } = useCapsuleReceipt(
+    authenticated ? address : null,
+    readNonce,
+    state?.slot,
+  );
   const reload = useCallback(
     async (signal?: AbortSignal) => {
       if (address === null) return;
@@ -100,6 +105,7 @@ export default function StarterPanel() {
     setState(null);
     setAccountRevision(undefined);
     setPending(null);
+    setDrawView(null);
     setError(null);
     if (address === null) {
       setMessage(null);
@@ -207,12 +213,15 @@ export default function StarterPanel() {
         } finally {
           if (!signal.aborted) setPending(null);
         }
-        if (result.resolution === "expired") {
+        if (result.resolution === "expired" || result.status?.err !== null) {
+          setDrawView(null);
           setMessage(null);
-          throw new WebApiError("BLOCKHASH_EXPIRED");
+          throw new WebApiError(
+            result.resolution === "expired"
+              ? "BLOCKHASH_EXPIRED"
+              : "TRANSACTION_FAILED",
+          );
         }
-        if (result.status?.err !== null)
-          throw new WebApiError("TRANSACTION_FAILED");
         toast.success("Transaction confirmed");
         return;
       }
@@ -251,7 +260,7 @@ export default function StarterPanel() {
         state.assetBinding,
       );
     }
-    const prepared = preparedSchema.parse(
+    const prepared = lobbyPreparedSchema.parse(
       await webApi("/api/tx/prepare", intent, signal),
     );
     const tx = VersionedTransaction.deserialize(
@@ -262,13 +271,30 @@ export default function StarterPanel() {
     else validatePreparedTransaction(tx, address, intent);
     const signed = await wallet.signTransaction(tx);
     if (signal.aborted) return;
-    const result = submittedSchema.parse(
+    const result = lobbySubmittedSchema.parse(
       await webApi(
         "/api/tx/submit",
         { intent, transaction: encodeBase64(signed.serialize()) },
         signal,
       ),
     );
+    if (signal.aborted) return;
+    if (intent.operation === "claimStarter") {
+      setDrawView({
+        owner: address,
+        nonce: BigInt(intent.nonce),
+        kind: "starterCat",
+      });
+    } else if (
+      intent.operation === "game" &&
+      intent.action.kind === "purchaseCapsule"
+    ) {
+      setDrawView({
+        owner: address,
+        nonce: BigInt(intent.action.nonce),
+        kind: intent.action.capsule,
+      });
+    }
     setPending({
       signature: result.signature,
       lastValidBlockHeight: prepared.lastValidBlockHeight,
@@ -374,6 +400,12 @@ export default function StarterPanel() {
             sign={wallet.signTransaction}
             blocked={blocked}
             accountRevision={accountRevision}
+            shopDraw={{
+              receipt: readNonce === latestPaid ? receipt : null,
+              retryDraw,
+              onViewDraw: (nonce, kind) =>
+                setDrawView({ owner: address, nonce, kind }),
+            }}
             tab={tab}
             setTab={setTab}
             perform={perform}
@@ -431,30 +463,36 @@ export default function StarterPanel() {
           />
         )}
       </div>
-      {(message || error !== null || pending !== null) && (
-        <footer className="lobby-status">
-          {message && <output aria-live="polite">{message}</output>}
-          {error !== null && <p role="alert">{webErrorMessage(error)}</p>}
-          {pending !== null && (
-            <button
-              type="button"
-              className="pixel-button"
-              disabled={busy}
-              onClick={() =>
-                void perform((signal) =>
-                  reconcile(
-                    pending.signature,
-                    pending.lastValidBlockHeight,
-                    signal,
-                  ),
-                )
-              }
-            >
-              Check transaction
-            </button>
-          )}
-        </footer>
+      {visibleDraw && (
+        <CapsuleReveal
+          key={visibleDraw.nonce.toString()}
+          kind={visibleDraw.kind}
+          receipt={receipt?.kind === visibleDraw.kind ? receipt : null}
+          cats={state?.cats ?? []}
+          retry={retryDraw}
+          onClose={() => setDrawView(null)}
+          onViewCats={() => {
+            setDrawView(null);
+            setTab("cats");
+          }}
+        />
       )}
+      <LobbyRequestStatus
+        message={message}
+        error={error}
+        busy={busy}
+        onCheck={
+          pending &&
+          (() =>
+            void perform((signal) =>
+              reconcile(
+                pending.signature,
+                pending.lastValidBlockHeight,
+                signal,
+              ),
+            ))
+        }
+      />
     </>
   );
 }

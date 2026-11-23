@@ -235,7 +235,24 @@ export function decodeLobbyState(input: unknown, wallet: string) {
 }
 export type LobbyState = ReturnType<typeof decodeLobbyState>;
 
-export function decodePaidDraw(input: unknown, wallet: string, nonce: bigint) {
+export type CapsuleKind = "starterCat" | "paidCat" | "upgrade";
+type CapsuleReward =
+  | { kind: "cat"; id: CatId }
+  | { kind: "upgrade"; rarity: (typeof grades)[number] };
+
+export type CapsuleReceipt = {
+  status: "pending" | "fulfilled" | "refunded";
+  kind: CapsuleKind;
+  reward: CapsuleReward | null;
+  deadline: string | null;
+  cost: string;
+};
+
+export function decodeCapsuleDraw(
+  input: unknown,
+  wallet: string,
+  nonce: bigint,
+): CapsuleReceipt {
   const [address, bump] = drawAddress(new PublicKey(wallet), nonce);
   const { accounts } = rawSchema.parse(input);
   const row = accounts[0];
@@ -257,19 +274,22 @@ export function decodePaidDraw(input: unknown, wallet: string, nonce: bigint) {
     draw.bump !== bump ||
     draw.owner.toBase58() !== wallet ||
     draw.nonce.toString() !== nonce.toString() ||
-    (kind !== "paidCat" && kind !== "upgrade") ||
-    draw.paidDeadlineSeconds === null ||
+    (kind !== "starterCat" && kind !== "paidCat" && kind !== "upgrade") ||
+    (draw.paidDeadlineSeconds === null) !== (kind === "starterCat") ||
+    (status === "refunded" && kind === "starterCat") ||
     (status !== "pending" && status !== "fulfilled" && status !== "refunded")
   )
     throw new Error("INVALID_DRAW_ACCOUNT");
-  let reward: string | null = null;
+  let reward: CapsuleReward | null = null;
   if (status === "fulfilled") {
-    if (draw.result && "cat" in draw.result && kind === "paidCat") {
+    if (draw.result && "cat" in draw.result && kind !== "upgrade") {
       const cat = tag(draw.result.cat[0]);
-      if (ids.some((id) => id === cat)) reward = CAT_NAMES[cat as CatId];
+      const id = ids.find((item) => item === cat);
+      if (id !== undefined) reward = { kind: "cat", id };
     } else if (draw.result && "upgrade" in draw.result && kind === "upgrade") {
       const grade = tag(draw.result.upgrade[0]);
-      if (grades.some((item) => item === grade)) reward = `${grade} upgrade`;
+      const rarity = grades.find((item) => item === grade);
+      if (rarity !== undefined) reward = { kind: "upgrade", rarity };
     }
     if (reward === null) throw new Error("INVALID_DRAW_ACCOUNT");
   }
@@ -277,7 +297,7 @@ export function decodePaidDraw(input: unknown, wallet: string, nonce: bigint) {
     status,
     kind,
     reward,
-    deadline: draw.paidDeadlineSeconds.toString(),
+    deadline: draw.paidDeadlineSeconds?.toString() ?? null,
     cost: draw.priceBaseUnits.toString(),
   };
 }

@@ -130,6 +130,44 @@ function transaction(
   };
 }
 describe("complete transaction validation", () => {
+  it("accepts wallet fee instructions for cat selection within the existing budget limits", () => {
+    const owner = wallet();
+    const intent = {
+      operation: "selectCat",
+      sponsored: false,
+      inventoryVersion: "2",
+      cat: "collector",
+    } as const;
+    const built = instructionFor(owner.address, intent);
+    const encode = (microLamports: number) => {
+      const message = new TransactionMessage({
+        payerKey: built.payer,
+        recentBlockhash: PublicKey.default.toBase58(),
+        instructions: [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports }),
+          built.instruction,
+        ],
+      }).compileToV0Message();
+      const tx = new VersionedTransaction(message);
+      tx.signatures[0] = owner.sign(message.serialize());
+      return Buffer.from(tx.serialize()).toString("base64");
+    };
+    expect(() =>
+      validateTransaction(owner.address, intent, encode(400_000)),
+    ).not.toThrow();
+    expect(() =>
+      validateTransaction(owner.address, intent, encode(500_001)),
+    ).toThrow("TRANSACTION_REJECTED");
+    expect(() =>
+      validateTransaction(
+        owner.address,
+        { ...intent, cat: "acrobat" },
+        encode(400_000),
+      ),
+    ).toThrow("TRANSACTION_REJECTED");
+  });
+
   it("prepares and submits the starter below the general sponsor cap without spending the reserve floor", async () => {
     const owner = wallet();
     const sponsor = Keypair.generate();
@@ -442,7 +480,7 @@ describe("complete transaction validation", () => {
     ).toThrow();
     for (const data of [
       Buffer.alloc(1400).toString("base64"),
-      t.encoded() + " ",
+      `${t.encoded()} `,
       "garbage",
     ])
       expect(() =>

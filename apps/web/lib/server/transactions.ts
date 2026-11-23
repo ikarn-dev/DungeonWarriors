@@ -358,6 +358,10 @@ export function validateTransaction(
             intent.action.completionSponsor
           ? 1
           : 0;
+  const walletMayAddFees =
+    intent.sponsored ||
+    intent.operation === "game" ||
+    intent.operation === "selectCat";
   const maxInstructions =
     intent.operation === "game"
       ? intent.playSponsor
@@ -366,7 +370,7 @@ export function validateTransaction(
             intent.action.expiresAtSeconds !== undefined
           ? 5 + fundingInstructions
           : 4 + fundingInstructions
-      : intent.sponsored
+      : walletMayAddFees
         ? 3
         : 1;
   if (
@@ -410,10 +414,9 @@ export function validateTransaction(
       recentBlockhash: message.recentBlockhash,
       // Wallets can add fee instructions after preparation. Every other byte
       // must still match a transaction rebuilt from the approved intent.
-      instructions:
-        intent.sponsored || intent.operation === "game"
-          ? reviewedInstructions(message, built.instructions)
-          : built.instructions,
+      instructions: walletMayAddFees
+        ? reviewedInstructions(message, built.instructions)
+        : built.instructions,
     }).compileToV0Message();
     if (
       !Buffer.from(expected.serialize()).equals(

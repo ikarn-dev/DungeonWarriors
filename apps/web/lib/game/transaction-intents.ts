@@ -10,6 +10,7 @@ import {
   TransactionMessage,
   type VersionedTransaction,
 } from "@solana/web3.js";
+import { z } from "zod";
 import { DEVNET } from "../solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
 import type { CatId } from "./catalog";
@@ -28,6 +29,23 @@ export type LobbyIntent =
       cat: CatId;
       sponsored: false;
     };
+export const lobbyPreparedSchema = z
+  .object({
+    transaction: z.string().max(1800),
+    blockhash: z.string(),
+    lastValidBlockHeight: z.number().int(),
+    operationId: z.string(),
+    network: z.literal("base").default("base"),
+  })
+  .strict();
+export const lobbySubmittedSchema = z
+  .object({
+    status: z.literal("requested"),
+    signature: z.string().min(64).max(88),
+    unknownResponse: z.boolean(),
+    network: z.literal("base").default("base"),
+  })
+  .strict();
 const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
 const coder = new BorshInstructionCoder(idl);
 export function validatePreparedTransaction(

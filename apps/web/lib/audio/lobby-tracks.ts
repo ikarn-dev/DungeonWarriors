@@ -2,7 +2,7 @@ import type { Voice } from "./chip-synth";
 
 // Two original 8-bar chiptune loops, written in 16th-note steps.
 // Melody tokens: a note name starts a note, "-" holds it, "." is a rest.
-export type LobbyTrack = "title" | "lobby";
+export type LobbyTrack = "title" | "lobby" | "summon";
 type Chord = { root: number; minor: boolean };
 type StepNote = { voice: Voice; midi: number; steps: number };
 export type Step = {
@@ -151,4 +151,28 @@ const lobby = compile({
   ],
 });
 
-export const TRACKS: Record<LobbyTrack, CompiledTrack> = { title, lobby };
+// A short, rising motif under the capsule machine.
+const summon = compile({
+  bpm: 108,
+  lead: [
+    "A4 - - - C5 - E5 - B5 - - - E5 - - -",
+    "G4 - - - B4 - D5 - G5 - - - D5 - - -",
+    "A4 - C5 - E5 - A5 - C6 - - - E5 - - -",
+    "G4 - B4 - D5 - G5 - A5 - - - . . . .",
+  ],
+  chords: [minor(57), major(55), minor(57), major(55)],
+  bass: [
+    [0, 0, 8],
+    [8, 7, 6],
+  ],
+  arpEvery: 2,
+  kicks: [],
+  hats: [],
+  meows: [],
+});
+
+export const TRACKS: Record<LobbyTrack, CompiledTrack> = {
+  title,
+  lobby,
+  summon,
+};

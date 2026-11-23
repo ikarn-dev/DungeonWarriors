@@ -1,4 +1,5 @@
 import type { VersionedTransaction } from "@solana/web3.js";
+import type { ComponentProps } from "react";
 import type { PlayerIntent } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
 import type { LobbyIntent } from "../lib/game/transaction-intents";
@@ -20,6 +21,7 @@ export default function LobbySections({
   sign,
   blocked,
   accountRevision,
+  shopDraw,
   tab,
   setTab,
   perform,
@@ -33,6 +35,10 @@ export default function LobbySections({
     | undefined;
   readonly blocked: boolean;
   readonly accountRevision: number | undefined;
+  readonly shopDraw: Pick<
+    ComponentProps<typeof CapsuleShop>,
+    "receipt" | "retryDraw" | "onViewDraw"
+  >;
   readonly tab: LobbyTab;
   readonly setTab: (tab: LobbyTab) => void;
   readonly perform: Work;
@@ -96,9 +102,9 @@ export default function LobbySections({
           <CapsuleShop
             key={`shop:${address}`}
             state={state}
-            wallet={address}
             blocked={blocked}
             action={game}
+            {...shopDraw}
           />
         ),
         wallet: (

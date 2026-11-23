@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { decodeCapsuleDraw } from "../lib/game/lobby-state";
 import { webApi } from "../lib/game/web-api";
 import { publicKeySchema } from "../lib/solana/addresses";
 
@@ -116,4 +117,35 @@ export function useFinalized<T>(
     return () => current.current?.abort();
   }, [revision, run]);
   return { value, failed, retry: run };
+}
+
+// Tie the displayed reward to the finalized owner and nonce even across a reconnect.
+export function useCapsuleReceipt(
+  address: string | null,
+  nonce: bigint | null,
+  slot: number | undefined,
+) {
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      if (address === null || nonce === null) return null;
+      const value = await read(
+        { kind: "draw", nonce: nonce.toString() },
+        AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+      );
+      return {
+        address,
+        nonce,
+        receipt: decodeCapsuleDraw(value, address, nonce),
+      };
+    },
+    [address, nonce],
+  );
+  const draw = useFinalized(slot, load);
+  return {
+    receipt:
+      draw.value?.address === address && draw.value.nonce === nonce
+        ? draw.value.receipt
+        : null,
+    retryDraw: draw.failed && nonce !== null ? draw.retry : undefined,
+  };
 }

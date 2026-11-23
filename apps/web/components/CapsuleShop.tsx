@@ -1,16 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { MEDIA_ROOT } from "../lib/game/assets";
 import { displayUsdc, type PlayerIntent } from "../lib/game/custody-client";
 import {
   CAT_NAMES,
-  decodePaidDraw,
+  type CapsuleKind,
+  type CapsuleReceipt,
   type LobbyState,
 } from "../lib/game/lobby-state";
-import { webApi } from "../lib/game/web-api";
-import { useFinalized } from "./account-data";
 
 const percent = new Intl.NumberFormat("en-US", {
   style: "percent",
@@ -77,40 +76,26 @@ function Offer({
 
 export default function CapsuleShop({
   state,
-  wallet,
   blocked,
   action,
+  receipt: draw,
+  retryDraw,
+  onViewDraw,
 }: {
   state: LobbyState;
-  wallet: string;
   blocked: boolean;
   action: (value: PlayerIntent["action"]) => void;
+  receipt: CapsuleReceipt | null;
+  retryDraw: (() => void) | undefined;
+  onViewDraw: (nonce: bigint, kind: CapsuleKind) => void;
 }) {
   const latest =
     state.nonce !== null && state.nonce > 1n ? state.nonce - 1n : null;
   const pending = state.pendingDraw !== null;
-  const loadDraw = useCallback(
-    async (signal: AbortSignal) =>
-      latest === null
-        ? null
-        : {
-            nonce: latest,
-            receipt: decodePaidDraw(
-              await webApi(
-                "/api/chain/state",
-                { kind: "draw", nonce: latest.toString() },
-                signal,
-              ),
-              wallet,
-              latest,
-            ),
-          },
-    [latest, wallet],
-  );
-  const read = useFinalized(state.slot, loadDraw);
-  const draw = read.value?.nonce === latest ? read.value?.receipt : undefined;
   const deadline =
-    pending && draw?.status === "pending" ? Number(draw.deadline) * 1000 : null;
+    pending && draw?.status === "pending" && draw.deadline !== null
+      ? Number(draw.deadline) * 1000
+      : null;
   const [expiredAt, setExpiredAt] = useState<number | null>(null);
   useEffect(() => {
     if (deadline === null) return;
@@ -178,7 +163,9 @@ export default function CapsuleShop({
                 ? "Your draw timed out. You can refund it."
                 : "Opening your capsule…"
               : draw?.status === "fulfilled"
-                ? `You opened ${draw.reward}.`
+                ? draw.reward?.kind === "cat"
+                  ? `You got ${CAT_NAMES[draw.reward.id]}.`
+                  : `You got a ${draw.reward?.rarity} upgrade.`
                 : draw?.status === "refunded"
                   ? `${displayUsdc(draw.cost)} USDC returned to your PURRPS balance.`
                   : null}
@@ -195,8 +182,17 @@ export default function CapsuleShop({
               Refund
             </button>
           )}
-          {pending && read.failed && (
-            <button type="button" className="pixel-button" onClick={read.retry}>
+          {draw && latest !== null && !canRefund && (
+            <button
+              type="button"
+              className="pixel-button"
+              onClick={() => onViewDraw(latest, draw.kind)}
+            >
+              {draw.status === "fulfilled" ? "Replay reveal" : "View draw"}
+            </button>
+          )}
+          {retryDraw && (
+            <button type="button" className="pixel-button" onClick={retryDraw}>
               Check draw
             </button>
           )}

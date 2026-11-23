@@ -71,6 +71,11 @@ export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
     };
   }, []);
 
+  return <LobbySoundToggle />;
+}
+
+export function LobbySoundToggle() {
+  const enabled = useSyncExternalStore(subscribe, readEnabled, () => true);
   const label = enabled ? "Turn sound off" : "Turn sound on";
   return (
     <button
