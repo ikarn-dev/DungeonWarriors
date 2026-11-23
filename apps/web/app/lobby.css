@@ -132,13 +132,18 @@
   padding: calc(var(--px) * 2);
   overscroll-behavior: contain;
 }
-/* Sits in the open sky, clear of the cats walking on the ground. */
+/* Centred on the whole screen, not the space between navbar and ground. */
 .lobby-start {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
   display: grid;
   gap: 0.875rem;
-  align-self: start;
-  width: min(24rem, 100%);
-  margin-top: clamp(1rem, 12dvh, 8rem);
+  width: min(24rem, calc(100% - var(--edge-left) - var(--edge-right)));
+  max-height: calc(100dvh - 2 * (var(--edge-top) + 4rem));
+  overflow: auto;
   padding: 1.5rem;
   text-align: center;
   font-family: var(--font-geist-sans), sans-serif;
