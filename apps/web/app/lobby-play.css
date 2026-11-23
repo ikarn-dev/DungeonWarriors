@@ -303,6 +303,88 @@
   white-space: nowrap;
 }
 
+.pixel-toast-action {
+  margin-left: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.pixel-spinner {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background:
+    linear-gradient(var(--gold) 0 0) 0 0 / 6px 6px no-repeat,
+    linear-gradient(#ffc53166 0 0) 6px 6px / 6px 6px no-repeat;
+}
+
+/* Pixel loader: the collector cat running on the spot. Frames are the v2
+   sheet's run clip (frames 4–11) at 2× scale. */
+.pixel-loader {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.pixel-loader-cat {
+  width: 96px;
+  height: 96px;
+  background:
+    url("/game-assets/v2/cat-collector.svg") -384px 0 / 2496px 96px no-repeat;
+  image-rendering: pixelated;
+}
+.pixel-loader-dots {
+  display: flex;
+  gap: 6px;
+}
+.pixel-loader-dots span {
+  width: 8px;
+  height: 8px;
+  background: var(--cream);
+  box-shadow: 0 0 0 2px var(--ink);
+  opacity: 0.3;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pixel-loader-cat {
+    animation: loader-run 600ms steps(8) infinite;
+  }
+  .pixel-loader-dots span {
+    animation: loader-dot 900ms steps(1) infinite;
+  }
+  .pixel-loader-dots span:nth-child(2) {
+    animation-delay: 300ms;
+  }
+  .pixel-loader-dots span:nth-child(3) {
+    animation-delay: 600ms;
+  }
+  .pixel-spinner {
+    animation: spinner-turn 480ms steps(4) infinite;
+  }
+}
+@keyframes loader-run {
+  to {
+    background-position-x: -1152px;
+  }
+}
+@keyframes loader-dot {
+  0% {
+    opacity: 1;
+  }
+  34% {
+    opacity: 0.3;
+  }
+}
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 40rem) {
   .bet-row {
     grid-template-columns: minmax(0, 1fr);

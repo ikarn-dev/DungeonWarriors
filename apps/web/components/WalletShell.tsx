@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { CATALOG_V1 } from "../lib/game/catalog";
 import LobbyScene from "./LobbyScene";
+import PixelLoader from "./PixelLoader";
 import StarterPanel from "./StarterLobby";
 
 const wallets: WalletProviderProps["wallets"] = [];
@@ -18,9 +19,9 @@ export default function WalletShell() {
       <>
         <LobbyScene cats={CATALOG_V1.cats.map(({ id }) => id)} />
         <div className="lobby-body">
-          <output className="lobby-start pixel-panel">
-            Loading wallet controls…
-          </output>
+          <div className="lobby-start pixel-panel">
+            <PixelLoader />
+          </div>
         </div>
       </>
     );

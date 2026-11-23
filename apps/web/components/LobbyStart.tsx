@@ -2,6 +2,7 @@ import type { useWallet } from "@solana/wallet-adapter-react";
 import type { ReactNode } from "react";
 import type { LobbyState } from "../lib/game/lobby-state";
 import { WalletPicker } from "./LobbyWallet";
+import PixelLoader from "./PixelLoader";
 
 // The single next step before the lobby menu opens: connect, sign in,
 // create the player account, then claim the free starter cat.
@@ -35,7 +36,7 @@ export default function LobbyStart({
   let body: ReactNode;
   if (!wallet.connected)
     body = <WalletPicker wallet={wallet} busy={busy} onConnect={onConnect} />;
-  else if (restoring) body = <p>Restoring your session…</p>;
+  else if (restoring) body = <PixelLoader label="Connecting" />;
   else if (!authenticated)
     body = (
       <button
@@ -48,7 +49,7 @@ export default function LobbyStart({
         {restoreFailed ? "Retry session" : "Sign in to PURRPS"}
       </button>
     );
-  else if (state === null) body = <p>Loading your finalized collection…</p>;
+  else if (state === null) body = <PixelLoader label="Loading your cats" />;
   else if (!state.configured)
     body = <p>Devnet configuration has not been published yet.</p>;
   else if (!state.hasPlayer)

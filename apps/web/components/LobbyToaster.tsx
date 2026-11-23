@@ -2,7 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { Toaster } from "sonner";
-import { webErrorMessage } from "../lib/game/web-api";
 import { type Fill, PixelMark } from "./PixelMark";
 
 const CHECK = [
@@ -13,7 +12,19 @@ const CHECK = [
   ".ooo...",
   "..o....",
 ] as const;
+const CROSS = [
+  "o....o",
+  "oo..oo",
+  ".oooo.",
+  "..oo..",
+  ".oooo.",
+  "oo..oo",
+  "o....o",
+] as const;
+const BANG = ["oo", "oo", "oo", "oo", "..", "oo"] as const;
 const green: Fill = (key) => (key === "o" ? "#8ee05c" : null);
+const red: Fill = (key) => (key === "o" ? "#ff6b6b" : null);
+const gold: Fill = (key) => (key === "o" ? "#ffc531" : null);
 const toasterStyle: CSSProperties & { "--width": string } = {
   "--width": "20rem",
 };
@@ -28,45 +39,21 @@ export default function LobbyToaster() {
       duration={2400}
       visibleToasts={3}
       style={toasterStyle}
-      icons={{ success: <PixelMark rows={CHECK} fill={green} /> }}
+      icons={{
+        success: <PixelMark rows={CHECK} fill={green} />,
+        error: <PixelMark rows={CROSS} fill={red} />,
+        info: <PixelMark rows={BANG} fill={gold} />,
+        loading: <span className="pixel-spinner" />,
+      }}
       toastOptions={{
         unstyled: true,
         classNames: {
           toast: "pixel-toast",
           title: "pixel-toast-title",
           icon: "pixel-toast-icon",
+          actionButton: "pixel-toast-action",
         },
       }}
     />
-  );
-}
-
-export function LobbyRequestStatus({
-  message,
-  error,
-  busy,
-  onCheck,
-}: {
-  message: string | null;
-  error: string | null;
-  busy: boolean;
-  onCheck: (() => void) | null;
-}) {
-  if (!message && error === null && !onCheck) return null;
-  return (
-    <footer className="lobby-status">
-      {message && <output aria-live="polite">{message}</output>}
-      {error !== null && <p role="alert">{webErrorMessage(error)}</p>}
-      {onCheck && (
-        <button
-          type="button"
-          className="pixel-button"
-          disabled={busy}
-          onClick={onCheck}
-        >
-          Check transaction
-        </button>
-      )}
-    </footer>
   );
 }

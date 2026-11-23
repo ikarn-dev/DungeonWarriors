@@ -12,6 +12,7 @@ import {
   type LobbyState,
 } from "../lib/game/lobby-state";
 import { LobbySoundToggle } from "./LobbySound";
+import PixelLoader from "./PixelLoader";
 
 export default function CapsuleReveal({
   kind,
@@ -166,14 +167,10 @@ export default function CapsuleReveal({
                 {displayUsdc(receipt.cost)} USDC returned to your PURRPS
                 balance.
               </p>
+            ) : retry ? (
+              <p>We couldn't check your capsule yet.</p>
             ) : (
-              <output>
-                {retry
-                  ? "Draw status is temporarily unavailable."
-                  : receipt
-                    ? "Waiting for the draw to finalize…"
-                    : "Waiting for Solana confirmation…"}
-              </output>
+              <PixelLoader label="Opening your capsule" />
             )}
             {!refunded && retry && (
               <button type="button" className="pixel-button" onClick={retry}>

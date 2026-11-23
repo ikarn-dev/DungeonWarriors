@@ -28,6 +28,7 @@ import {
   readWebJson,
   WebApiError,
   webApi,
+  webErrorMessage,
 } from "../lib/game/web-api";
 import { useCapsuleReceipt } from "./account-data";
 import CapsuleReveal from "./CapsuleReveal";
@@ -35,11 +36,15 @@ import type { LobbyTab } from "./LobbyMenu";
 import LobbyScene from "./LobbyScene";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
-import LobbyToaster, { LobbyRequestStatus } from "./LobbyToaster";
+import LobbyToaster from "./LobbyToaster";
 import { WalletChip } from "./LobbyWallet";
 import { signInWallet } from "./wallet-sign-in";
 
 const drawPollMs = 6_000;
+// One toast per transaction: loading, then confirmed or still pending.
+const TX_TOAST = "transaction";
+const notifyError = (code: string) =>
+  toast.error(webErrorMessage(code), { id: code });
 type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 
 export default function StarterPanel() {
@@ -55,8 +60,6 @@ export default function StarterPanel() {
   const [accountRevision, setAccountRevision] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<LobbyTab>("play");
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{
     signature: string;
     lastValidBlockHeight: number;
@@ -106,11 +109,7 @@ export default function StarterPanel() {
     setAccountRevision(undefined);
     setPending(null);
     setDrawView(null);
-    setError(null);
-    if (address === null) {
-      setMessage(null);
-      return;
-    }
+    if (address === null) return;
     const controller = new AbortController();
     const signal = AbortSignal.any([
       controller.signal,
@@ -124,19 +123,16 @@ export default function StarterPanel() {
           signal,
         );
         if (controller.signal.aborted) return;
-        if (session.wallet !== walletAddress) {
-          setMessage(null);
-          return;
-        }
+        if (session.wallet !== walletAddress) return;
         setSessionWallet(walletAddress);
-        setMessage(null);
         await reload(signal).catch((failure: unknown) => {
           if (
             failure instanceof WebApiError &&
             failure.code === "AUTH_REQUIRED"
           )
             throw failure;
-          if (!controller.signal.aborted) setError("ACCOUNT_STATE_UNAVAILABLE");
+          if (!controller.signal.aborted)
+            notifyError("ACCOUNT_STATE_UNAVAILABLE");
         });
       } catch (failure) {
         if (controller.signal.aborted) return;
@@ -145,10 +141,11 @@ export default function StarterPanel() {
           failure.code === "AUTH_REQUIRED"
         ) {
           setSessionWallet(null);
-          setMessage(null);
         } else {
           setRestoreFailed(true);
-          setMessage("Couldn't restore your session. Try again.");
+          toast.error("Couldn't reconnect to PURRPS. Tap Retry.", {
+            id: "restore",
+          });
         }
       } finally {
         if (!controller.signal.aborted) setCheckedWallet(walletAddress);
@@ -165,16 +162,13 @@ export default function StarterPanel() {
     const controller = new AbortController();
     work.current = controller;
     setBusy(true);
-    setError(null);
     try {
       await action(controller.signal);
     } catch (failure) {
       if (controller.signal.aborted) return;
-      if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED") {
+      if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
         setSessionWallet(null);
-        setMessage(null);
-      }
-      setError(
+      notifyError(
         failure instanceof WebApiError
           ? failure.code
           : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
@@ -192,7 +186,7 @@ export default function StarterPanel() {
     if (!(await signInWallet(address, wallet.signMessage, signal))) return;
     setSessionWallet(address);
     await reload(signal);
-    setMessage(null);
+    toast.success("Signed in", { id: "restore" });
   }
   async function reconcile(
     signature: string,
@@ -215,23 +209,31 @@ export default function StarterPanel() {
         }
         if (result.resolution === "expired" || result.status?.err !== null) {
           setDrawView(null);
-          setMessage(null);
+          toast.dismiss(TX_TOAST);
           throw new WebApiError(
             result.resolution === "expired"
               ? "BLOCKHASH_EXPIRED"
               : "TRANSACTION_FAILED",
           );
         }
-        toast.success("Transaction confirmed");
+        toast.success("Transaction confirmed", { id: TX_TOAST });
         return;
       }
       await pause(3000, signal);
     }
     if (!signal.aborted) {
       await reload(signal);
-      setMessage(
-        "Transaction remains pending. Check this same signature before retrying.",
-      );
+      toast("Still confirming on Solana", {
+        id: TX_TOAST,
+        duration: Number.POSITIVE_INFINITY,
+        action: {
+          label: "Check again",
+          onClick: () =>
+            void perform((next) =>
+              reconcile(signature, lastValidBlockHeight, next),
+            ),
+        },
+      });
     }
   }
   async function transact(
@@ -300,7 +302,7 @@ export default function StarterPanel() {
       lastValidBlockHeight: prepared.lastValidBlockHeight,
       starter: intent.operation === "claimStarter",
     });
-    setMessage("Waiting for Solana Devnet confirmation.");
+    toast.loading("Confirming…", { id: TX_TOAST });
     await reconcile(result.signature, prepared.lastValidBlockHeight, signal);
   }
   const paidDraw = state?.starter === "fulfilled";
@@ -334,16 +336,16 @@ export default function StarterPanel() {
           attempts >= maxAttempts ||
           (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
         ) {
-          setError("DRAW_STATUS_UNAVAILABLE");
+          notifyError("DRAW_STATUS_UNAVAILABLE");
           return;
         }
       }
       if (attempts < maxAttempts)
         timer = setTimeout(() => void poll(), drawPollMs);
       else if (!paidDraw)
-        setMessage(
-          "Draw remains pending. Refresh to recover this same request.",
-        );
+        toast("Your cat is still on its way. It appears once it's ready.", {
+          id: "draw",
+        });
     };
     timer = setTimeout(() => void poll(), drawPollMs);
     return () => {
@@ -351,12 +353,6 @@ export default function StarterPanel() {
       clearTimeout(timer);
     };
   }, [authenticated, address, paidDraw, state?.pendingDraw]);
-  // Confirmations are transient; pending and error states stay until resolved.
-  useEffect(() => {
-    if (message === null || pending !== null) return;
-    const timer = setTimeout(() => setMessage(null), 4000);
-    return () => clearTimeout(timer);
-  }, [message, pending]);
   const blocked = busy || pending !== null;
   const copy = () =>
     void perform(async () => {
@@ -477,22 +473,6 @@ export default function StarterPanel() {
           }}
         />
       )}
-      <LobbyRequestStatus
-        message={message}
-        error={error}
-        busy={busy}
-        onCheck={
-          pending &&
-          (() =>
-            void perform((signal) =>
-              reconcile(
-                pending.signature,
-                pending.lastValidBlockHeight,
-                signal,
-              ),
-            ))
-        }
-      />
     </>
   );
 }

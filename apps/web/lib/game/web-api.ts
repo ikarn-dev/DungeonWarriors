@@ -5,6 +5,21 @@ export class WebApiError extends Error {
     this.code = code;
   }
 }
+// Player-facing copy for expected failures; anything else stays generic.
+const FRIENDLY: Readonly<Record<string, string>> = {
+  AUTH_REQUIRED: "Please sign in again to continue.",
+  ACCOUNT_STATE_UNAVAILABLE: "Couldn't load your account. Please refresh.",
+  WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",
+  MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Try another wallet.",
+  TRANSACTION_SIGNING_REQUIRED: "This wallet can't approve transactions.",
+  TRANSACTION_FAILED: "The transaction didn't go through. Please try again.",
+  BLOCKHASH_EXPIRED: "That request expired. Please try again.",
+  DRAW_STATUS_UNAVAILABLE:
+    "Couldn't check your capsule yet. It appears once it's ready.",
+  ASSETS_NOT_READY: "Game art is updating. Please try again shortly.",
+  ADMISSION_CLOSED: "Runs are paused right now. Please check back soon.",
+  RATE_LIMITED: "Too many requests. Wait a moment and try again.",
+};
 export function webErrorMessage(code: string) {
   if (code === "ORIGIN_REJECTED")
     return "Sign-in could not start on this site address. Please contact the PURRPS team.";
@@ -12,7 +27,7 @@ export function webErrorMessage(code: string) {
     return "PURRPS is temporarily unavailable. Please try again once service is restored.";
   if (code === "SPONSOR_BUDGET_UNAVAILABLE")
     return "PURRPS cannot cover the Devnet fees right now. Try again when sponsorship is available.";
-  return `Request could not finish: ${code.replaceAll("_", " ").toLowerCase()}. You can refresh and retry.`;
+  return FRIENDLY[code] ?? "Something went wrong. Please try again.";
 }
 export async function readWebJson(response: Response): Promise<unknown> {
   if (response.body === null) throw new WebApiError("EMPTY_RESPONSE");
