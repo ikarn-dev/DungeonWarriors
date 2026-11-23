@@ -199,6 +199,8 @@ pub const RULES_V3: GameRules = GameRules {
     ..RULES_V2
 };
 
+pub const RULES_V4: GameRules = GameRules { rules_version: 4, ..RULES_V3 };
+
 pub fn platform_gap(rules: &GameRules, segment: u64) -> bool {
     let stride = u64::from(rules.generation.booster_stride_segments);
     rules.rules_version >= RULES_V3.rules_version && segment % stride == stride / 2

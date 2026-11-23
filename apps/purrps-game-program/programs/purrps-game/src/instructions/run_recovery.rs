@@ -36,7 +36,8 @@ pub fn handle_recover_run_oracle(
     let run = &mut a.run;
     validate_input_snapshot(run)?;
     require!(
-        matches!(run.phase, RunPhase::Active | RunPhase::Suspended) && run.terminal.is_none(),
+        run.snapshot.rules.rules_version < crate::rules::RULES_V4.rules_version
+            && matches!(run.phase, RunPhase::Active | RunPhase::Suspended) && run.terminal.is_none(),
         ErrorCode::InvalidRun
     );
     let clock = Clock::get()?;

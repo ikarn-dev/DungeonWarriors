@@ -458,6 +458,10 @@ export async function submitPlay(
   if (cost === null)
     return { status: "requested", signature, network, unknownResponse: true };
   if (cost > 0n) await admitSponsorCost(operationId, cost, signature);
+  if (intent.action.kind === "reserveRun" && intent.action.rulesVersion === 4) {
+    const { registerBrowserLaunch } = await import("./browser-launch");
+    await registerBrowserLaunch(wallet, intent.action.nonce);
+  }
   return sendReviewed(scopedRpc, tx, network, signature, true);
 }
 

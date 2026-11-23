@@ -16,7 +16,7 @@ export default function RunMarket({
   const latest = prices.at(-1);
   if (!latest) return null;
   return (
-    <div className="run-market pixel-panel" data-course="platform-course-v3">
+    <div className="run-market pixel-panel" data-course="browser-course-v4">
       <div className="flex items-baseline justify-between gap-2">
         <span>{market}/USD</span>
         <strong

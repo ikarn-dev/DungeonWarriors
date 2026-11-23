@@ -27,6 +27,7 @@ import type { PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig, sponsorshipConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
+import { browserConfigured } from "./browser-config";
 import { readWalletFunds } from "./wallet-funds";
 
 export {
@@ -327,7 +328,7 @@ async function readRunEntry(rpc: Connection, owner: PublicKey) {
     "gameConfig",
     configInfo ?? null,
   );
-  if (!config?.allowReservations)
+  if (!config?.allowReservations || (config.rules?.version === 4 && !browserConfigured()))
     return { ...context, entry: { status: "closed" } };
   if (
     config.schemaVersion !== 1 ||

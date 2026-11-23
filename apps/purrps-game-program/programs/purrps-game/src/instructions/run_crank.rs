@@ -113,6 +113,12 @@ pub fn handle_activate_run(ctx: Context<ActivateRun>, args: RunIdentityArgs) -> 
     );
     let clock = Clock::get()?;
     let oracle = read_oracle(run, &a.price_update, &clock)?;
+    if run.snapshot.rules.rules_version == crate::rules::RULES_V4.rules_version {
+        activate_world(run, &oracle, clock.unix_timestamp)?;
+        run.crank.clock_origin_seconds = u64::try_from(clock.unix_timestamp)
+            .map_err(|_| error!(ErrorCode::InvalidRun))?;
+        return Ok(());
+    }
     let before = run.get_lamports();
     let rent = Rent::get()?.minimum_balance(run.to_account_info().data_len());
     require!(

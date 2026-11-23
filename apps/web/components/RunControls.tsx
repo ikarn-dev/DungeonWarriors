@@ -34,6 +34,7 @@ export default function RunControls({
   rpc,
   run,
   playKey,
+  local,
   accepted,
   eligible,
   playing,
@@ -44,9 +45,10 @@ export default function RunControls({
   onInputs,
   rulesVersion,
 }: {
-  rpc: Connection;
-  run: PublicKey;
-  playKey: Keypair;
+  rpc?: Connection;
+  run?: PublicKey;
+  playKey?: Keypair;
+  local?: (action: PlayerIntent) => void;
   accepted: bigint;
   eligible: boolean;
   playing: boolean;
@@ -104,6 +106,10 @@ export default function RunControls({
           : !active || !policy.current.artReady)
       )
         return;
+      if (local) {
+        local(action);
+        return;
+      }
       if (action.kind === "move")
         queue = queue.filter(({ kind }) => kind !== "move");
       if (queue.length >= 8) {
@@ -194,7 +200,7 @@ export default function RunControls({
     window.addEventListener("keyup", keyUp);
     // One in-flight message at a time keeps strict sequential nonces, even on lost replies.
     async function flush() {
-      if (signal.aborted) return;
+      if (signal.aborted || local || !rpc || !run || !playKey) return;
       if (!policy.current.playing) {
         if (wasPlaying) {
           wasPlaying = false;
@@ -278,7 +284,7 @@ export default function RunControls({
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
     };
-  }, [rpc, run, playKey, surface, onInputs, rulesVersion]);
+  }, [rpc, run, playKey, local, surface, onInputs, rulesVersion]);
 
   function playAction(kind: "dash" | "boost" | "jump", byPointer: boolean) {
     enqueue.current({ kind });
@@ -379,7 +385,7 @@ export default function RunControls({
             data-active={power.active || undefined}
             style={cooldown}
             disabled={controlsOff || !power.ready}
-            aria-describedby={`power-${run.toBase58()}`}
+            aria-describedby={`power-${run?.toBase58() ?? "browser"}`}
             onClick={(event) => playAction("boost", event.detail > 0)}
           >
             <span
@@ -412,7 +418,7 @@ export default function RunControls({
         </div>
       </div>
       <p className="run-controls-note">
-        <span id={`power-${run.toBase58()}`}>
+        <span id={`power-${run?.toBase58() ?? "browser"}`}>
           {power.name}: {power.detail}
         </span>
         {message && <output>{message}</output>}

@@ -16,6 +16,8 @@ const routes = [
   "tx.prepare",
   "tx.submit",
   "tx.status",
+  "run.browser",
+  "run.settle",
 ] as const;
 export type RouteOperation = (typeof routes)[number];
 const providers = ["solana", "magicblock", "redis"] as const;

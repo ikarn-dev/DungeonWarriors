@@ -6,7 +6,7 @@ use crate::{
     constants::*,
     contracts::{Market, OracleBinding, VersionBinding},
     error::ErrorCode,
-    rules::{GameRules, RULES_V1, RULES_V2, RULES_V3},
+    rules::{GameRules, RULES_V1, RULES_V2, RULES_V3, RULES_V4},
 };
 
 pub fn validate_oracle_binding(binding: &OracleBinding, market: Market) -> Result<()> {
@@ -52,6 +52,7 @@ pub fn validate_rules(
         1 => RULES_V1,
         2 => RULES_V2,
         3 => RULES_V3,
+        4 => RULES_V4,
         _ => return err!(ErrorCode::InvalidRules),
     };
     require!(*rules == canonical, ErrorCode::InvalidRules);

@@ -1,4 +1,5 @@
 pub mod abort_reservation;
+pub mod browser_run;
 pub mod capsules;
 pub mod completion;
 pub mod completion_funding;
@@ -23,6 +24,7 @@ pub mod starter;
 pub mod upgrade;
 
 pub use abort_reservation::*;
+pub use browser_run::*;
 pub use capsules::*;
 pub use completion::*;
 pub use completion_funding::*;

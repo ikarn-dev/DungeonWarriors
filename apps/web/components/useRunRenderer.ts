@@ -2,6 +2,7 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { CatId } from "../lib/game/catalog";
+import type { WorldState } from "../lib/game/world-state";
 import type { Predictor } from "../lib/game/predictor";
 import { RULES_V1 } from "../lib/game/rules";
 import { loadRunArtwork, type RunArtwork } from "../lib/game/run-artwork";
@@ -28,6 +29,7 @@ export function useRunRenderer({
   artwork,
   prediction,
   revision,
+  source,
   focusable,
 }: {
   present: boolean;
@@ -37,8 +39,9 @@ export function useRunRenderer({
   cat: CatId | undefined;
   media: { version: number; contentHash: string } | null;
   artwork: RunArtwork | undefined;
-  prediction: RefObject<RunPrediction | null>;
-  revision: RefObject<number>;
+  prediction?: RefObject<RunPrediction | null>;
+  revision?: RefObject<number>;
+  source?: { world: () => WorldState; sample: () => { lead: number; revision: number } };
   focusable: boolean;
 }) {
   const [artError, setArtError] = useState(false);
@@ -88,12 +91,12 @@ export function useRunRenderer({
           ? artwork
           : await loadRunArtwork(binding, controller.signal);
       if (controller.signal.aborted) return;
-      const initial = prediction.current?.world;
+      const initial = source?.world() ?? prediction?.current?.world;
       if (!initial) return;
       game = renderRun(engine, container, manifest, selected, {
         rulesVersion,
-        world: () => {
-          const active = prediction.current;
+        world: source?.world ?? (() => {
+          const active = prediction?.current;
           if (!active) return initial;
           const elapsed = active.extrapolate
             ? ((performance.now() - active.sampledAt) *
@@ -119,11 +122,11 @@ export function useRunRenderer({
             }
           }
           return active.world;
-        },
-        sample: () => ({
-          lead: prediction.current?.lead ?? 0,
-          revision: revision.current,
         }),
+        sample: source?.sample ?? (() => ({
+          lead: prediction?.current?.lead ?? 0,
+          revision: revision?.current ?? 0,
+        })),
         reduced: () => reduced.matches,
         onError: () => {
           if (!controller.signal.aborted) setArtError(true);
@@ -152,6 +155,7 @@ export function useRunRenderer({
     mount,
     prediction,
     revision,
+    source,
   ]);
 
   return { artReady, artError: artError || media === null };

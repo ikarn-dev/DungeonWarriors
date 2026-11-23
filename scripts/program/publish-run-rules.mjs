@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import process from "node:process";
-import { RULES_V2, RULES_V3 } from "../../apps/web/lib/game/rules.ts";
+import { RULES_V2, RULES_V3, RULES_V4 } from "../../apps/web/lib/game/rules.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
@@ -31,7 +31,7 @@ const rulesHash = (data) =>
     .update(program.toBuffer())
     .update(coder.types.encode("gameRules", data))
     .digest("hex");
-const target = RULES_V3.rulesVersion;
+const target = RULES_V4.rulesVersion;
 
 const [mode, adminPath, extra] = process.argv.slice(2);
 check(
@@ -67,7 +67,7 @@ async function hostedClientReady() {
     const response = await fetch(new URL(path, starter), {
       signal: AbortSignal.timeout(8000),
     });
-    if (response.ok && (await response.text()).includes("platform-course-v3"))
+    if (response.ok && (await response.text()).includes("browser-course-v4"))
       return true;
   }
   return false;
@@ -81,21 +81,34 @@ if (mode === "--publish" && current.rules?.version !== target) {
   check(current.catalog?.version >= 2, "PUBLISH_THE_PIXEL_ART_CATALOG_FIRST");
   const currentVersion = current.rules?.version;
   check(
-    currentVersion === 1 || currentVersion === 2,
+    currentVersion === 1 || currentVersion === 2 || currentVersion === 3,
     "UNEXPECTED_CURRENT_RULES",
   );
-  if (currentVersion === 2)
+  if (currentVersion === 2 || currentVersion === 3)
     check(
       Buffer.from(current.rules.contentHash).toString("hex") ===
-        rulesHash(RULES_V2),
+        rulesHash(currentVersion === 2 ? RULES_V2 : RULES_V3),
       "RULES_HASH_MISMATCH",
     );
   const admin = Keypair.fromSecretKey(
     Uint8Array.from(JSON.parse(readFileSync(adminPath, "utf8"))),
   );
   check(admin.publicKey.equals(current.admin), "INVALID_ADMIN");
-  // Publish both missing versions atomically so new runs skip intermediate rules.
-  const instructions = [RULES_V2, RULES_V3]
+  const readiness = await fetch(new URL("/api/run/browser", process.env.APP_ORIGIN),
+    {signal:AbortSignal.timeout(8000)}).then((response) => response.json());
+  check(readiness.ready === true && readiness.version === target, "CONFIGURE_THE_VERIFIER_AND_WORKER_FIRST");
+  const verifierBytes = Buffer.from(process.env.BROWSER_VERIFIER_SECRET_KEY ?? "", "base64");
+  check(verifierBytes.length === 64, "VERIFIER_NOT_CONFIGURED");
+  const authority = Keypair.fromSecretKey(verifierBytes).publicKey;
+  check(!authority.equals(admin.publicKey), "VERIFIER_MUST_BE_DEDICATED");
+  const verifierAddress = pda("browser-verifier");
+  const configured = await rpc.getAccountInfo(verifierAddress);
+  if (configured) {
+    check(configured.owner.equals(program) &&
+      coder.accounts.decode("browserVerifier", configured.data).authority.equals(authority), "VERIFIER_MISMATCH");
+  }
+  // The final pointer is v4 only if every required version publishes successfully.
+  const instructions = [RULES_V2, RULES_V3, RULES_V4]
     .filter((data) => data.rulesVersion > currentVersion)
     .map(
       (data) =>
@@ -123,6 +136,16 @@ if (mode === "--publish" && current.rules?.version !== target) {
           }),
         }),
     );
+  if (!configured) instructions.unshift(new TransactionInstruction({
+    programId:program,
+    keys:[
+      {pubkey:config,isSigner:false,isWritable:false},
+      {pubkey:admin.publicKey,isSigner:true,isWritable:true},
+      {pubkey:verifierAddress,isSigner:false,isWritable:true},
+      {pubkey:SystemProgram.programId,isSigner:false,isWritable:false},
+    ],
+    data:coder.instruction.encode("configureBrowserVerifier",{authority}),
+  }));
   const block = await rpc.getLatestBlockhash("confirmed");
   const transaction = new Transaction({
     feePayer: admin.publicKey,
@@ -130,6 +153,9 @@ if (mode === "--publish" && current.rules?.version !== target) {
     lastValidBlockHeight: block.lastValidBlockHeight,
   }).add(...instructions);
   transaction.sign(admin);
+  check(transaction.serialize().length <= 1232, "PUBLICATION_PACKET_TOO_LARGE");
+  const preview = await rpc.simulateTransaction(transaction);
+  check(preview.value.err === null, "RULES_PUBLICATION_SIMULATION_FAILED");
   signature = await rpc.sendRawTransaction(transaction.serialize(), {
     preflightCommitment: "confirmed",
   });
@@ -146,7 +172,7 @@ if (signature)
 if (latest.rules?.version === target)
   check(
     Buffer.from(latest.rules.contentHash).toString("hex") ===
-      rulesHash(RULES_V3),
+      rulesHash(RULES_V4),
     "RULES_HASH_MISMATCH",
   );
 process.stdout.write(

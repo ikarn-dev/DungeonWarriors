@@ -119,6 +119,13 @@ pub mod purrps_game {
         crate::instructions::run_crank::handle_activate_run(ctx, args)
     }
 
+    pub fn configure_browser_verifier(ctx: Context<ConfigureBrowserVerifier>, authority: Pubkey) -> Result<()> {
+        crate::instructions::browser_run::configure(ctx, authority)
+    }
+    pub fn record_browser_result(ctx: Context<RecordBrowserResult>, args: BrowserResult) -> Result<()> {
+        crate::instructions::browser_run::record(ctx, args)
+    }
+
     pub fn advance_run(ctx: Context<AdvanceRun>, args: AdvanceRunArgs) -> Result<()> {
         crate::instructions::run_crank::handle_advance_run(ctx, args)
     }

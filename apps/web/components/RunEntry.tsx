@@ -27,7 +27,7 @@ import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
 import type { MARKETS } from "../lib/solana/addresses";
 import { u64Input } from "../lib/solana/program";
 import { RunBet, RunGameDialog } from "./RunScreen";
-import RunStage from "./RunStage";
+import RunStage from "./RunViewer";
 
 type Market = (typeof MARKETS)[number]["market"];
 type Offer = Extract<
@@ -494,7 +494,7 @@ export default function RunEntry({
         />
       ) : (
         <div className="lobby-banner">
-          <p>Run #{viewer} is still in progress.</p>
+          <p>Finishing run #{viewer}.</p>
           <button
             type="button"
             className="pixel-button"
@@ -502,7 +502,7 @@ export default function RunEntry({
             disabled={blocked}
             onClick={() => setOpen(true)}
           >
-            Continue run
+            View settlement
           </button>
         </div>
       )}
@@ -520,6 +520,7 @@ export default function RunEntry({
             key={viewer}
             wallet={wallet}
             nonce={viewer}
+            rulesVersion={launch.current?.reserve.rulesVersion ?? state.rulesVersion}
             playKey={runningNonce ? launch.current?.key : undefined}
             artwork={launch.current?.artwork}
             activating={starting}

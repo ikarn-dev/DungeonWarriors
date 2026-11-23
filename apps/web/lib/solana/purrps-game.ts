@@ -529,6 +529,68 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "configureBrowserVerifier";
+      discriminator: [54, 90, 183, 177, 148, 171, 88, 218];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "admin";
+          writable: true;
+          signer: true;
+          relations: ["config"];
+        },
+        {
+          name: "browserVerifier";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  98,
+                  114,
+                  111,
+                  119,
+                  115,
+                  101,
+                  114,
+                  45,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "authority";
+          type: "pubkey";
+        },
+      ];
+    },
+    {
       name: "configureSponsorship";
       discriminator: [79, 11, 99, 120, 73, 223, 182, 148];
       accounts: [
@@ -2139,6 +2201,81 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "recordBrowserResult";
+      discriminator: [243, 203, 60, 192, 233, 26, 55, 43];
+      accounts: [
+        {
+          name: "run";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [114, 117, 110, 45, 103, 97, 109, 101];
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.owner";
+                account: "runGameState";
+              },
+              {
+                kind: "account";
+                path: "run.snapshot.nonce";
+                account: "runGameState";
+              },
+            ];
+          };
+        },
+        {
+          name: "browserVerifier";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  98,
+                  114,
+                  111,
+                  119,
+                  115,
+                  101,
+                  114,
+                  45,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "authority";
+          signer: true;
+          relations: ["browserVerifier"];
+        },
+        {
+          name: "magicContext";
+          address: "MagicContext1111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "browserResult";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "refundCapsule";
       discriminator: [17, 72, 179, 34, 38, 133, 69, 107];
       accounts: [
@@ -3564,6 +3701,10 @@ export type PurrpsGame = {
   ];
   accounts: [
     {
+      name: "browserVerifier";
+      discriminator: [213, 195, 14, 94, 46, 27, 74, 163];
+    },
+    {
       name: "capsuleDraw";
       discriminator: [213, 12, 103, 20, 228, 32, 16, 181];
     },
@@ -3914,6 +4055,64 @@ export type PurrpsGame = {
           {
             name: "allowanceBaseUnits";
             type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "browserResult";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "snapshotHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "reason";
+            type: {
+              defined: {
+                name: "terminalReason";
+              };
+            };
+          },
+          {
+            name: "activeTicks";
+            type: "u64";
+          },
+          {
+            name: "score";
+            type: "u64";
+          },
+          {
+            name: "coins";
+            type: "u64";
+          },
+          {
+            name: "qualifiedCheckpoints";
+            type: "u64";
+          },
+          {
+            name: "finalObservation";
+            type: {
+              defined: {
+                name: "oracleObservation";
+              };
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "browserVerifier";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "authority";
+            type: "pubkey";
           },
         ];
       };
@@ -7409,6 +7608,54 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "configure_browser_verifier",
+      discriminator: [54, 90, 183, 177, 148, 171, 88, 218],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "admin",
+          writable: true,
+          signer: true,
+          relations: ["config"],
+        },
+        {
+          name: "browser_verifier",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  98, 114, 111, 119, 115, 101, 114, 45, 118, 101, 114, 105, 102,
+                  105, 101, 114,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "authority",
+          type: "pubkey",
+        },
+      ],
+    },
+    {
       name: "configure_sponsorship",
       discriminator: [79, 11, 99, 120, 73, 223, 182, 148],
       accounts: [
@@ -8966,6 +9213,67 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "record_browser_result",
+      discriminator: [243, 203, 60, 192, 233, 26, 55, 43],
+      accounts: [
+        {
+          name: "run",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [114, 117, 110, 45, 103, 97, 109, 101],
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.owner",
+                account: "RunGameState",
+              },
+              {
+                kind: "account",
+                path: "run.snapshot.nonce",
+                account: "RunGameState",
+              },
+            ],
+          },
+        },
+        {
+          name: "browser_verifier",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  98, 114, 111, 119, 115, 101, 114, 45, 118, 101, 114, 105, 102,
+                  105, 101, 114,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "authority",
+          signer: true,
+          relations: ["browser_verifier"],
+        },
+        {
+          name: "magic_context",
+          address: "MagicContext1111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "BrowserResult",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "refund_capsule",
       discriminator: [17, 72, 179, 34, 38, 133, 69, 107],
       accounts: [
@@ -10367,6 +10675,10 @@ export const PURRPS_GAME_IDL = {
   ],
   accounts: [
     {
+      name: "BrowserVerifier",
+      discriminator: [213, 195, 14, 94, 46, 27, 74, 163],
+    },
+    {
       name: "CapsuleDraw",
       discriminator: [213, 12, 103, 20, 228, 32, 16, 181],
     },
@@ -10540,6 +10852,64 @@ export const PURRPS_GAME_IDL = {
           {
             name: "allowance_base_units",
             type: "u64",
+          },
+        ],
+      },
+    },
+    {
+      name: "BrowserResult",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "snapshot_hash",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "reason",
+            type: {
+              defined: {
+                name: "TerminalReason",
+              },
+            },
+          },
+          {
+            name: "active_ticks",
+            type: "u64",
+          },
+          {
+            name: "score",
+            type: "u64",
+          },
+          {
+            name: "coins",
+            type: "u64",
+          },
+          {
+            name: "qualified_checkpoints",
+            type: "u64",
+          },
+          {
+            name: "final_observation",
+            type: {
+              defined: {
+                name: "OracleObservation",
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "BrowserVerifier",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "authority",
+            type: "pubkey",
           },
         ],
       },

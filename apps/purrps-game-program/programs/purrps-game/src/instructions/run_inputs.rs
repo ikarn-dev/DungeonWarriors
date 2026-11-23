@@ -36,7 +36,8 @@ pub fn handle_submit_intents(ctx: Context<RunInput>, args: SubmitIntentsArgs) ->
     let run = &mut ctx.accounts.run;
     validate_input_snapshot(run)?;
     require!(
-        args.intents.iter().all(|entry| {
+        run.snapshot.rules.rules_version < crate::rules::RULES_V4.rules_version
+            && args.intents.iter().all(|entry| {
             !matches!(
                 entry.action,
                 PlayerIntent::Heartbeat { .. } | PlayerIntent::Inactive
@@ -57,7 +58,8 @@ pub fn handle_heartbeat(ctx: Context<RunInput>, intent: IntentEnvelope) -> Resul
     let run = &mut ctx.accounts.run;
     validate_input_snapshot(run)?;
     require!(
-        matches!(
+        run.snapshot.rules.rules_version < crate::rules::RULES_V4.rules_version
+            && matches!(
             intent.action,
             PlayerIntent::Heartbeat { .. } | PlayerIntent::Inactive
         ),

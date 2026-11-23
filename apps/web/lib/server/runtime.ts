@@ -80,6 +80,7 @@ function makeRuntime() {
     global: limiter(120),
     ip: limiter(20),
     wallet: limiter(30),
+    browser: limiter(90),
   };
 }
 export function runtime() {

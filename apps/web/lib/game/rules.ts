@@ -89,7 +89,8 @@ export const RULES_V3 = {
   generation: { ...RULES_V2.generation, maxSampleChangeBps: 8 },
   physics: { ...RULES_V2.physics, maxRequiredGapSubpixels: 48 * 256 },
 } as const;
-export const supportedRules = [RULES_V1, RULES_V2, RULES_V3] as const;
+export const RULES_V4 = { ...RULES_V3, rulesVersion: 4 } as const;
+export const supportedRules = [RULES_V1, RULES_V2, RULES_V3, RULES_V4] as const;
 export type GameplayRules = (typeof supportedRules)[number];
 export function rulesForVersion(version: number) {
   return supportedRules.find((rules) => rules.rulesVersion === version);
