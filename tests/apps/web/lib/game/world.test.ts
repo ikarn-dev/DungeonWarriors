@@ -12,6 +12,7 @@ import {
 } from "../../../../../apps/web/lib/game/rules";
 import { step } from "../../../../../apps/web/lib/game/simulation";
 import {
+  advanceWorld,
   initializeWorld,
   stepWorld,
 } from "../../../../../apps/web/lib/game/world";
@@ -91,6 +92,33 @@ it("uses live price direction for v3 platforms and records a missed gap as a los
   expect(falling.frame.runner.ySubpixels).toBeGreaterThanOrEqual(540 * 256);
   expect(jumping.frame.phase).toBe("active");
   expect(jumping.frame.qualifiedCheckpoints).toBe(1n);
+});
+
+it("replays a price-synced course across browser frame boundaries without chain snapshots", () => {
+  const stats = catStats("collector", 1);
+  const rules = RULES_V3;
+  const start = initializeWorld(initialWorld().frame, stats, sample(), rules);
+  const first = sample(1n);
+  const second = sample(-1n);
+  const intents = [{ tick: 108n, action: { kind: "jump" as const } }];
+
+  const uphill = advanceWorld(start, stats, intents, first, rules, 60);
+  const downhill = advanceWorld(
+    uphill.world,
+    stats,
+    intents,
+    second,
+    rules,
+    60,
+  );
+  const at90 = advanceWorld(uphill.world, stats, intents, second, rules, 30);
+  const at120 = advanceWorld(at90.world, stats, intents, second, rules, 30);
+
+  expect(downhill).toEqual(at120);
+  expect(uphill.world.frame.activeTicks).toBe(60n);
+  expect(downhill.world.frame.activeTicks).toBe(120n);
+  expect(downhill.world.frame.runner.grounded).toBe(false);
+  expect(start.frame.activeTicks).toBe(0n);
 });
 
 it("matches independent signed ramp-contact and jump cases", () => {

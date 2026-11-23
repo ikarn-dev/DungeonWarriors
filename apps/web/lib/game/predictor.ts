@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { CatStats } from "./catalog";
 import { intentEnvelopeSchema, rulesVersionSchema } from "./protocol";
 import { RULES_V1, rulesForVersion, U64_MAX } from "./rules";
-import { stepWorld } from "./world";
+import { advanceWorld } from "./world";
 import {
   priceSampleSchema,
   validateWorldState,
@@ -171,7 +171,7 @@ export class Predictor {
     const count = Math.min(ticks, RULES_V1.maxPredictionTicks);
     const cached =
       this.cached && this.cached.ticks <= count ? this.cached : undefined;
-    let result = cached?.world ?? worldOf(this.snapshot);
+    const start = cached?.world ?? worldOf(this.snapshot);
     const queuedTick = this.snapshot.queued.at(-1)?.assignedTick ?? 0n;
     const firstTick = this.snapshot.frame.activeTicks + 1n;
     const events = [
@@ -190,27 +190,17 @@ export class Predictor {
     ];
     const rules = rulesForVersion(this.snapshot.rulesVersion);
     if (!rules) throw new PredictionError("INVALID_SNAPSHOT");
-    for (
-      let i = cached?.ticks ?? 0;
-      i < count && result.frame.phase === "active";
-      i++
-    ) {
-      const nextTick = result.frame.activeTicks + 1n;
-      const actions = events
-        .filter((event) => event.tick === nextTick)
-        .map((event) => event.action);
-      if (actions.length > RULES_V1.maxQueuedIntents)
-        return { ...result, limited: true };
-      result = stepWorld(
-        result,
-        this.stats,
-        actions,
-        this.snapshot.sample,
-        rules,
-      );
-    }
-    this.cached = { ticks: count, world: result };
-    this.predictedTick = result.frame.activeTicks;
-    return { ...result, limited: ticks > count };
+    const { world, limited } = advanceWorld(
+      start,
+      this.stats,
+      events,
+      this.snapshot.sample,
+      rules,
+      count - (cached?.ticks ?? 0),
+    );
+    if (limited) return { ...world, limited: true };
+    this.cached = { ticks: count, world };
+    this.predictedTick = world.frame.activeTicks;
+    return { ...world, limited: ticks > count };
   }
 }

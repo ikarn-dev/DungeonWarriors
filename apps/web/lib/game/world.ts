@@ -345,6 +345,37 @@ export function initializeWorld(
   return state;
 }
 
+export type TimedIntent = { tick: bigint; action: PlayerIntent };
+
+// The caller supplies the price sample and already-ordered actions for this
+// window. This loop has no wallet, clock, network or settlement authority.
+export function advanceWorld(
+  world: WorldState,
+  stats: CatStats,
+  intents: readonly TimedIntent[],
+  sample: PriceSample,
+  rules: GameplayRules,
+  ticks: number,
+): { world: WorldState; limited: boolean } {
+  if (!Number.isInteger(ticks) || ticks < 0 || ticks > rules.ticksPerSecond)
+    throw new RangeError("Invalid simulation window");
+  const through = world.frame.activeTicks + BigInt(ticks);
+  const actionsByTick = new Map<bigint, PlayerIntent[]>();
+  for (const { tick, action } of intents) {
+    if (tick <= world.frame.activeTicks || tick > through) continue;
+    const actions = actionsByTick.get(tick);
+    if (actions) actions.push(action);
+    else actionsByTick.set(tick, [action]);
+  }
+  for (let i = 0; i < ticks && world.frame.phase === "active"; i++) {
+    const actions = actionsByTick.get(world.frame.activeTicks + 1n) ?? [];
+    if (actions.length > rules.maxQueuedIntents)
+      return { world, limited: true };
+    world = stepWorld(world, stats, actions, sample, rules);
+  }
+  return { world, limited: false };
+}
+
 export function stepWorld(
   state: WorldState,
   stats: CatStats,
