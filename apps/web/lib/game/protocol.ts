@@ -10,7 +10,7 @@ export const MAX_INTENTS_PER_SUBMISSION = 8;
 
 const u64Schema = z.bigint().min(0n).max(U64_MAX);
 const inputAxisSchema = z.enum(["left", "neutral", "right"]);
-export const rulesVersionSchema = z.literal([1, 2]);
+export const rulesVersionSchema = z.literal([1, 2, 3]);
 
 const playerIntentSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("move"), axis: inputAxisSchema }).strict(),

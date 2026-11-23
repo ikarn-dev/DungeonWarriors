@@ -2,8 +2,11 @@ import type { CatStats, Power } from "./catalog";
 import type { PlayerIntent } from "./protocol";
 import {
   type GameplayRules,
+  minimumPlatformGap,
+  platformGap,
   priceChangeBps,
   RULES_V1,
+  RULES_V3,
   speedBps,
   terrainStepSubpixels,
 } from "./rules";
@@ -107,9 +110,10 @@ function prepare(
   } catch {
     throw new SimulationError("INVALID_OBSERVATION");
   }
-  const p = RULES_V1.physics;
+  const p = gameRules.physics;
   const rules = gameRules.generation;
-  const progressive = gameRules.rulesVersion === 2;
+  const progressive = gameRules.rulesVersion >= 2;
+  const platforms = gameRules.rulesVersion >= RULES_V3.rulesVersion;
   const maximum = BigInt(p.maxRequiredRiseSubpixels);
   const movement = progressive
     ? ((sample.previousPrice - sample.price) * 10_000n * maximum) /
@@ -119,6 +123,7 @@ function prepare(
     movement < -maximum ? -maximum : movement > maximum ? maximum : movement,
   );
   const width = rules.segmentWidthSubpixels;
+  const minimumGap = minimumPlatformGap(gameRules);
   const cutoff = state.frame.runner.xSubpixels - 2 * width;
   state.entities = state.entities.filter(
     (e) => !e.consumed && e.xSubpixels + e.widthSubpixels >= cutoff,
@@ -138,6 +143,18 @@ function prepare(
   for (let i = 0; i <= rules.lookaheadSegments + 2; i++) {
     if (state.generation.nextXSubpixels >= horizon) break;
     const g = { ...state.generation };
+    const gap = platformGap(gameRules, g.nextSegment)
+      ? minimumGap +
+        Math.trunc(
+          ((p.maxRequiredGapSubpixels - minimumGap) * Math.abs(terrainStep)) /
+            p.maxRequiredRiseSubpixels,
+        )
+      : 0;
+    const platformWidth = width - gap;
+    const riseLimit = Math.trunc(
+      (p.maxRequiredRiseSubpixels * platformWidth) / width,
+    );
+    const rise = Math.max(-riseLimit, Math.min(riseLimit, terrainStep));
     const endY =
       g.nextSegment < 2n
         ? g.surfaceYSubpixels
@@ -145,7 +162,7 @@ function prepare(
             (p.viewportHeightPixels * 256) / 4,
             Math.min(
               (p.viewportHeightPixels * 256 * 3) / 4,
-              g.surfaceYSubpixels + terrainStep,
+              g.surfaceYSubpixels + rise,
             ),
           );
     const ramp: WorldEntity = {
@@ -153,7 +170,7 @@ function prepare(
         "star",
         g.nextXSubpixels,
         g.surfaceYSubpixels,
-        width,
+        platformWidth,
         p.hitboxHeightSubpixels,
       ),
       kind: "ramp",
@@ -169,7 +186,7 @@ function prepare(
         (["magnet", "doubleJump", "shield", "extraDash"] as const)[
           Number((g.nextSegment / BigInt(rules.boosterStrideSegments)) % 4n)
         ] ?? "magnet";
-      const x = coordinate(g.nextXSubpixels + Math.trunc(width / 2));
+      const x = coordinate(g.nextXSubpixels + Math.trunc(platformWidth / 2));
       const surface = surfaceAt(ramp, x);
       if (surface === null) throw new SimulationError("INVALID_WORLD");
       const booster =
@@ -212,7 +229,7 @@ function prepare(
         ? state.generation.spawnedHazardMask
         : state.generation.spawnedCoinMask;
       if ((mask & (1 << index)) !== 0) continue;
-      const x = coordinate(
+      let x = coordinate(
         state.generation.checkpointXSubpixels +
           coinDistance(
             state.generation.checkpointSpeedSubpixelsPerTick,
@@ -225,9 +242,30 @@ function prepare(
         (e) =>
           e.kind === "ramp" &&
           x >= e.xSubpixels &&
-          x < e.xSubpixels + e.widthSubpixels,
+          x < e.xSubpixels + (platforms ? width : e.widthSubpixels),
       );
       if (tile === undefined) continue;
+      if (platforms) {
+        // Coins scheduled over a gap remain on the takeoff side. Keep hazards
+        // out of the jump window on either side of a gap.
+        const end = tile.xSubpixels + tile.widthSubpixels;
+        if (tile.widthSubpixels < width)
+          x = Math.min(x, end - p.hitboxWidthSubpixels / 2);
+        const clearance = p.minLandingWidthSubpixels * 2;
+        if (
+          hazard &&
+          state.entities.some((e) => {
+            if (e.kind !== "ramp" || e.widthSubpixels === width) return false;
+            const edge = e.xSubpixels + e.widthSubpixels;
+            return (
+              x >= edge - clearance && x <= e.xSubpixels + width + clearance
+            );
+          })
+        ) {
+          state.generation.spawnedHazardMask |= 1 << index;
+          continue;
+        }
+      }
       const surface = surfaceAt(tile, x);
       if (surface === null) throw new SimulationError("INVALID_WORLD");
       if (

@@ -160,7 +160,7 @@ export async function decodeRunAccount(
     const previous =
       r.observations[
         (r.observationHead +
-          (r.snapshot.rulesBinding.version === 2
+          (r.snapshot.rulesBinding.version >= 2
             ? 0
             : Math.max(0, r.observationCount - 2))) %
           16

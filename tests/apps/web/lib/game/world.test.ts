@@ -6,6 +6,7 @@ import { grossPayout } from "../../../../../apps/web/lib/game/economy";
 import {
   RULES_V1,
   RULES_V2,
+  RULES_V3,
   runLevel,
   U64_MAX,
 } from "../../../../../apps/web/lib/game/rules";
@@ -33,6 +34,65 @@ it("renders the v2 quiet-market obstacle and maps small price changes to signed 
     else expect(ramp).toMatchObject({ riseSubpixels: Number(-change * 307n) });
   }
 });
+it("uses live price direction for v3 platforms and records a missed gap as a loss", () => {
+  const stats = catStats("collector", 1);
+  const start = initialWorld().frame;
+  const rules = RULES_V3;
+  for (const change of [1n, -1n]) {
+    const world = initializeWorld(start, stats, sample(change), rules);
+    expect(world.entities).toContainEqual(
+      expect.objectContaining({
+        kind: "ramp",
+        riseSubpixels: Number(-change * 1536n),
+      }),
+    );
+    expect(world.entities).toContainEqual(
+      expect.objectContaining({
+        kind: "ramp",
+        widthSubpixels: rules.generation.segmentWidthSubpixels - 41 * 256,
+      }),
+    );
+  }
+
+  const initial = initializeWorld(start, stats, sample(), rules);
+  const gap = initial.entities.find(
+    (e) =>
+      e.kind === "ramp" &&
+      e.widthSubpixels < rules.generation.segmentWidthSubpixels,
+  );
+  if (!gap) throw new Error("No gap in the opening course");
+  let falling = initial;
+  let jumping = initial;
+  for (let tick = 0; tick < rules.checkpointTicks; tick++) {
+    if (falling.frame.phase === "active")
+      falling = stepWorld(falling, stats, [], sample(), rules);
+    const runner = jumping.frame.runner;
+    const takeoff = jumping.entities.some((e) => {
+      const edge = e.xSubpixels + e.widthSubpixels;
+      const distance =
+        edge - runner.xSubpixels - rules.physics.hitboxWidthSubpixels;
+      return (
+        e.kind === "ramp" &&
+        e.widthSubpixels < rules.generation.segmentWidthSubpixels &&
+        distance >= 0 &&
+        distance <= rules.physics.minLandingWidthSubpixels
+      );
+    });
+    const jump = runner.grounded && takeoff;
+    jumping = stepWorld(
+      jumping,
+      stats,
+      jump ? [{ kind: "jump" }] : [],
+      sample(),
+      rules,
+    );
+  }
+  expect(falling.frame.terminalReason).toBe("crash");
+  expect(falling.frame.runner.ySubpixels).toBeGreaterThanOrEqual(540 * 256);
+  expect(jumping.frame.phase).toBe("active");
+  expect(jumping.frame.qualifiedCheckpoints).toBe(1n);
+});
+
 it("matches independent signed ramp-contact and jump cases", () => {
   const rows = readFileSync(
     new URL("../../../../fixtures/game-v1/ramps.csv", import.meta.url),

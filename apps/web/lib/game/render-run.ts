@@ -15,7 +15,7 @@ import {
   surfaces,
   TerrainColumns,
 } from "./render-terrain";
-import { RULES_V1 } from "./rules";
+import { RULES_V1, RULES_V3 } from "./rules";
 import type { WorldEntity } from "./simulation-state";
 import type { WorldState } from "./world-state";
 
@@ -69,6 +69,7 @@ export function runImages(manifest: AssetManifest, cat: CatId) {
 }
 
 export type RunRenderOptions = {
+  rulesVersion: number;
   world: () => WorldState;
   // Elapsed fraction of the next predicted tick and the reconcile counter.
   sample: () => { lead: number; revision: number };
@@ -173,7 +174,11 @@ export function renderRun(
       this.layers = layers.map(([id]) =>
         this.add.tileSprite(0, 0, view.width, RUN_VIEW.height, id).setOrigin(0),
       );
-      this.terrain = new TerrainColumns(this, RUN_VIEW.maxHeight);
+      this.terrain = new TerrainColumns(
+        this,
+        RUN_VIEW.maxHeight,
+        options.rulesVersion >= RULES_V3.rulesVersion,
+      );
       this.shadows = Array.from({ length: 24 }, () =>
         this.add.image(0, 0, "coin-shadow").setDepth(4).setVisible(false),
       );

@@ -39,6 +39,7 @@ export class TerrainColumns {
   constructor(
     private readonly scene: Phaser.Scene,
     maxHeight: number,
+    private readonly floatingPlatforms: boolean,
   ) {
     const source = scene.textures.get("terrain-fill").getSourceImage();
     const canvas = scene.textures.createCanvas(
@@ -99,7 +100,7 @@ export class TerrainColumns {
         tile = track[++index];
       const surface =
         tile && point >= tile.xSubpixels ? surfaceAt(tile, point) : null;
-      if (surface === null) continue;
+      if (!tile || surface === null) continue;
       used++;
       const worldY = Math.round(surface / 512) * 2;
       const y = worldY + yOffset;
@@ -107,8 +108,20 @@ export class TerrainColumns {
       const absolute = Math.round(x + anchor);
       const bodyX = mod(absolute, BODY_WIDTH);
       const bodyY = mod(worldY, TILE);
+      const underside = this.floatingPlatforms
+        ? (tile.ySubpixels +
+            tile.heightSubpixels +
+            (tile.kind === "ramp" ? Math.max(0, tile.riseSubpixels) : 0)) /
+            256 +
+          yOffset
+        : height + 1;
       body
-        .setCrop(bodyX, bodyY, COLUMN, Math.max(0, height - y + 1))
+        .setCrop(
+          bodyX,
+          bodyY,
+          COLUMN,
+          Math.max(0, Math.min(height + 1, underside) - y),
+        )
         .setPosition(screenX - bodyX, y - bodyY)
         .setVisible(y < height);
       const grassX = mod(absolute, TILE);

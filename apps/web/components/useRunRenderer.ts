@@ -22,6 +22,7 @@ export function useRunRenderer({
   present,
   mount,
   hasWorld,
+  rulesVersion,
   cat,
   media,
   artwork,
@@ -32,6 +33,7 @@ export function useRunRenderer({
   present: boolean;
   mount: RefObject<HTMLDivElement | null>;
   hasWorld: boolean;
+  rulesVersion: number;
   cat: CatId | undefined;
   media: { version: number; contentHash: string } | null;
   artwork: RunArtwork | undefined;
@@ -89,6 +91,7 @@ export function useRunRenderer({
       const initial = prediction.current?.world;
       if (!initial) return;
       game = renderRun(engine, container, manifest, selected, {
+        rulesVersion,
         world: () => {
           const active = prediction.current;
           if (!active) return initial;
@@ -144,6 +147,7 @@ export function useRunRenderer({
     version,
     hash,
     hasWorld,
+    rulesVersion,
     present,
     mount,
     prediction,

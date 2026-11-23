@@ -2,7 +2,7 @@ use anchor_lang::AnchorSerialize;
 use purrps_game::{
     catalog::{cat_stats, CatId},
     protocol::{PlayerIntent, RunPhase},
-    rules::{RULES_V1, RULES_V2},
+    rules::{RULES_V1, RULES_V2, RULES_V3},
     simulation::{
         collision::surface_at,
         world::{
@@ -131,6 +131,56 @@ fn v2_quiet_course_requires_jumps_and_keeps_speed_progressing_past_seven_times()
     }
     assert!(played.frame.qualified_checkpoints >= 14);
     assert!(played.frame.runner.automatic_speed_subpixels_per_tick > 2_800);
+}
+
+#[test]
+fn v3_slopes_follow_the_feed_and_a_missed_gap_records_a_crash() {
+    use purrps_game::protocol::TerminalReason;
+    let cat = CatId::Collector;
+    let stats = cat_stats(cat, 1).unwrap();
+    let frame = initial(cat, 1, 0).frame;
+    let rules = &RULES_V3;
+    let width = rules.generation.segment_width_subpixels;
+    for change in [1, -1] {
+        let world = initialize_world_for_rules(frame, &stats, sample(change), rules).unwrap();
+        assert!(world
+            .entities
+            .iter()
+            .any(|e| e.kind == EntityKind::Ramp(-1_536 * change as i32)));
+        assert!(world.entities.iter().any(|e| {
+            matches!(e.kind, EntityKind::Ramp(_)) && e.width_subpixels == width - 41 * 256
+        }));
+    }
+
+    let initial = initialize_world_for_rules(frame, &stats, sample(0), rules).unwrap();
+    let mut falling = initial.clone();
+    let mut jumping = initial;
+    for _ in 0..rules.checkpoint_ticks {
+        if falling.frame.phase == RunPhase::Active {
+            falling = step_world_for_rules(&falling, &stats, &[], sample(0), rules).unwrap();
+        }
+        let runner = jumping.frame.runner;
+        let takeoff = jumping.entities.iter().any(|e| {
+            let distance = e.x_subpixels + e.width_subpixels
+                - runner.x_subpixels
+                - rules.physics.hitbox_width_subpixels;
+            matches!(e.kind, EntityKind::Ramp(_))
+                && e.width_subpixels < width
+                && (0..=rules.physics.min_landing_width_subpixels).contains(&distance)
+        });
+        let actions = if runner.grounded && takeoff {
+            &[PlayerIntent::Jump][..]
+        } else {
+            &[]
+        };
+        jumping = step_world_for_rules(&jumping, &stats, actions, sample(0), rules).unwrap();
+    }
+    assert_eq!(falling.frame.terminal_reason, Some(TerminalReason::Crash));
+    assert!(
+        falling.frame.runner.y_subpixels >= i32::from(rules.physics.viewport_height_pixels) * 256
+    );
+    assert_eq!(jumping.frame.phase, RunPhase::Active);
+    assert_eq!(jumping.frame.qualified_checkpoints, 1);
 }
 
 #[test]

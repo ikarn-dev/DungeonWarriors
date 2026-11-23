@@ -94,6 +94,7 @@ it("registers all bound cat and coin frames under the keys loaded by the scene",
     bound,
     "acrobat",
     {
+      rulesVersion: 1,
       world: () => {
         throw new Error("No world requested during preload");
       },

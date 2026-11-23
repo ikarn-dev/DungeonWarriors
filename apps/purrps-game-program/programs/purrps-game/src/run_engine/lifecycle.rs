@@ -198,7 +198,7 @@ pub fn advance_tick(run: &mut RunGameState, oracle: &InspectedOracle, now: i64) 
     );
     let last = run.latest_observation()?.ok_or(ErrorCode::InvalidRun)?;
     let current = oracle.next_observation(Some(last))?;
-    let previous = if run.snapshot.rules.rules_version == 2 {
+    let previous = if run.snapshot.rules.rules_version >= 2 {
         run.observations[usize::from(run.observation_head)]
     } else if current == last && run.observation_count > 1 {
         let end = usize::from(run.observation_head) + usize::from(run.observation_count);

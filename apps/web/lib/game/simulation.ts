@@ -1,6 +1,6 @@
 import type { CatStats } from "./catalog";
 import type { PlayerIntent } from "./protocol";
-import { type GameplayRules, RULES_V1, speedBps } from "./rules";
+import { type GameplayRules, RULES_V1, RULES_V3, speedBps } from "./rules";
 import {
   body,
   collects,
@@ -208,12 +208,21 @@ export function step(
       result.frame.phase = "terminalRecorded";
       return result;
     }
-    command(result.frame, stats, tick, action, rules.rulesVersion === 2);
+    command(result.frame, stats, tick, action, rules.rulesVersion >= 2);
   }
   integrateVelocity(result.frame, stats, tick, rules);
   const path = moveRunner(result.frame.runner, entities);
   validateFrame(result.frame, stats);
   result.frame.activeTicks = tick;
+  if (
+    rules.rulesVersion >= RULES_V3.rulesVersion &&
+    result.frame.runner.ySubpixels >=
+      rules.physics.viewportHeightPixels * rules.physics.subpixelsPerPixel
+  ) {
+    result.frame.phase = "terminalRecorded";
+    result.frame.terminalReason = "crash";
+    return result;
+  }
   for (const e of entities) {
     if (
       e.kind === "hazard" &&

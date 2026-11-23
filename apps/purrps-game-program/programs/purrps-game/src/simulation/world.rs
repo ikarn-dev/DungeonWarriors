@@ -5,7 +5,7 @@ use super::{
 use crate::{
     catalog::{CatStats, Power},
     protocol::{PlayerIntent, RunPhase},
-    rules::{price_change_bps, speed_bps_for_rules, GameRules, RULES_V1},
+    rules::{platform_gap, price_change_bps, speed_bps_for_rules, GameRules, RULES_V1, RULES_V3},
     state::run::{EntityKind, GenerationState, WorldEntity, MAX_WORLD_ENTITIES},
 };
 
@@ -40,6 +40,11 @@ fn coin_distance(speed: i32, target: i32, ticks: u16) -> i64 {
     accelerating * i64::from(speed)
         + ease * accelerating * (accelerating + 1) / 2
         + (i64::from(ticks) - accelerating) * i64::from(target)
+}
+
+// The whole hitbox must leave support for at least one tick, even at full speed.
+fn minimum_gap(rules: &GameRules) -> i32 {
+    rules.physics.hitbox_width_subpixels + rules.physics.max_velocity_subpixels_per_tick
 }
 
 fn validate_state(state: &WorldState, rules: &GameRules) -> Result<(), SimulationError> {
@@ -86,20 +91,32 @@ fn validate_state(state: &WorldState, rules: &GameRules) -> Result<(), Simulatio
     let Some(first) = ramps.first() else {
         return Err(SimulationError::InvalidWorld);
     };
-    let last = ramps.last().unwrap();
+    let first_segment = g
+        .next_segment
+        .checked_sub(ramps.len() as u64)
+        .ok_or(SimulationError::InvalidWorld)?;
     let horizon = i64::from(state.frame.runner.x_subpixels)
         + i64::from(width) * i64::from(RULES_V1.generation.lookahead_segments);
     if first.x_subpixels > state.frame.runner.x_subpixels
         || i64::from(g.next_x_subpixels) < horizon - i64::from(p.max_velocity_subpixels_per_tick)
         || i64::from(g.next_x_subpixels) > horizon + i64::from(width)
-        || i64::from(last.x_subpixels) + i64::from(last.width_subpixels)
-            != i64::from(g.next_x_subpixels)
-        || surface_at(last, i64::from(g.next_x_subpixels)) != Some(i64::from(g.surface_y_subpixels))
-        || ramps.windows(2).any(|pair| {
-            i64::from(pair[0].x_subpixels) + i64::from(pair[0].width_subpixels)
-                != i64::from(pair[1].x_subpixels)
-                || surface_at(pair[0], i64::from(pair[1].x_subpixels))
-                    != Some(i64::from(pair[1].y_subpixels))
+        || ramps.iter().enumerate().any(|(index, ramp)| {
+            let (next_x, next_y) = ramps
+                .get(index + 1)
+                .map_or((g.next_x_subpixels, g.surface_y_subpixels), |next| {
+                    (next.x_subpixels, next.y_subpixels)
+                });
+            let edge = ramp.x_subpixels + ramp.width_subpixels;
+            let gap = next_x - edge;
+            let has_gap = platform_gap(rules, first_segment + index as u64);
+            surface_at(ramp, i64::from(edge)) != Some(i64::from(next_y))
+                || (rules.rules_version >= RULES_V3.rules_version
+                    && next_x - ramp.x_subpixels != width)
+                || if has_gap {
+                    !(minimum_gap(rules)..=rules.physics.max_required_gap_subpixels).contains(&gap)
+                } else {
+                    gap != 0
+                }
         })
     {
         return Err(SimulationError::InvalidWorld);
@@ -169,9 +186,10 @@ fn prepare(
         sample.exponent,
     )
     .map_err(|_| SimulationError::InvalidObservation)?;
-    let p = RULES_V1.physics;
+    let p = game_rules.physics;
     let rules = game_rules.generation;
-    let progressive = game_rules.rules_version == 2;
+    let progressive = game_rules.rules_version >= 2;
+    let platforms = game_rules.rules_version >= RULES_V3.rules_version;
     let terrain_step = if progressive {
         let maximum = i128::from(p.max_required_rise_subpixels);
         let change = i128::from(sample.previous_price) - i128::from(sample.price);
@@ -182,6 +200,7 @@ fn prepare(
         crate::rules::terrain_step_subpixels(change)
     };
     let width = rules.segment_width_subpixels;
+    let minimum_gap = minimum_gap(game_rules);
     let cutoff = i64::from(state.frame.runner.x_subpixels) - 2 * i64::from(width);
     state.entities.retain(|e| {
         !e.consumed && i64::from(e.x_subpixels) + i64::from(e.width_subpixels) >= cutoff
@@ -203,10 +222,20 @@ fn prepare(
             break;
         }
         let g = state.generation;
+        let gap = if platform_gap(game_rules, g.next_segment) {
+            minimum_gap
+                + (p.max_required_gap_subpixels - minimum_gap) * terrain_step.abs()
+                    / p.max_required_rise_subpixels
+        } else {
+            0
+        };
+        let platform_width = width - gap;
+        let rise_limit = p.max_required_rise_subpixels * platform_width / width;
+        let rise = terrain_step.clamp(-rise_limit, rise_limit);
         let end_y = if g.next_segment < 2 {
             g.surface_y_subpixels
         } else {
-            (g.surface_y_subpixels + terrain_step).clamp(
+            (g.surface_y_subpixels + rise).clamp(
                 i32::from(p.viewport_height_pixels) * 256 / 4,
                 i32::from(p.viewport_height_pixels) * 256 * 3 / 4,
             )
@@ -215,7 +244,7 @@ fn prepare(
             EntityKind::Ramp(end_y - g.surface_y_subpixels),
             g.next_x_subpixels,
             g.surface_y_subpixels,
-            width,
+            platform_width,
             p.hitbox_height_subpixels,
         );
         push(state, ramp)?;
@@ -235,7 +264,7 @@ fn prepare(
             } else {
                 EntityKind::Star
             };
-            let x = coordinate(i64::from(g.next_x_subpixels) + i64::from(width / 2))?;
+            let x = coordinate(i64::from(g.next_x_subpixels) + i64::from(platform_width / 2))?;
             let pickup_height = if progressive && booster {
                 p.hitbox_height_subpixels + 16 * 256
             } else {
@@ -273,7 +302,7 @@ fn prepare(
             if mask & (1 << index) != 0 {
                 continue;
             }
-            let x = coordinate(
+            let mut x = coordinate(
                 i64::from(state.generation.checkpoint_x_subpixels)
                     + coin_distance(
                         state.generation.checkpoint_speed_subpixels_per_tick,
@@ -285,10 +314,32 @@ fn prepare(
             let Some(tile) = state.entities.iter().find(|e| {
                 matches!(e.kind, EntityKind::Ramp(_))
                     && x >= e.x_subpixels
-                    && i64::from(x) < i64::from(e.x_subpixels) + i64::from(e.width_subpixels)
+                    && i64::from(x)
+                        < i64::from(e.x_subpixels)
+                            + i64::from(if platforms { width } else { e.width_subpixels })
             }) else {
                 continue;
             };
+            if platforms {
+                // Keep the coin on its departure platform and the jump clear of hazards.
+                let end = tile.x_subpixels + tile.width_subpixels;
+                if tile.width_subpixels < width {
+                    x = x.min(end - p.hitbox_width_subpixels / 2);
+                }
+                let clearance = p.min_landing_width_subpixels * 2;
+                if hazard
+                    && state.entities.iter().any(|e| {
+                        let edge = e.x_subpixels + e.width_subpixels;
+                        matches!(e.kind, EntityKind::Ramp(_))
+                            && e.width_subpixels < width
+                            && x >= edge - clearance
+                            && x <= e.x_subpixels + width + clearance
+                    })
+                {
+                    state.generation.spawned_hazard_mask |= 1 << index;
+                    continue;
+                }
+            }
             let surface = surface_at(tile, i64::from(x)).unwrap();
             // Keep jump windows between coins. Later levels add baseline obstacles.
             if !hazard

@@ -83,10 +83,30 @@ export const RULES_V2 = {
     boosterStrideSegments: 8,
   },
 } as const;
-export const supportedRules = [RULES_V1, RULES_V2] as const;
+export const RULES_V3 = {
+  ...RULES_V2,
+  rulesVersion: 3,
+  generation: { ...RULES_V2.generation, maxSampleChangeBps: 8 },
+  physics: { ...RULES_V2.physics, maxRequiredGapSubpixels: 48 * 256 },
+} as const;
+export const supportedRules = [RULES_V1, RULES_V2, RULES_V3] as const;
 export type GameplayRules = (typeof supportedRules)[number];
 export function rulesForVersion(version: number) {
   return supportedRules.find((rules) => rules.rulesVersion === version);
+}
+
+// The whole hitbox must leave support for at least one tick, even at full speed.
+export function minimumPlatformGap(rules: GameplayRules) {
+  const { hitboxWidthSubpixels, maxVelocitySubpixelsPerTick } = rules.physics;
+  return hitboxWidthSubpixels + maxVelocitySubpixelsPerTick;
+}
+
+export function platformGap(rules: GameplayRules, segment: bigint) {
+  const stride = BigInt(rules.generation.boosterStrideSegments);
+  return (
+    rules.rulesVersion >= RULES_V3.rulesVersion &&
+    segment % stride === stride / 2n
+  );
 }
 
 export function priceChangeBps(

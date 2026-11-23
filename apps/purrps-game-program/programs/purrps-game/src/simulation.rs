@@ -5,7 +5,7 @@ pub mod world;
 use crate::{
     catalog::CatStats,
     protocol::{InputAxis, PlayerIntent, RunPhase, TerminalReason},
-    rules::{speed_bps_for_rules, GameRules, RULES_V1},
+    rules::{speed_bps_for_rules, GameRules, RULES_V1, RULES_V3},
     state::run::{
         EntityKind, PowerState, RunnerState, WorldEntity, MAX_QUEUED_INTENTS, MAX_WORLD_ENTITIES,
     },
@@ -195,7 +195,7 @@ fn pickups(
     Ok(())
 }
 
-// Terrain is swept X then Y; supported feet follow continuous ramp surfaces.
+// Terrain is swept X then Y; supported feet follow the ramp surface.
 // Bounded copies make failures atomic for both the program core and predictor.
 pub(crate) fn command_terminal(action: &PlayerIntent, qualified: u64) -> Option<TerminalReason> {
     match action {
@@ -254,13 +254,21 @@ pub fn step_for_rules(
             stats,
             tick,
             action,
-            rules.rules_version == 2,
+            rules.rules_version >= 2,
         )?;
     }
     integrate_velocity(&mut result.frame, stats, tick, rules);
     let path = collision::move_runner(&mut result.frame.runner, entities);
     validate_frame(&result.frame, stats)?;
     result.frame.active_ticks = tick;
+    if rules.rules_version >= RULES_V3.rules_version
+        && result.frame.runner.y_subpixels
+            >= i32::from(rules.physics.viewport_height_pixels)
+                * i32::from(rules.physics.subpixels_per_pixel)
+    {
+        terminate(&mut result.frame, TerminalReason::Crash);
+        return Ok(result);
+    }
     for e in entities.iter().filter(|e| e.kind == EntityKind::Hazard) {
         if collision::hits(path, e)
             && !powers::absorb_hit(&mut result.frame.runner, &mut result.frame.powers, tick)?

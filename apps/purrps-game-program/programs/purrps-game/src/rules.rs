@@ -186,6 +186,24 @@ pub const RULES_V2: GameRules = GameRules {
     ..RULES_V1
 };
 
+pub const RULES_V3: GameRules = GameRules {
+    rules_version: 3,
+    generation: GenerationRules {
+        max_sample_change_bps: 8,
+        ..RULES_V2.generation
+    },
+    physics: PhysicsRules {
+        max_required_gap_subpixels: 48 * 256,
+        ..RULES_V2.physics
+    },
+    ..RULES_V2
+};
+
+pub fn platform_gap(rules: &GameRules, segment: u64) -> bool {
+    let stride = u64::from(rules.generation.booster_stride_segments);
+    rules.rules_version >= RULES_V3.rules_version && segment % stride == stride / 2
+}
+
 pub fn price_change_bps(
     previous_price: i64,
     previous_exponent: i32,

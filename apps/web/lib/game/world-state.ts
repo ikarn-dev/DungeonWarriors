@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { type GameplayRules, RULES_V1, speedBps, U64_MAX } from "./rules";
+import {
+  type GameplayRules,
+  minimumPlatformGap,
+  platformGap,
+  RULES_V1,
+  RULES_V3,
+  speedBps,
+  U64_MAX,
+} from "./rules";
 import { validateWorld } from "./simulation";
 import { surfaceAt } from "./simulation-collision";
 import {
@@ -89,7 +97,8 @@ export function validateWorldState(
     .sort((a, b) => a.xSubpixels - b.xSubpixels);
   const first = ramps[0];
   const last = ramps.at(-1);
-  const width = RULES_V1.generation.segmentWidthSubpixels;
+  const width = rules.generation.segmentWidthSubpixels;
+  const firstSegment = g.nextSegment - BigInt(ramps.length);
   const horizon =
     state.frame.runner.xSubpixels +
     width * RULES_V1.generation.lookaheadSegments;
@@ -99,14 +108,22 @@ export function validateWorldState(
     first.xSubpixels > state.frame.runner.xSubpixels ||
     g.nextXSubpixels < horizon - p.maxVelocitySubpixelsPerTick ||
     g.nextXSubpixels > horizon + width ||
-    last.xSubpixels + last.widthSubpixels !== g.nextXSubpixels ||
-    surfaceAt(last, g.nextXSubpixels) !== g.surfaceYSubpixels ||
+    firstSegment < 0n ||
     ramps.some((r, index) => {
       const next = ramps[index + 1];
+      const nextX = next?.xSubpixels ?? g.nextXSubpixels;
+      const nextY = next?.ySubpixels ?? g.surfaceYSubpixels;
+      const edge = r.xSubpixels + r.widthSubpixels;
+      const gap = nextX - edge;
+      const hasGap = platformGap(rules, firstSegment + BigInt(index));
       return (
-        next !== undefined &&
-        (r.xSubpixels + r.widthSubpixels !== next.xSubpixels ||
-          surfaceAt(r, next.xSubpixels) !== next.ySubpixels)
+        surfaceAt(r, edge) !== nextY ||
+        (rules.rulesVersion >= RULES_V3.rulesVersion &&
+          nextX - r.xSubpixels !== width) ||
+        (hasGap
+          ? gap < minimumPlatformGap(rules) ||
+            gap > rules.physics.maxRequiredGapSubpixels
+          : gap !== 0)
       );
     })
   )

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CatStats } from "./catalog";
 import { intentEnvelopeSchema, rulesVersionSchema } from "./protocol";
-import { RULES_V1, RULES_V2, U64_MAX } from "./rules";
+import { RULES_V1, rulesForVersion, U64_MAX } from "./rules";
 import { stepWorld } from "./world";
 import {
   priceSampleSchema,
@@ -60,8 +60,10 @@ export function parsePredictionSnapshot(input: unknown): Snapshot {
   const parsed = snapshotSchema.safeParse(input);
   if (!parsed.success) throw new PredictionError("INVALID_SNAPSHOT");
   const s = parsed.data;
+  const rules = rulesForVersion(s.rulesVersion);
+  if (!rules) throw new PredictionError("INVALID_SNAPSHOT");
   try {
-    validateWorldState(worldOf(s), s.rulesVersion === 2 ? RULES_V2 : RULES_V1);
+    validateWorldState(worldOf(s), rules);
   } catch {
     throw new PredictionError("INVALID_SNAPSHOT");
   }
@@ -186,7 +188,8 @@ export class Predictor {
         };
       }),
     ];
-    const rules = this.snapshot.rulesVersion === 2 ? RULES_V2 : RULES_V1;
+    const rules = rulesForVersion(this.snapshot.rulesVersion);
+    if (!rules) throw new PredictionError("INVALID_SNAPSHOT");
     for (
       let i = cached?.ticks ?? 0;
       i < count && result.frame.phase === "active";

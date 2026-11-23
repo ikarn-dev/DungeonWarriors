@@ -448,6 +448,7 @@ export default function RunStage({
     present,
     mount,
     hasWorld,
+    rulesVersion,
     cat,
     media,
     artwork,
@@ -574,7 +575,7 @@ export default function RunStage({
               ? powerHints[power]
               : state.readyAtTick > frame.activeTicks
                 ? `Ready in ${Math.ceil(Number(state.readyAtTick - frame.activeTicks) / RULES_V1.ticksPerSecond)}s`
-                : rulesVersion === 2 &&
+                : rulesVersion >= 2 &&
                     (power === "doubleJump" || power === "extraDash")
                   ? powerHints[power]
                   : "Ready",
