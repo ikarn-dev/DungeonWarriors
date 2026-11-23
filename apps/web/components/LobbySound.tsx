@@ -50,7 +50,10 @@ export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
       const control = event.target.closest(".lobby a, .lobby button");
       if (!control || control.matches(":disabled, .lobby-sound")) return;
       if (control.matches(".lobby-play")) lobbyMusic.start();
-      else if (control.matches(".pixel-button")) lobbyMusic.blip();
+      else if (
+        control.matches(".pixel-button, .dpad-arm, .face-button, .console-pill")
+      )
+        lobbyMusic.blip();
     };
     // Hover chirp for Start, mouse pointers only.
     const over = (event: PointerEvent) => {

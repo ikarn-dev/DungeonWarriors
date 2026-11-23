@@ -1,5 +1,7 @@
 import type { VersionedTransaction } from "@solana/web3.js";
 import type { ComponentProps } from "react";
+import { useEffect } from "react";
+import { lobbyMusic } from "../lib/audio/lobby-music";
 import type { PlayerIntent } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
 import type { LobbyIntent } from "../lib/game/transaction-intents";
@@ -48,6 +50,11 @@ export default function LobbySections({
   ) => Promise<void>;
   readonly reload: (signal: AbortSignal) => Promise<void>;
 }) {
+  // The shop and its capsule draws play without the background loop.
+  useEffect(() => {
+    lobbyMusic.hold("shop", tab === "shop");
+    return () => lobbyMusic.hold("shop", false);
+  }, [tab]);
   const selected = state.cats.find(({ id }) => id === state.selected) ?? null;
   const reloadSoon = () => void perform((signal) => reload(signal));
   const game = (action: PlayerIntent["action"]) =>

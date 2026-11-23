@@ -1,12 +1,19 @@
 "use client";
 
 import type { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { PlayerIntent } from "../lib/game/protocol";
 import { RULES_V1 } from "../lib/game/rules";
 import { sendRunInput } from "../lib/game/run-input";
 
-const button = "pixel-button run-control";
 const powerIcons = {
   magnet: "magnet",
   doubleJump: "double-jump",
@@ -280,44 +287,77 @@ export default function RunControls({
   }
 
   const controlsOff = paused || !playing || !artReady;
+  const move = (axis: "left" | "right") => ({
+    onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      enqueue.current({ kind: "move", axis });
+    },
+    onLostPointerCapture: () =>
+      enqueue.current({ kind: "move", axis: "neutral" }),
+    onKeyDown: (event: ReactKeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        enqueue.current({ kind: "move", axis });
+      }
+    },
+    onKeyUp: (event: ReactKeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter")
+        enqueue.current({ kind: "move", axis: "neutral" });
+    },
+  });
+  const cooldown: CSSProperties & { "--cool": string } = {
+    "--cool": `${Math.round(power.remaining * 360)}deg`,
+  };
   return (
     <fieldset className="run-controls" aria-label="Run controls" ref={root}>
-      <div className="run-pad" data-pad="move">
-        {(["left", "right"] as const).map((axis) => (
+      <div className="console-shell" data-side="left">
+        <div className="dpad">
           <button
-            key={axis}
             type="button"
-            className={button}
-            aria-label={axis === "left" ? "Move left" : "Move right"}
-            data-direction
+            className="dpad-arm"
+            data-dir="up"
+            aria-label="Jump"
             disabled={controlsOff}
-            onPointerDown={(event) => {
-              event.currentTarget.setPointerCapture(event.pointerId);
-              enqueue.current({ kind: "move", axis });
-            }}
-            onLostPointerCapture={() =>
-              enqueue.current({ kind: "move", axis: "neutral" })
-            }
-            onKeyDown={(event) => {
-              if (event.key === " " || event.key === "Enter") {
-                event.preventDefault();
-                enqueue.current({ kind: "move", axis });
-              }
-            }}
-            onKeyUp={(event) => {
-              if (event.key === " " || event.key === "Enter")
-                enqueue.current({ kind: "move", axis: "neutral" });
-            }}
+            onClick={(event) => playAction("jump", event.detail > 0)}
           >
-            <span className="pixel-icon" data-icon={axis} aria-hidden="true" />
+            <span className="pixel-icon" data-icon="jump" aria-hidden="true" />
           </button>
-        ))}
+          {(["left", "right"] as const).map((axis) => (
+            <button
+              key={axis}
+              type="button"
+              className="dpad-arm"
+              data-dir={axis}
+              aria-label={axis === "left" ? "Move left" : "Move right"}
+              disabled={controlsOff}
+              {...move(axis)}
+            >
+              <span
+                className="pixel-icon"
+                data-icon={axis}
+                aria-hidden="true"
+              />
+            </button>
+          ))}
+          <span className="dpad-hub" aria-hidden="true" />
+          <span className="dpad-arm" data-dir="down" aria-hidden="true" />
+        </div>
       </div>
-      <div className="run-pad" data-pad="cash">
+      <div className="console-center">
+        <p className="console-readout" aria-live="polite">
+          {payout ? (
+            <>
+              <strong>{payout.amount}</strong>
+              <span>{payout.multiplier}</span>
+            </>
+          ) : (
+            <span>Reach a checkpoint to unlock cash out</span>
+          )}
+        </p>
         <button
           type="button"
-          className="pixel-button run-cash"
-          data-tone={eligible ? "gold" : undefined}
+          className="console-pill"
+          data-ready={eligible || undefined}
           disabled={!eligible || cashOut || !playing}
           onClick={() => enqueue.current({ kind: "cashOut" })}
         >
@@ -326,65 +366,50 @@ export default function RunControls({
             data-icon={eligible ? "cash-out" : "lock"}
             aria-hidden="true"
           />
-          <span className="run-cash-text">
-            <span>
-              {cashOut
-                ? "Cash-out requested"
-                : eligible
-                  ? "Cash out"
-                  : "Cash out locked"}
-            </span>
-            <strong>
-              {payout
-                ? `${payout.amount} · ${payout.multiplier}`
-                : "Reach a checkpoint"}
-            </strong>
-          </span>
+          {cashOut ? "Cash-out requested" : "Cash out"}
         </button>
       </div>
-      <div className="run-pad" data-pad="action">
-        <button
-          type="button"
-          className={button}
-          data-tone="blue"
-          disabled={controlsOff}
-          onClick={(event) => playAction("dash", event.detail > 0)}
-        >
-          <span className="pixel-icon" data-icon="dash" aria-hidden="true" />
-          <span className="run-control-label">Dash</span>
-        </button>
-        <button
-          type="button"
-          className={button}
-          data-tone={power.id}
-          data-active={power.active || undefined}
-          disabled={controlsOff || !power.ready}
-          aria-describedby={`power-${run.toBase58()}`}
-          onClick={(event) => playAction("boost", event.detail > 0)}
-        >
-          <span
-            className="run-cooldown"
-            aria-hidden="true"
-            style={{ transform: `scaleY(${power.remaining})` }}
-          />
-          <span
-            className="pixel-icon"
-            data-icon={powerIcons[power.id]}
-            aria-hidden="true"
-          />
-          <span className="run-control-label">{power.name}</span>
-        </button>
-        <button
-          type="button"
-          className={button}
-          data-tone="green"
-          data-size="large"
-          disabled={controlsOff}
-          onClick={(event) => playAction("jump", event.detail > 0)}
-        >
-          <span className="pixel-icon" data-icon="jump" aria-hidden="true" />
-          <span className="run-control-label">Jump</span>
-        </button>
+      <div className="console-shell" data-side="right">
+        <div className="face">
+          <button
+            type="button"
+            className="face-button"
+            data-key="power"
+            data-tone={power.id}
+            data-active={power.active || undefined}
+            style={cooldown}
+            disabled={controlsOff || !power.ready}
+            aria-describedby={`power-${run.toBase58()}`}
+            onClick={(event) => playAction("boost", event.detail > 0)}
+          >
+            <span
+              className="pixel-icon"
+              data-icon={powerIcons[power.id]}
+              aria-hidden="true"
+            />
+            <span className="face-label">{power.name}</span>
+          </button>
+          <button
+            type="button"
+            className="face-button"
+            data-key="dash"
+            disabled={controlsOff}
+            onClick={(event) => playAction("dash", event.detail > 0)}
+          >
+            <span className="pixel-icon" data-icon="dash" aria-hidden="true" />
+            <span className="face-label">Dash</span>
+          </button>
+          <button
+            type="button"
+            className="face-button"
+            data-key="jump"
+            disabled={controlsOff}
+            onClick={(event) => playAction("jump", event.detail > 0)}
+          >
+            <span className="pixel-icon" data-icon="jump" aria-hidden="true" />
+            <span className="face-label">Jump</span>
+          </button>
+        </div>
       </div>
       <p className="run-controls-note">
         <span id={`power-${run.toBase58()}`}>

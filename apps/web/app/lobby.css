@@ -132,11 +132,13 @@
   padding: calc(var(--px) * 2);
   overscroll-behavior: contain;
 }
+/* Sits in the open sky, clear of the cats walking on the ground. */
 .lobby-start {
   display: grid;
   gap: 0.875rem;
-  width: min(26rem, 100%);
-  margin-top: clamp(0rem, 6dvh, 3rem);
+  align-self: start;
+  width: min(24rem, 100%);
+  margin-top: clamp(1rem, 12dvh, 8rem);
   padding: 1.5rem;
   text-align: center;
   font-family: var(--font-geist-sans), sans-serif;
@@ -212,7 +214,6 @@
 :where(.lobby-panel) :is(dd, strong) {
   color: var(--cream);
 }
-.pixel-field,
 :where(.lobby-panel) :is(input, select) {
   min-height: 2.75rem;
   padding: 0.375rem 0.75rem;
@@ -225,7 +226,6 @@
     inset 0 calc(var(--px) + 2px) 0 0 #0b0a14;
   font: inherit;
 }
-.pixel-field:focus-visible,
 :where(.lobby-panel) :is(input, select):focus-visible {
   outline: var(--px) solid var(--gold-hi);
   outline-offset: 2px;
@@ -247,10 +247,6 @@
 .lobby-stack {
   display: grid;
   gap: 0.875rem;
-}
-.lobby-label {
-  font-size: 0.875rem;
-  text-align: left;
 }
 .lobby-card img {
   image-rendering: pixelated;

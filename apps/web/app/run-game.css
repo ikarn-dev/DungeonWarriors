@@ -1,8 +1,6 @@
 /* In-game screen: full-viewport pixel HUD over the Phaser canvas. */
 .run-dialog,
 .run-stage {
-  --btn: clamp(3.25rem, 12dvh, 4.5rem);
-  --btn-large: clamp(4.25rem, 16dvh, 6rem);
   color: var(--cream);
   font-family: var(--font-pixel), var(--font-geist-sans), sans-serif;
 }
@@ -303,91 +301,6 @@
   font-size: 0.875rem;
 }
 
-/* Bottom touch pads. */
-.run-controls {
-  position: absolute;
-  z-index: 3;
-  inset: auto calc(var(--edge-right) + var(--px))
-    calc(var(--edge-bottom) + var(--px)) calc(var(--edge-left) + var(--px));
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: end;
-  gap: 0.75rem;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  pointer-events: none;
-}
-.run-pad {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.875rem;
-  pointer-events: auto;
-}
-.run-pad[data-pad="move"] {
-  justify-self: start;
-}
-.run-pad[data-pad="action"] {
-  justify-self: end;
-}
-.run-control {
-  flex-direction: column;
-  gap: 0.125rem;
-  width: var(--btn);
-  height: var(--btn);
-  padding: 0.25rem;
-  overflow: hidden;
-}
-.run-control[data-size="large"] {
-  --icon: 36px;
-  width: var(--btn-large);
-  height: var(--btn-large);
-}
-.run-control[data-direction] {
-  --icon: 32px;
-  touch-action: none;
-}
-.run-control-label {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 0.75rem;
-  text-overflow: clip;
-}
-.run-control[data-active] {
-  outline: var(--px) solid var(--gold-hi);
-  outline-offset: var(--px);
-}
-.run-cooldown {
-  position: absolute;
-  inset: var(--px);
-  z-index: -1;
-  transform-origin: bottom;
-  background: #0b0a1480;
-  pointer-events: none;
-}
-.run-control:has(.run-cooldown) {
-  z-index: 0;
-}
-.run-cash {
-  gap: 0.625rem;
-  min-height: var(--btn);
-  padding: 0.375rem 1.125rem;
-  text-align: left;
-}
-.run-cash-text {
-  display: grid;
-  gap: 0.125rem;
-}
-.run-cash-text span {
-  font-size: 0.9375rem;
-}
-.run-cash-text strong {
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-  text-shadow: none;
-}
 .run-controls-note,
 .run-keyboard {
   position: absolute;
@@ -403,14 +316,14 @@
 }
 .run-controls-note {
   right: 0;
-  bottom: calc(var(--btn-large) + 0.75rem);
+  bottom: calc(var(--face) * 1.75 + 2rem);
   display: grid;
   justify-items: end;
   gap: 0.25rem;
 }
 .run-keyboard {
   left: 0;
-  bottom: calc(var(--btn) + 0.75rem);
+  bottom: calc(var(--arm) * 3 + 2rem);
   color: var(--soft);
 }
 
@@ -458,8 +371,6 @@
 }
 @media (max-height: 26rem) {
   .run-dialog .run-stage {
-    --btn: 3.25rem;
-    --btn-large: 4.25rem;
     --icon: 22px;
   }
   .run-hud-cat img {

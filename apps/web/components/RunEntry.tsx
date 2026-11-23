@@ -185,7 +185,7 @@ export default function RunEntry({
     if (open && dialog.current && !dialog.current.open)
       dialog.current.showModal();
   }, [open]);
-  // The game screen has its own sound; the lobby music waits until it closes.
+  // The game screen plays effects only; the background loop waits until it closes.
   useEffect(() => {
     lobbyMusic.hold("run", open);
     return () => lobbyMusic.hold("run", false);

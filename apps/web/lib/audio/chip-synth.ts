@@ -35,8 +35,8 @@ export class ChipSynth {
     this.out = ctx.createGain();
     this.out.gain.value = 0;
     this.out.connect(soften);
-    // Music buses follow the master fade; UI sounds bypass it so a cue still
-    // plays while the music fades in or out.
+    // Music buses follow the master fade. Meows and UI sounds bypass it, so
+    // they still play while the background loop is paused or fading.
     const bus = (level: number, direct = false) => {
       const gain = ctx.createGain();
       gain.gain.value = direct ? level * MASTER : level;
@@ -48,7 +48,7 @@ export class ChipSynth {
       arp: bus(0.06),
       bass: bus(0.22),
       drum: bus(0.12),
-      meow: bus(0.28),
+      meow: bus(0.28, true),
       ui: bus(0.08, true),
     };
     this.waves = { lead: pulseWave(ctx, 0.25), arp: pulseWave(ctx, 0.125) };

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./run-pixel.css";
 @import "./run-game.css";
+@import "./run-console.css";
 @import "./lobby.css";
 @import "./lobby-title.css";
 @import "./lobby-sections.css";

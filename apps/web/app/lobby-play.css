@@ -138,6 +138,48 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Wallet picker: one row per detected wallet. */
+.wallet-picker {
+  display: grid;
+  gap: 1rem;
+}
+.wallet-picker h2 {
+  margin: 0;
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 1.375rem;
+  line-height: 1.2;
+}
+.wallet-picker ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+.wallet-picker .pixel-button {
+  justify-content: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.25rem;
+  padding-inline: 0.75rem 1rem;
+  font-size: 1rem;
+}
+.wallet-picker img {
+  flex: none;
+  border-radius: 0.5rem;
+}
+.wallet-picker-name {
+  flex: 1;
+  text-align: left;
+}
+.wallet-picker-tag {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.8;
+  text-shadow: none;
+}
+
 /* Wallet pill in the navbar. */
 .lobby-wallet {
   position: absolute;
@@ -232,10 +274,13 @@
 }
 
 /* Sonner toasts, unstyled and themed here. */
+/* Sonner positions each toast absolutely inside its centred stack; both
+   inline insets plus auto margins centre the pill in that stack. */
 .pixel-toast {
   display: flex;
   align-items: center;
   gap: 0.625rem;
+  inset-inline: 0;
   width: max-content;
   max-width: 100%;
   margin-inline: auto;

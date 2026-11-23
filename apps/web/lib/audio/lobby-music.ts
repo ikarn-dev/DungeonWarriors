@@ -28,7 +28,7 @@ class LobbyMusic {
   // Browsers allow audio only after a user gesture; call this from one.
   unlock() {
     if (this.synth) {
-      if (this.active()) void this.synth.ctx.resume();
+      if (this.effects()) void this.synth.ctx.resume();
       return;
     }
     if (typeof AudioContext === "undefined") return;
@@ -45,34 +45,35 @@ class LobbyMusic {
     this.sync();
   }
   reveal() {
-    if (!this.synth || !this.enabled || document.hidden) return;
+    if (!this.synth || !this.effects()) return;
     this.synth.jingle(this.synth.ctx.currentTime);
   }
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
     this.sync();
   }
-  // A named hold (for example an open run) silences the music until released.
+  // A named hold (the game screen, the shop) pauses the background loop until
+  // released. Clicks, meows and other effects keep playing.
   hold(reason: string, held: boolean) {
     if (held) this.holds.add(reason);
     else this.holds.delete(reason);
     this.sync();
   }
   blip() {
-    if (this.synth && this.active())
+    if (this.synth && this.effects())
       this.synth.blip(this.synth.ctx.currentTime);
   }
   powerDown() {
-    if (this.synth && this.active())
+    if (this.synth && this.effects())
       this.synth.powerDown(this.synth.ctx.currentTime);
   }
   hover() {
-    if (this.synth && this.active())
+    if (this.synth && this.effects())
       this.synth.hover(this.synth.ctx.currentTime);
   }
   // Start: the game jingle followed by a short meow.
   start() {
-    if (!this.synth || !this.active()) return;
+    if (!this.synth || !this.effects()) return;
     const now = this.synth.ctx.currentTime;
     this.synth.jingle(now);
     this.synth.meow(now + 0.32, true);
@@ -86,43 +87,44 @@ class LobbyMusic {
   // A lobby cat hopped. Meows are rationed so several cats never overlap,
   // and panned to where the cat is on screen (-1 left, 1 right).
   hop(pan: number) {
-    if (!this.synth || !this.active()) return;
+    if (!this.synth || !this.effects()) return;
     const now = this.synth.ctx.currentTime;
     if (now - this.lastHop < 2.5 || Math.random() > 0.6) return;
     this.lastHop = now;
     this.synth.meow(now + 0.02, Math.random() < 0.5, pan);
   }
 
-  private active() {
-    return (
-      this.enabled &&
-      this.wanted !== null &&
-      this.holds.size === 0 &&
-      !document.hidden
-    );
+  private effects() {
+    return this.enabled && !document.hidden;
+  }
+  private music() {
+    return this.effects() && this.wanted !== null && this.holds.size === 0;
   }
 
   private sync() {
     const synth = this.synth;
     if (!synth) return;
     const target =
-      this.summoning && this.enabled && !document.hidden
+      this.summoning && this.effects()
         ? "summon"
-        : this.active()
+        : this.music()
           ? this.wanted
           : null;
+    // Effects need a running context. Suspend only when sound is off or the
+    // tab is hidden, after any closing cue or fade has played out.
+    if (this.effects()) void synth.ctx.resume();
+    else
+      setTimeout(() => {
+        if (!this.effects()) void synth.ctx.suspend();
+      }, 600);
     if (target === (this.playing?.name ?? null)) return;
     const now = synth.ctx.currentTime;
     if (target === null) {
       synth.fade(0, now, 0.4);
       clearInterval(this.timer);
       this.playing = null;
-      setTimeout(() => {
-        if (this.playing === null) void synth.ctx.suspend();
-      }, 600);
       return;
     }
-    void synth.ctx.resume();
     if (this.playing) {
       synth.fade(0, now, 0.15);
       synth.fade(1, now + 0.2, 0.6);
