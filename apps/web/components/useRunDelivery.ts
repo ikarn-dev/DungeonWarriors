@@ -73,7 +73,7 @@ export function useRunDelivery(
           "confirmed",
         );
         if (result === "confirmed") pending.confirmed = true;
-        if (result === "failed") {
+        if (result === "failed" || result === "expired") {
           flight = undefined;
           failures++;
         }

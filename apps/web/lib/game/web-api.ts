@@ -18,6 +18,11 @@ const FRIENDLY: Readonly<Record<string, string>> = {
     "Couldn't check your capsule yet. It appears once it's ready.",
   ASSETS_NOT_READY: "Game art is updating. Please try again shortly.",
   ADMISSION_CLOSED: "Runs are paused right now. Please check back soon.",
+  SERVICE_UNAVAILABLE:
+    "The transaction service is temporarily unavailable. Try again shortly.",
+  LIMITER_UNAVAILABLE:
+    "The transaction service is temporarily unavailable. Try again shortly.",
+  ER_UNAVAILABLE: "MagicBlock is temporarily unavailable. Try again shortly.",
   RATE_LIMITED: "Too many requests. Wait a moment and try again.",
 };
 export function webErrorMessage(code: string) {

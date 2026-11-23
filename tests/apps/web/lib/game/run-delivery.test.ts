@@ -186,6 +186,38 @@ it("advances play-key approval at confirmed but keeps finalized as the base defa
   }
 });
 
+it("distinguishes an expired signature from a finalized transaction failure", async () => {
+  const pending = {
+    signature: "2".repeat(87),
+    network: "base",
+    lastValidBlockHeight: 123,
+  } as const;
+  const fetchStatus = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ status: null, resolution: "expired" }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        status: {
+          confirmationStatus: "finalized",
+          err: { InstructionError: [0, "Custom"] },
+        },
+        resolution: "failed",
+      }),
+    );
+  vi.stubGlobal("fetch", fetchStatus);
+  try {
+    const { signal } = new AbortController();
+    await expect(confirmGameAction(pending, signal, 1)).resolves.toBe(
+      "expired",
+    );
+    await expect(confirmGameAction(pending, signal, 1)).resolves.toBe("failed");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it("plots only consumed price observations, retaining precision and showing gaps", () => {
   const start = { sequence: 1n, price: 20_000_123n, exponent: -6 };
   const later = { ...start, sequence: 2n, price: 20_010_123n };

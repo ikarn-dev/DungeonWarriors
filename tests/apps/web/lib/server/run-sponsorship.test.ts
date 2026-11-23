@@ -247,7 +247,7 @@ it("omits the writable Hydra accounts when settling a run that never activated",
   );
 });
 
-it("launches atomically with the scoped play key and the sponsor as the sole SOL payer", async () => {
+it("reconciles an expired launch without paying fees and keeps the scoped key as the sole player signer", async () => {
   const { owner, play, sponsor, wallet, intent } = launch();
   const { sponsor: address, floor } = intent.action.completionFunding;
   const value = { ...intent, playSponsor: { sponsor: address, floor } };
@@ -297,9 +297,19 @@ it("launches atomically with the scoped play key and the sponsor as the sole SOL
     simulateTransaction: simulate,
     sendRawTransaction: send,
   });
+  simulate.mockResolvedValueOnce({ value: { err: "BlockhashNotFound" } });
   mock.admit.mockResolvedValue(1);
+  const expired = await submit(wallet, value, encoded());
+  expect(expired).toMatchObject({
+    network: "base",
+    unknownResponse: true,
+    signature: expect.any(String),
+  });
+  expect(send).not.toHaveBeenCalled();
+  expect(mock.admit).not.toHaveBeenCalled();
   await expect(submit(wallet, value, encoded())).resolves.toMatchObject({
     network: "base",
+    signature: expired.signature,
   });
   expect(
     VersionedTransaction.deserialize(send.mock.calls[0]?.[0]).signatures.every(

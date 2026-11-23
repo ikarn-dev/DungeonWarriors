@@ -287,6 +287,7 @@ export default function RunEntry({
       const setup = launch.current;
       let delegationWaits = 0;
       let checkedFinalApproval = false;
+      let refreshedBlockhash = false;
       for (;;) {
         signal.throwIfAborted();
         const { step, reserve } = setup;
@@ -343,6 +344,19 @@ export default function RunEntry({
           } catch (error) {
             if (
               error instanceof WebApiError &&
+              error.code === "BLOCKHASH_EXPIRED"
+            ) {
+              if (!refreshedBlockhash) {
+                refreshedBlockhash = true;
+                continue;
+              }
+              setNotice(
+                "Network approval expired. Continue to retry this bet.",
+              );
+              return;
+            }
+            if (
+              error instanceof WebApiError &&
               error.code === "RUN_DELEGATION_PENDING" &&
               step === "activate" &&
               delegationWaits < 6
@@ -385,7 +399,22 @@ export default function RunEntry({
         }
         const signature = setup.flight.signature;
         setup.flight = null;
-        if (status === "failed") throw new WebApiError("TRANSACTION_FAILED");
+        if (status === "expired") {
+          if (step !== "authorize" && !refreshedBlockhash) {
+            refreshedBlockhash = true;
+            continue;
+          }
+          setNotice(
+            step === "authorize"
+              ? "Wallet approval expired. Continue to approve the same bet."
+              : "The transaction expired. Continue to retry the same run.",
+          );
+          return;
+        }
+        if (status === "failed") {
+          if (step !== "activate") launch.current = null;
+          throw new WebApiError("TRANSACTION_FAILED");
+        }
         if (step === "activate") {
           setup.step = "active";
           setNotice(null);
@@ -404,8 +433,9 @@ export default function RunEntry({
       if (setup?.step === "active") return;
       if (
         setup &&
-        (setup.flight === null ||
-          (!setup.flight.signature && knownFailure(error)))
+        !setup.flight?.signature &&
+        (knownFailure(error) ||
+          (setup.step === "authorize" && setup.flight === null))
       ) {
         setup.flight = null;
         if (setup.step !== "activate") launch.current = null;

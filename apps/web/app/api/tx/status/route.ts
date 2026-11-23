@@ -42,14 +42,20 @@ export async function POST(request: Request) {
     if (utils.bytes.bs58.decode(value.signature).length !== 64)
       throw new ApiError("INVALID_SIGNATURE", 400);
     const rpc = await checkedConnection(value.network);
-    const result = await rpc.getSignatureStatuses([value.signature], {
-      searchTransactionHistory: true,
-    });
-    const status = result.value[0] ?? null;
-    const expired =
-      status === null &&
+    const readSignature = () =>
+      rpc.getSignatureStatuses([value.signature], {
+        searchTransactionHistory: true,
+      });
+    let result = await readSignature();
+    const pastValidity =
+      result.value[0] == null &&
       value.lastValidBlockHeight !== undefined &&
       (await rpc.getBlockHeight("finalized")) > value.lastValidBlockHeight;
+    // Reconcile after the finalized height read so an earlier null cannot
+    // declare expiry while the transaction is landing.
+    if (pastValidity) result = await readSignature();
+    const status = result.value[0] ?? null;
+    const expired = status === null && pastValidity;
     const resolution =
       status === null
         ? expired

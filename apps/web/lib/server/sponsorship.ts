@@ -448,7 +448,15 @@ export async function submitPlay(
     sponsor.publicKey,
     network,
     true,
-  );
+  ).catch((error: unknown) => {
+    if (error instanceof ApiError && error.code === "BLOCKHASH_EXPIRED")
+      return null;
+    throw error;
+  });
+  // An RPC can reject an old hash even if this signature was already sent.
+  // Give the client the exact signature to reconcile before re-signing.
+  if (cost === null)
+    return { status: "requested", signature, network, unknownResponse: true };
   if (cost > 0n) await admitSponsorCost(operationId, cost, signature);
   return sendReviewed(scopedRpc, tx, network, signature, true);
 }

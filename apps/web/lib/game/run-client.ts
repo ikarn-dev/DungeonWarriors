@@ -122,7 +122,7 @@ export async function confirmGameAction(
       status: { confirmationStatus: string; err: unknown } | null;
       resolution: string;
     }>("/api/tx/status", pending, signal);
-    if (resolution === "expired") return "failed";
+    if (resolution === "expired") return "expired";
     if (
       status?.confirmationStatus === "finalized" ||
       (commitment === "confirmed" && status?.confirmationStatus === "confirmed")
