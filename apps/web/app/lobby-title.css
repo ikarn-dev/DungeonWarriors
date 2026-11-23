@@ -1,0 +1,88 @@
+/* Title screen: brand badges and the Start button. */
+/* "Built on" badges: rounded pills, pixel marks, brand-coloured names. */
+.lobby-brands {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lobby-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.875rem 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: #0b0a14b3;
+  box-shadow:
+    inset 0 0 0 2px #ffffff26,
+    0 2px 0 0 #0b0a1459;
+  color: var(--soft);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.lobby-brand svg {
+  flex: none;
+  image-rendering: pixelated;
+}
+.lobby-brand strong {
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+/* Solana's gradient, with the purple end lifted for contrast on dark. */
+.lobby-brand[data-brand="solana"] strong {
+  background: linear-gradient(90deg, #b27aff, #14f195);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lobby-brand[data-brand="magicblock"] strong {
+  color: #ffffff;
+}
+
+.pixel-button.lobby-play {
+  gap: 0.75rem;
+  margin-top: clamp(1rem, 8dvh, 4rem);
+  min-width: clamp(14rem, 28vw, 18rem);
+  min-height: 4.5rem;
+  padding-inline: 2.5rem 2rem;
+  border-radius: 999px;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  box-shadow:
+    0 0 0 var(--px) var(--ink),
+    inset 0 var(--px) 0 0 var(--gold-hi),
+    inset 0 calc(var(--px) * -2) 0 0 var(--gold-lo),
+    0 calc(var(--px) * 3) 0 0 #0b0a1466;
+}
+.pixel-button.lobby-play:active {
+  transform: translateY(var(--px));
+  box-shadow:
+    0 0 0 var(--px) var(--ink),
+    inset 0 var(--px) 0 0 var(--gold-lo);
+}
+.lobby-play .pixel-icon {
+  --icon: 32px;
+}
+
+/* Sound toggle sits on the ground strip, clear of the menu and status bar. */
+.pixel-button.lobby-sound {
+  position: absolute;
+  z-index: 3;
+  right: calc(var(--edge-right) + var(--px));
+  bottom: calc(var(--edge-bottom) + var(--px));
+  width: 2.75rem;
+  padding: 0;
+}
+
+@media (max-height: 30rem) {
+  .lobby-brands {
+    display: none;
+  }
+}

@@ -3,6 +3,7 @@
 import { Keypair, type VersionedTransaction } from "@solana/web3.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { lobbyMusic } from "../lib/audio/lobby-music";
 import { parseUsdc } from "../lib/game/custody-client";
 import { quotedGross } from "../lib/game/economy";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
@@ -183,6 +184,11 @@ export default function RunEntry({
   useEffect(() => {
     if (open && dialog.current && !dialog.current.open)
       dialog.current.showModal();
+  }, [open]);
+  // The game screen has its own sound; the lobby music waits until it closes.
+  useEffect(() => {
+    lobbyMusic.hold("run", open);
+    return () => lobbyMusic.hold("run", false);
   }, [open]);
 
   async function start(signal: AbortSignal) {

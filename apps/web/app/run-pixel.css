@@ -160,6 +160,12 @@
 .pixel-icon[data-icon="lock"] {
   --i: 8;
 }
+.pixel-icon[data-icon="mute"] {
+  --i: 10;
+}
+.pixel-icon[data-icon="sound"] {
+  --i: 15;
+}
 .pixel-icon[data-icon="magnet"] {
   --i: 9;
 }
