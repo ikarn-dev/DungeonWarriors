@@ -25,6 +25,24 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",
   MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Try another wallet.",
   TRANSACTION_SIGNING_REQUIRED: "This wallet can't approve transactions.",
+  DUNGEON_WALLET_DECLINED: "Wallet approval was declined.",
+  DUNGEON_WALLET_FAILED:
+    "Your wallet could not approve this Devnet wager. Check that it is connected to Devnet.",
+  DUNGEON_WALLET_PAYER_CHANGED:
+    "Your wallet replaced the PURRPS fee payer. Use a wallet that supports sponsored Devnet transactions.",
+  DUNGEON_WALLET_FEE_CHANGED:
+    "Your wallet changed the sponsored network fee. Use the transaction’s original fee when approving.",
+  DUNGEON_WALLET_BLOCKHASH_CHANGED:
+    "Your wallet replaced the Devnet transaction’s blockhash. Check that your wallet is on Devnet.",
+  WALLET_CHANGED_DUNGEON_TRANSACTION:
+    "Your wallet changed the wager instructions. Approval was blocked.",
+  INVALID_DUNGEON_QUOTE: "The prepared wager did not match the selected terms.",
+  UNEXPECTED_DUNGEON_TRANSACTION:
+    "The prepared transaction did not match this wager.",
+  DUNGEON_ART_LOAD_FAILED: "Could not load the dungeon artwork.",
+  DUNGEON_PREPARE_FAILED: "Could not prepare the Devnet wager.",
+  DUNGEON_SUBMIT_UNCONFIRMED:
+    "Could not confirm submission. Checking the saved wager.",
   INVALID_SIGNATURE: "The wallet did not return a valid approval.",
   TRANSACTION_REJECTED: "The approved transaction did not match this wager.",
   SIMULATION_REJECTED: "Devnet rejected this wager before it was sent.",

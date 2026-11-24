@@ -5,6 +5,7 @@ import {
   type DungeonArtwork,
   loadDungeonArtwork,
 } from "../lib/dungeon/artwork";
+import { logDungeon } from "../lib/dungeon/debug";
 import {
   type DungeonRequest,
   type DungeonView,
@@ -14,6 +15,7 @@ import { type DungeonPrepare, requestDungeon } from "../lib/dungeon/request";
 import {
   approveDungeonReservation,
   type DungeonApproval,
+  hasDungeonReservationFee,
 } from "../lib/dungeon/transactions";
 import { mergeDungeonView } from "../lib/dungeon/view-state";
 import type { CatId } from "../lib/game/catalog";
@@ -52,6 +54,7 @@ export default function DungeonEntry({
   const [busy, setBusy] = useState(false);
   const [launch, setLaunch] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   let stake: bigint | null = null;
   try {
     stake = parseUsdc(amount);
@@ -60,6 +63,7 @@ export default function DungeonEntry({
   }
   const rawStake = stake?.toString();
   const active = view !== null && !view.settled;
+  const pendingWager = view?.preparation ? view : null;
   const open =
     launch && view !== null && !["preparing", "cancelled"].includes(view.phase);
   const confirming = view?.phase === "preparing" && !view.preparation;
@@ -127,7 +131,8 @@ export default function DungeonEntry({
         );
         if (next?.phase === "cancelled") {
           setLaunch(false);
-          setNotice("The wager was not placed. Press Play to start again.");
+          setNotice(null);
+          setFailure("Devnet did not confirm this wager.");
         } else if (next && next.phase !== "preparing") setNotice(null);
         if (next?.settled || (waiting && next?.phase === "ready")) return;
       } catch {
@@ -176,13 +181,15 @@ export default function DungeonEntry({
     const { signal } = controller;
     starting.current = controller;
     setBusy(true);
+    setFailure(null);
     setNotice("Preparing your expedition…");
-    let loaded = false;
+    logDungeon("play.start", { network: "devnet", saved: expedition !== null });
+    let step = "artwork";
     try {
       const artwork = await loadDungeonArtwork(artCat);
       signal.throwIfAborted();
       setArt(artwork);
-      loaded = true;
+      step = "prepare";
       let request:
         | DungeonPrepare
         | Extract<DungeonRequest, { kind: "quote" }>
@@ -193,7 +200,11 @@ export default function DungeonEntry({
           { kind: "status", nonce: previous.nonce, client: client.current },
           signal,
         );
-        if (expedition?.phase === "cancelled" && expedition.settled) {
+        if (
+          (expedition?.phase === "cancelled" && expedition.settled) ||
+          (expedition?.preparation &&
+            !hasDungeonReservationFee(expedition.preparation.transaction))
+        ) {
           request = {
             kind: "quote",
             stake: previous.stake,
@@ -217,14 +228,13 @@ export default function DungeonEntry({
               expedition.maxGross !== request.maxGross ||
               expedition.rulesHash !== request.rulesHash))
         )
-          throw new Error("INVALID_DUNGEON_QUOTE");
+          throw new WebApiError("INVALID_DUNGEON_QUOTE");
+        logDungeon("wager.prepared", { renewed: request.kind === "quote" });
       }
       if (!expedition) return;
       if (expedition.preparation) {
-        if (!sign) {
-          setNotice("Reconnect your wallet to approve this wager.");
-          return;
-        }
+        if (!sign) throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
+        step = "wallet";
         if (approved.current?.source !== expedition.preparation.transaction)
           setNotice("Approve the wager in your wallet.");
         approved.current = await approveDungeonReservation(
@@ -234,6 +244,7 @@ export default function DungeonEntry({
           approved.current,
         );
         signal.throwIfAborted();
+        step = "submit";
         setNotice("Confirming your wager…");
         expedition = await send(
           {
@@ -244,25 +255,25 @@ export default function DungeonEntry({
           signal,
         );
       }
-      if (expedition?.phase === "cancelled") {
-        setNotice("The wager was not placed. Press Play to start again.");
-        return;
-      }
+      if (expedition?.phase === "cancelled")
+        throw new WebApiError("TRANSACTION_FAILED");
+      logDungeon("play.accepted", { phase: expedition?.phase ?? "unknown" });
       setLaunch(true);
       setNotice(null);
     } catch (error) {
       if (signal.aborted) return;
-      setNotice(
-        !loaded
-          ? "The game could not load. Press Play to try again."
-          : error instanceof WebApiError
-            ? webErrorMessage(error.code)
-            : error instanceof Error &&
-                error.message === "WALLET_CHANGED_DUNGEON_TRANSACTION"
-              ? "The wallet changed the transaction. The wager was not sent."
-              : "The expedition could not start. Press Play to continue.",
-      );
-      if (!loaded) return;
+      const code =
+        error instanceof WebApiError
+          ? error.code
+          : step === "artwork"
+            ? "DUNGEON_ART_LOAD_FAILED"
+            : step === "submit"
+              ? "DUNGEON_SUBMIT_UNCONFIRMED"
+              : "DUNGEON_PREPARE_FAILED";
+      logDungeon("play.failed", { step, code });
+      setNotice(null);
+      setFailure(webErrorMessage(code));
+      if (step !== "submit" && step !== "prepare") return;
       const saved = await send(
         { kind: "status", nonce: expedition?.nonce, client: client.current },
         signal,
@@ -275,6 +286,7 @@ export default function DungeonEntry({
       ) {
         setLaunch(true);
         setNotice(null);
+        setFailure(null);
       }
     } finally {
       if (starting.current === controller) {
@@ -285,13 +297,9 @@ export default function DungeonEntry({
   }
   return (
     <>
-      {active ? (
+      {active && !pendingWager ? (
         <div className="lobby-banner">
-          <p>
-            {view.phase === "preparing"
-              ? `Wager ${displayUsdc(view.stake)} USDC · Up to ${displayUsdc(view.maxGross)} USDC across ${view.maxRooms} rooms`
-              : `Expedition #${view.nonce}`}
-          </p>
+          <p>Expedition #{view.nonce}</p>
           <button
             className="pixel-button"
             data-tone="gold"
@@ -315,11 +323,16 @@ export default function DungeonEntry({
               id={`dungeon-bet-${wallet}`}
               inputMode="decimal"
               autoComplete="off"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              disabled={busy}
+              value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
+              onChange={(event) => {
+                setAmount(event.target.value);
+                setFailure(null);
+              }}
+              disabled={busy || pendingWager !== null}
               aria-invalid={
-                amount !== "" && (!stake || stake > BigInt(state.available))
+                !pendingWager &&
+                amount !== "" &&
+                (!stake || stake > BigInt(state.available))
               }
             />
             <span>USDC</span>
@@ -327,6 +340,12 @@ export default function DungeonEntry({
           <p className="bet-available">
             Available {displayUsdc(state.available)} USDC
           </p>
+          {pendingWager && busy && (
+            <p className="dungeon-offer">
+              {pendingWager.maxRooms} rooms · Up to{" "}
+              {displayUsdc(pendingWager.maxGross)} USDC
+            </p>
+          )}
           <button
             className="pixel-button lobby-play"
             aria-busy={busy}
@@ -337,8 +356,7 @@ export default function DungeonEntry({
               busy ||
               !sign ||
               checking ||
-              !stake ||
-              stake > BigInt(state.available)
+              (!pendingWager && (!stake || stake > BigInt(state.available)))
             }
             onClick={() => void begin()}
           >
@@ -360,7 +378,12 @@ export default function DungeonEntry({
           </p>
         </div>
       )}
-      {!open && (notice || waiting || checking) && (
+      {!open && failure && (
+        <p role="alert" className="lobby-problem">
+          {failure}
+        </p>
+      )}
+      {!open && !failure && (notice || waiting || checking) && (
         <output className="lobby-section-note">
           {notice ??
             (waiting ? "Confirming your wager…" : "Checking your expedition…")}

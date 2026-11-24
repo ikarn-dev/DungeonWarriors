@@ -1,9 +1,20 @@
 import { BN } from "@anchor-lang/core";
-import { Keypair } from "@solana/web3.js";
+import {
+  ComputeBudgetInstruction,
+  ComputeBudgetProgram,
+  Keypair,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dungeonPrepareSchema } from "../../../../../apps/web/lib/dungeon/request";
 import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
-import { approveDungeonReservation } from "../../../../../apps/web/lib/dungeon/transactions";
+import {
+  approveDungeonReservation,
+  hasDungeonReservationFee,
+  reservationMessage,
+} from "../../../../../apps/web/lib/dungeon/transactions";
+import { encodeBase64 } from "../../../../../apps/web/lib/game/web-api";
 import {
   quoteDungeon,
   submitDungeon,
@@ -24,7 +35,8 @@ vi.mock("../../../../../apps/web/lib/server/dungeon-chain", () => ({
   readExpedition: vi.fn(),
 }));
 vi.mock("../../../../../apps/web/lib/server/dungeon-store", () => ({
-  activeDungeon: async () => null,
+  activeDungeon: async () =>
+    mocks.stored && !mocks.stored.settled ? mocks.stored.nonce : null,
   withDungeon: async (
     _owner: string,
     _nonce: string,
@@ -103,7 +115,9 @@ it("reuses the unchanged onchain nonce after cancellation, but never overwrites 
   expect(next.preparation?.transaction).toBeTruthy();
   expect(mocks.stored?.reserve.signature).toBeNull();
   const original = mocks.stored?.reserve.transaction;
-  await expect(quoteDungeon(owner, input)).rejects.toThrow("DUNGEON_ACTIVE");
+  expect((await quoteDungeon(owner, input)).preparation?.transaction).toBe(
+    original,
+  );
   expect(mocks.stored?.reserve.transaction).toBe(original);
 });
 
@@ -123,7 +137,21 @@ it("calculates and freezes the exact funded terms from one Play request", async 
     maxGross: "7214062",
     rulesHash: "00".repeat(32),
   });
-  expect(quote.preparation?.transaction).toBeTruthy();
+  const preparation = quote.preparation;
+  if (!preparation) throw new Error("Expected a prepared wager");
+  const tx = VersionedTransaction.deserialize(
+    Buffer.from(preparation.transaction, "base64"),
+  );
+  const parsed = TransactionMessage.decompile(tx.message);
+  expect(parsed.instructions).toHaveLength(2);
+  const fee = parsed.instructions[0];
+  if (!fee) throw new Error("Expected the sponsor fee instruction");
+  expect(
+    ComputeBudgetInstruction.decodeSetComputeUnitPrice(fee).microLamports,
+  ).toBe(0n);
+  expect(
+    tx.signatures.every((signature) => signature.every((byte) => byte === 0)),
+  ).toBe(true);
 });
 
 it("reaches the wallet without the unsupported browser Buffer bigint writer", async () => {
@@ -158,7 +186,6 @@ it("reaches the wallet without the unsupported browser Buffer bigint writer", as
 });
 
 it("reuses a validated wallet approval for the same preparation, but signs again for a new blockhash", async () => {
-  const { VersionedTransaction } = await import("@solana/web3.js");
   const quote = await quoteDungeon(owner, {
     kind: "quote",
     stake: "1000000",
@@ -204,7 +231,7 @@ it("reuses a validated wallet approval for the same preparation, but signs again
       },
       null,
     ),
-  ).rejects.toThrow("WALLET_CHANGED_DUNGEON_TRANSACTION");
+  ).rejects.toThrow("DUNGEON_WALLET_BLOCKHASH_CHANGED");
   await approveDungeonReservation(owner, changed, sign, first);
   expect(sign).toHaveBeenCalledTimes(3);
 });
@@ -242,4 +269,136 @@ it("persists the single wallet approval and reuses its signature after a repeate
     signature,
     signature,
   ]);
+});
+
+it("replaces only an old unsigned preparation with the same terms", async () => {
+  const quote = await quoteDungeon(owner, {
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  });
+  const saved = mocks.stored;
+  if (!saved || !quote.preparation)
+    throw new Error("Expected a prepared wager");
+  const oldTx = new VersionedTransaction(
+    reservationMessage(
+      saved,
+      saved.reserve.sponsor,
+      saved.reserve.maxPayerDebit,
+      Keypair.generate().publicKey.toBase58(),
+      false,
+    ),
+  );
+  const oldBytes = encodeBase64(oldTx.serialize());
+  saved.reserve.transaction = oldBytes;
+  const signer = Keypair.fromSeed(new Uint8Array(32).fill(1));
+  const wallet = vi.fn(async (tx: VersionedTransaction) => {
+    const prepared = TransactionMessage.decompile(tx.message);
+    const result = prepared.instructions.some(({ programId }) =>
+      programId.equals(ComputeBudgetProgram.programId),
+    )
+      ? tx
+      : new VersionedTransaction(
+          new TransactionMessage({
+            ...prepared,
+            instructions: [
+              ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: 1000n,
+              }),
+              ...prepared.instructions,
+            ],
+          }).compileToV0Message(),
+        );
+    result.sign([signer]);
+    return result;
+  });
+  await expect(
+    approveDungeonReservation(
+      owner,
+      {
+        ...quote,
+        preparation: { ...quote.preparation, transaction: oldBytes },
+      },
+      wallet,
+      null,
+    ),
+  ).rejects.toMatchObject({ code: "DUNGEON_WALLET_FEE_CHANGED" });
+  const input = {
+    kind: "quote",
+    stake: saved.stake,
+    cat: saved.cat,
+    maxRooms: saved.maxRooms,
+    maxGross: saved.maxGross,
+    rulesHash: saved.rulesHash,
+  } as const;
+  await expect(
+    quoteDungeon(owner, { ...input, stake: "2000000" }),
+  ).rejects.toThrow("DUNGEON_ACTIVE");
+  expect(mocks.stored?.reserve.transaction).toBe(oldBytes);
+  const replacement = await quoteDungeon(owner, input);
+  expect(replacement).toMatchObject({
+    nonce: saved.nonce,
+    stake: saved.stake,
+    maxGross: saved.maxGross,
+    rulesHash: saved.rulesHash,
+  });
+  expect(
+    hasDungeonReservationFee(replacement.preparation?.transaction ?? ""),
+  ).toBe(true);
+  wallet.mockClear();
+  const approved = await approveDungeonReservation(
+    owner,
+    replacement,
+    wallet,
+    null,
+  );
+  expect(wallet).toHaveBeenCalledTimes(1);
+  await submitDungeon(owner, replacement.nonce, approved.transaction);
+  await expect(quoteDungeon(owner, input)).rejects.toThrow("DUNGEON_ACTIVE");
+});
+
+it("reports wallet fee edits before sending an approval to the server", async () => {
+  const quote = await quoteDungeon(owner, {
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  });
+  const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  try {
+    await expect(
+      approveDungeonReservation(
+        owner,
+        quote,
+        async (tx) => {
+          const { payerKey, recentBlockhash, instructions } =
+            TransactionMessage.decompile(tx.message);
+          const changed = new VersionedTransaction(
+            new TransactionMessage({
+              payerKey,
+              recentBlockhash,
+              instructions: [
+                ComputeBudgetProgram.setComputeUnitPrice({
+                  microLamports: 1000n,
+                }),
+                ...instructions.slice(1),
+              ],
+            }).compileToV0Message(),
+          );
+          changed.sign([Keypair.fromSeed(new Uint8Array(32).fill(1))]);
+          return changed;
+        },
+        null,
+      ),
+    ).rejects.toMatchObject({ code: "DUNGEON_WALLET_FEE_CHANGED" });
+    expect(log).toHaveBeenCalledWith("[dungeon] wallet.message_changed", {
+      blockhashChanged: false,
+      feePayerChanged: false,
+      feeInstructionsChanged: true,
+      instructionCountBefore: 2,
+      instructionCountAfter: 2,
+    });
+    expect(mocks.stored?.reserve.signature).toBeNull();
+  } finally {
+    log.mockRestore();
+  }
 });

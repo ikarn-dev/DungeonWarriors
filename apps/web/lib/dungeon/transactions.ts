@@ -1,16 +1,18 @@
 import { BN } from "@anchor-lang/core";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   PublicKey,
   SYSVAR_SLOT_HASHES_PUBKEY,
   SystemProgram,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { decodeBase64, encodeBase64 } from "../game/web-api";
+import { decodeBase64, encodeBase64, WebApiError } from "../game/web-api";
 import { DEVNET } from "../solana/addresses";
 import { programInstruction } from "../solana/instruction";
 import { nonceBytes, pda } from "../solana/program";
+import { logDungeon } from "./debug";
 import type { DungeonView } from "./protocol";
 import { payout } from "./rules";
 
@@ -35,11 +37,12 @@ export function dungeonAccounts(owner: string, nonce: string) {
     systemProgram: SystemProgram.programId,
   };
 }
+type ReservationTerms = Pick<
+  DungeonView,
+  "owner" | "nonce" | "cat" | "rules" | "commitment" | "stake" | "maxRooms"
+>;
 export function reservationInstruction(
-  quote: Pick<
-    DungeonView,
-    "owner" | "nonce" | "cat" | "rules" | "commitment" | "stake" | "maxRooms"
-  >,
+  quote: ReservationTerms,
   sponsor: string,
   maxPayerDebit: string,
 ) {
@@ -67,6 +70,39 @@ export function reservationInstruction(
     },
   );
 }
+export function reservationMessage(
+  quote: ReservationTerms,
+  sponsor: string,
+  maxPayerDebit: string,
+  recentBlockhash: string,
+  fixedFees = true,
+) {
+  return new TransactionMessage({
+    payerKey: new PublicKey(sponsor),
+    recentBlockhash,
+    instructions: [
+      // Explicitly use Devnet's default price so wallets leave the fee unchanged.
+      ...(fixedFees
+        ? [ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 0n })]
+        : []),
+      reservationInstruction(quote, sponsor, maxPayerDebit),
+    ],
+  }).compileToV0Message();
+}
+function budgetInstructions(tx: VersionedTransaction) {
+  const { compiledInstructions, staticAccountKeys } = tx.message;
+  return compiledInstructions.filter(({ programIdIndex }) =>
+    staticAccountKeys[programIdIndex]?.equals(ComputeBudgetProgram.programId),
+  );
+}
+export function hasDungeonReservationFee(transaction: string) {
+  return (
+    budgetInstructions(
+      VersionedTransaction.deserialize(decodeBase64(transaction)),
+    ).length > 0
+  );
+}
+
 export function validateDungeonReservation(
   tx: VersionedTransaction,
   owner: string,
@@ -80,21 +116,22 @@ export function validateDungeonReservation(
     payout(BigInt(quote.stake), quote.maxRooms, quote.rules) !==
       BigInt(quote.maxGross)
   )
-    throw new Error("UNEXPECTED_DUNGEON_TRANSACTION");
-  const expected = new TransactionMessage({
-    payerKey: new PublicKey(prepared.sponsor),
-    recentBlockhash: tx.message.recentBlockhash,
-    instructions: [
-      reservationInstruction(quote, prepared.sponsor, prepared.maxPayerDebit),
-    ],
-  }).compileToV0Message();
+    throw new WebApiError("UNEXPECTED_DUNGEON_TRANSACTION");
+  // Previously issued messages can still be submitted against their original digest.
+  const expected = reservationMessage(
+    quote,
+    prepared.sponsor,
+    prepared.maxPayerDebit,
+    tx.message.recentBlockhash,
+    budgetInstructions(tx).length > 0,
+  );
   const bytes = expected.serialize(),
     actual = tx.message.serialize();
   if (
     bytes.length !== actual.length ||
     bytes.some((value, index) => value !== actual[index])
   )
-    throw new Error("UNEXPECTED_DUNGEON_TRANSACTION");
+    throw new WebApiError("UNEXPECTED_DUNGEON_TRANSACTION");
 }
 
 export type DungeonApproval = { source: string; transaction: string };
@@ -105,7 +142,7 @@ export async function approveDungeonReservation(
   previous: DungeonApproval | null,
 ): Promise<DungeonApproval> {
   if (!quote.preparation || quote.owner !== owner)
-    throw new Error("INVALID_DUNGEON_QUOTE");
+    throw new WebApiError("INVALID_DUNGEON_QUOTE");
   const source = quote.preparation.transaction;
   const tx = VersionedTransaction.deserialize(decodeBase64(source));
   validateDungeonReservation(tx, owner, quote);
@@ -117,13 +154,65 @@ export async function approveDungeonReservation(
     );
     return previous;
   }
-  const preparedMessage = tx.message.serialize();
-  const signed = await sign(tx);
+  const reviewed = tx.message.serialize();
+  const before = walletSummary(tx);
+  logDungeon("wallet.request", {
+    network: "devnet",
+    fixedFee: before.budget !== "",
+  });
+  let signed: VersionedTransaction;
+  try {
+    signed = await sign(tx);
+  } catch (error) {
+    const rejected =
+      error instanceof Error &&
+      /(?:user (?:rejected|declined|denied)|rejected by (?:the )?user)/i.test(
+        error.message,
+      );
+    throw new WebApiError(
+      rejected ? "DUNGEON_WALLET_DECLINED" : "DUNGEON_WALLET_FAILED",
+    );
+  }
   const signedMessage = signed.message.serialize();
   if (
-    preparedMessage.length !== signedMessage.length ||
-    preparedMessage.some((byte, index) => byte !== signedMessage[index])
-  )
-    throw new Error("WALLET_CHANGED_DUNGEON_TRANSACTION");
+    reviewed.length !== signedMessage.length ||
+    reviewed.some((byte, index) => byte !== signedMessage[index])
+  ) {
+    const after = walletSummary(signed);
+    const changes = {
+      blockhashChanged: before.blockhash !== after.blockhash,
+      feePayerChanged: before.payer !== after.payer,
+      feeInstructionsChanged: before.budget !== after.budget,
+      instructionCountBefore: before.instructions,
+      instructionCountAfter: after.instructions,
+    };
+    logDungeon("wallet.message_changed", changes);
+    throw new WebApiError(
+      changes.feePayerChanged
+        ? "DUNGEON_WALLET_PAYER_CHANGED"
+        : changes.feeInstructionsChanged
+          ? "DUNGEON_WALLET_FEE_CHANGED"
+          : changes.blockhashChanged
+            ? "DUNGEON_WALLET_BLOCKHASH_CHANGED"
+            : "WALLET_CHANGED_DUNGEON_TRANSACTION",
+    );
+  }
+  const ownerIndex = signed.message.staticAccountKeys.findIndex(
+    (key) => key.toBase58() === owner,
+  );
+  if (!signed.signatures[ownerIndex]?.some((byte) => byte !== 0))
+    throw new WebApiError("INVALID_SIGNATURE");
+  logDungeon("wallet.approved", { messageUnchanged: true });
   return { source, transaction: encodeBase64(signed.serialize()) };
+}
+
+function walletSummary(tx: VersionedTransaction) {
+  return {
+    blockhash: tx.message.recentBlockhash,
+    payer: tx.message.staticAccountKeys[0]?.toBase58(),
+    budget: budgetInstructions(tx)
+      .map((instruction) => instruction.data.join(","))
+      .join(";"),
+    instructions: tx.message.compiledInstructions.length,
+  };
 }

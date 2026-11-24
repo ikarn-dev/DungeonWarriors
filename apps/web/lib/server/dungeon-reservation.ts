@@ -1,10 +1,6 @@
 import "server-only";
 import { utils } from "@anchor-lang/core";
-import {
-  PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import {
   catSchema,
   type DungeonRequest,
@@ -13,7 +9,8 @@ import {
 import type { DungeonPrepare } from "../dungeon/request";
 import { payout } from "../dungeon/rules";
 import {
-  reservationInstruction,
+  hasDungeonReservationFee,
+  reservationMessage,
   validateDungeonReservation,
 } from "../dungeon/transactions";
 import { verifyWalletSignature } from "./auth";
@@ -66,7 +63,8 @@ export async function quoteDungeon(
   owner: string,
   input: QuoteRequest | DungeonPrepare,
 ) {
-  if ((await activeDungeon(owner)) !== null)
+  const active = await activeDungeon(owner);
+  if (active !== null && input.kind !== "quote")
     throw new ApiError("DUNGEON_ACTIVE", 409);
   const setup = await dungeonSetup(owner),
     stake = BigInt(input.stake);
@@ -82,8 +80,27 @@ export async function quoteDungeon(
   )
     throw new ApiError("CAT_NOT_OWNED", 409);
   const nonce = setup.player.nextRunNonce.toString();
+  if (active !== null && active !== nonce)
+    throw new ApiError("DUNGEON_ACTIVE", 409);
   return withDungeon(owner, nonce, async (existing) => {
-    if (existing && (!existing.settled || existing.phase !== "cancelled"))
+    // Upgrade only old unsigned preparations, with their quoted terms intact.
+    const sameUnsigned =
+      input.kind === "quote" &&
+      existing?.phase === "preparing" &&
+      !existing.settled &&
+      existing.reserve.signature === null &&
+      existing.stake === input.stake &&
+      existing.cat === input.cat &&
+      existing.maxRooms === input.maxRooms &&
+      existing.maxGross === input.maxGross &&
+      existing.rulesHash === input.rulesHash;
+    if (sameUnsigned && hasDungeonReservationFee(existing.reserve.transaction))
+      return { record: existing, value: dungeonView(existing) };
+    if (
+      existing &&
+      !sameUnsigned &&
+      (!existing.settled || existing.phase !== "cancelled")
+    )
       throw new ApiError("DUNGEON_ACTIVE", 409);
     const maxRooms = quoteDepth(stake, setup.free, setup.rules);
     if (
@@ -132,13 +149,12 @@ export async function quoteDungeon(
       reason: null,
     };
     const tx = new VersionedTransaction(
-      new TransactionMessage({
-        payerKey: sponsor.publicKey,
-        recentBlockhash: block.blockhash,
-        instructions: [
-          reservationInstruction(record, record.reserve.sponsor, maxPayerDebit),
-        ],
-      }).compileToV0Message(),
+      reservationMessage(
+        record,
+        record.reserve.sponsor,
+        maxPayerDebit,
+        block.blockhash,
+      ),
     );
     await checkPlaySpend(setup.rpc, tx, sponsor.publicKey, "base", false);
     record.reserve.transaction = Buffer.from(tx.serialize()).toString("base64");
@@ -169,7 +185,11 @@ export async function submitDungeon(
       record.reserve.messageHash
     )
       throw new ApiError("TRANSACTION_REJECTED", 400);
-    validateDungeonReservation(tx, owner, dungeonView(record));
+    try {
+      validateDungeonReservation(tx, owner, dungeonView(record));
+    } catch {
+      throw new ApiError("TRANSACTION_REJECTED", 400);
+    }
     const signer = tx.message.staticAccountKeys.findIndex(
       (key) => key.toBase58() === owner,
     );
