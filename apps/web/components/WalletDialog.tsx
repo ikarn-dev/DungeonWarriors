@@ -9,14 +9,12 @@ import { UiIcon } from "./UiIcon";
 export default function WalletDialog({
   open,
   wallet,
-  busy,
-  onConnect,
+  busy = false,
   onClose,
 }: {
   readonly open: boolean;
   readonly wallet: ReturnType<typeof useWallet>;
-  readonly busy: boolean;
-  readonly onConnect: () => void;
+  readonly busy?: boolean;
   readonly onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -46,7 +44,6 @@ export default function WalletDialog({
           <WalletPicker
             wallet={wallet}
             busy={busy}
-            onConnect={onConnect}
             titleId="wallet-dialog-title"
           />
         </div>

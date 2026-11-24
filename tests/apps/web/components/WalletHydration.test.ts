@@ -29,7 +29,6 @@ function dialog(open: boolean, wallet: ReturnType<typeof useHydratedWallet>) {
     wallet,
     busy: false,
     onClose: noop,
-    onConnect: noop,
   });
 }
 function ConnectedDialog() {
@@ -67,7 +66,6 @@ it("renders discovered wallets only when the dialog opens", () => {
     wallet: detectedWallet,
     busy: false,
     onClose: noop,
-    onConnect: noop,
   };
   const closed = renderToStaticMarkup(
     createElement(WalletDialog, { ...props, open: false }),

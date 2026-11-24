@@ -1,8 +1,9 @@
 import type { useWallet } from "@solana/wallet-adapter-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { lobbySounds } from "../lib/audio/lobby-sounds";
 import { UiIcon } from "./UiIcon";
+import { requestWalletConnection } from "./wallet-connect";
 
 type Wallet = ReturnType<typeof useWallet>;
 
@@ -10,24 +11,17 @@ type Wallet = ReturnType<typeof useWallet>;
 // press selects the wallet and opens its connect prompt.
 export function WalletPicker({
   wallet,
-  busy,
-  onConnect,
+  busy = false,
   titleId,
 }: {
   readonly wallet: Wallet;
-  readonly busy: boolean;
-  readonly onConnect: () => void;
+  readonly busy?: boolean;
   readonly titleId?: string;
 }) {
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [failedWallet, setFailedWallet] = useState<string | null>(null);
+  const clearAttempt = useRef<(() => void) | null>(null);
+  useEffect(() => () => clearAttempt.current?.(), []);
   const selected = wallet.wallet?.adapter.name ?? null;
-  // Connect once the provider has switched to the chosen wallet. If its own
-  // silent auto-connect already succeeded, `connected` ends the wait.
-  useEffect(() => {
-    if (chosen === null || selected !== chosen || wallet.connecting) return;
-    setChosen(null);
-    if (!wallet.connected) onConnect();
-  }, [chosen, selected, wallet.connecting, wallet.connected, onConnect]);
   // No adapters are registered by hand, so this list holds only wallets the
   // browser announced (plus Mobile Wallet Adapter on phones).
   const detected = wallet.wallets;
@@ -48,13 +42,15 @@ export function WalletPicker({
                 className="pixel-button"
                 data-shape="round"
                 data-tone={detected.length === 1 ? "gold" : undefined}
-                disabled={busy || wallet.connecting}
+                disabled={busy || wallet.connecting || wallet.disconnecting}
                 onClick={() => {
-                  if (selected === adapter.name) onConnect();
-                  else {
-                    setChosen(adapter.name);
-                    wallet.select(adapter.name);
-                  }
+                  clearAttempt.current?.();
+                  setFailedWallet(null);
+                  clearAttempt.current = requestWalletConnection(
+                    wallet,
+                    adapter,
+                    () => setFailedWallet(adapter.name),
+                  );
                 }}
               >
                 <Image
@@ -74,6 +70,15 @@ export function WalletPicker({
             </li>
           ))}
         </ul>
+      )}
+      {failedWallet !== null && (
+        <p role="alert">
+          Couldn’t connect to {failedWallet}. Open and unlock your wallet, then
+          select it again.
+        </p>
+      )}
+      {wallet.connecting && selected !== null && failedWallet === null && (
+        <p aria-live="polite">Open {selected} to finish connecting.</p>
       )}
     </div>
   );

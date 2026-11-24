@@ -463,12 +463,7 @@ export default function StarterPanel() {
       <WalletDialog
         open={picking}
         wallet={wallet}
-        busy={busy || wallet.connecting}
-        onConnect={() =>
-          void perform(async () => {
-            await wallet.connect();
-          })
-        }
+        busy={busy}
         onClose={() => setPicking(false)}
       />
       {visibleDraw && (

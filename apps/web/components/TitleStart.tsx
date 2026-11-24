@@ -90,7 +90,8 @@ export default function TitleStart() {
     }
   }, [wanted, address, wallet.connecting, step, picking]);
 
-  const busy = step !== "idle";
+  const connecting = wanted && wallet.connecting;
+  const busy = step !== "idle" || connecting || (wanted && address !== null);
   return (
     <>
       <button
@@ -106,21 +107,11 @@ export default function TitleStart() {
           }
         }}
       >
-        {LABELS[step]}
+        {LABELS[connecting ? "connecting" : step]}
       </button>
       <WalletDialog
         open={picking}
         wallet={wallet}
-        busy={wallet.connecting}
-        onConnect={() => {
-          setStep("connecting");
-          wallet.connect().catch(() => {
-            setStep("idle");
-            toast.error("Your wallet didn't connect. Try again.", {
-              id: "start",
-            });
-          });
-        }}
         onClose={() => {
           setPicking(false);
           // Cancelled before choosing a wallet; a connect already under way
