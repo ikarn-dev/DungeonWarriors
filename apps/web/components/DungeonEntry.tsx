@@ -6,13 +6,11 @@ import {
   loadDungeonArtwork,
 } from "../lib/dungeon/artwork";
 import {
-  type DungeonOffer,
   type DungeonRequest,
   type DungeonView,
-  dungeonOfferSchema,
   dungeonViewSchema,
 } from "../lib/dungeon/protocol";
-import { requestDungeon } from "../lib/dungeon/request";
+import { type DungeonPrepare, requestDungeon } from "../lib/dungeon/request";
 import {
   approveDungeonReservation,
   type DungeonApproval,
@@ -21,7 +19,7 @@ import { mergeDungeonView } from "../lib/dungeon/view-state";
 import type { CatId } from "../lib/game/catalog";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
-import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
+import { WebApiError, webErrorMessage } from "../lib/game/web-api";
 import DungeonScreen from "./DungeonScreen";
 
 export default function DungeonEntry({
@@ -46,13 +44,13 @@ export default function DungeonEntry({
   const latest = useRef<DungeonView | null>(null),
     finalized = useRef<string | null>(null);
   const approved = useRef<DungeonApproval | null>(null);
+  const starting = useRef<AbortController | null>(null);
   const [view, setView] = useState<DungeonView | null>(null);
   const [art, setArt] = useState<DungeonArtwork | null>(null);
-  const [artError, setArtError] = useState(false);
-  const [amount, setAmount] = useState(""),
-    [offer, setOffer] = useState<DungeonOffer | null>(null);
-  const [busy, setBusy] = useState(false),
-    [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [checking, setChecking] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [launch, setLaunch] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   let stake: bigint | null = null;
   try {
@@ -62,9 +60,10 @@ export default function DungeonEntry({
   }
   const rawStake = stake?.toString();
   const active = view !== null && !view.settled;
-  useEffect(() => {
-    latest.current = view;
-  }, [view]);
+  const open =
+    launch && view !== null && !["preparing", "cancelled"].includes(view.phase);
+  const confirming = view?.phase === "preparing" && !view.preparation;
+  const waiting = launch && confirming;
   const accept = useCallback(
     (incoming: DungeonView | null, newApproval = false) => {
       const next = mergeDungeonView(latest.current, incoming, newApproval);
@@ -73,7 +72,11 @@ export default function DungeonEntry({
       if (newApproval && next?.phase === "preparing") finalized.current = null;
       latest.current = next;
       setView(next);
-      if (next?.settled && finalized.current !== next.nonce) {
+      if (
+        next?.settled &&
+        next.phase !== "cancelled" &&
+        finalized.current !== next.nonce
+      ) {
         finalized.current = next.nonce;
         void refresh(AbortSignal.timeout(10000)).catch(() =>
           setNotice("Refresh your balance to see the finalized result."),
@@ -84,120 +87,62 @@ export default function DungeonEntry({
     [wallet, refresh],
   );
   const send = useCallback(
-    async (input: DungeonRequest) => {
+    async (input: DungeonRequest | DungeonPrepare, signal?: AbortSignal) => {
+      const result = await requestDungeon(input, signal);
+      signal?.throwIfAborted();
       return accept(
-        dungeonViewSchema.nullable().parse(await requestDungeon(input)),
-        input.kind === "quote",
+        dungeonViewSchema.nullable().parse(result),
+        input.kind === "prepare",
       );
     },
     [accept],
   );
-  const artworkCat = view && !view.settled ? view.cat : cat;
-  useEffect(() => {
-    let live = true;
-    void loadDungeonArtwork(artworkCat).then(
-      (value) => {
-        if (live) {
-          setArt(value);
-          setArtError(false);
-        }
-      },
-      () => {
-        if (live) setArtError(true);
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [artworkCat]);
   useEffect(() => {
     const controller = new AbortController();
-    void webApi(
-      "/api/dungeon",
-      { kind: "status", client: client.current },
-      controller.signal,
-    )
-      .then((value) => {
-        if (!controller.signal.aborted)
-          accept(dungeonViewSchema.nullable().parse(value));
-      })
+    void send({ kind: "status", client: client.current }, controller.signal)
       .catch(() => {
         if (!controller.signal.aborted)
-          setNotice("Could not check your previous expedition. Try again.");
+          setNotice("Could not check your previous expedition.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChecking(false);
       });
-    return () => controller.abort();
-  }, [accept]);
-  useEffect(() => {
-    if (active || !rawStake) {
-      setOffer(null);
-      return;
-    }
-    const controller = new AbortController();
-    setOffer(null);
-    const timer = setTimeout(() => {
-      void webApi(
-        "/api/dungeon",
-        { kind: "offer", stake: rawStake, cat },
-        controller.signal,
-      )
-        .then((value) => {
-          if (!controller.signal.aborted) {
-            setOffer(dungeonOfferSchema.parse(value));
-            setNotice(null);
-          }
-        })
-        .catch((error: unknown) => {
-          if (!controller.signal.aborted)
-            setNotice(
-              error instanceof WebApiError
-                ? webErrorMessage(error.code)
-                : "Could not quote this expedition.",
-            );
-        });
-    }, 350);
     return () => {
-      clearTimeout(timer);
       controller.abort();
+      starting.current?.abort();
     };
-  }, [active, rawStake, cat]);
-  const phase = view?.phase,
-    settled = view?.settled,
-    nonce = view?.nonce;
+  }, [send]);
+  const nonce = view?.nonce;
+  const pendingSettlement =
+    active && view !== null && ["won", "lost", "refunded"].includes(view.phase);
   useEffect(() => {
-    if (
-      busy ||
-      !nonce ||
-      settled ||
-      phase === "playing" ||
-      phase === "intermission" ||
-      phase === "ready"
-    )
-      return;
+    if (busy || !nonce || (!waiting && !pendingSettlement)) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        await webApi(
-          "/api/dungeon",
+        const next = await send(
           { kind: "status", nonce, client: client.current },
           controller.signal,
-        ).then((value) => {
-          if (!controller.signal.aborted)
-            accept(dungeonViewSchema.nullable().parse(value));
-        });
+        );
+        if (next?.phase === "cancelled") {
+          setLaunch(false);
+          setNotice("The wager was not placed. Press Play to start again.");
+        } else if (next && next.phase !== "preparing") setNotice(null);
+        if (next?.settled || (waiting && next?.phase === "ready")) return;
       } catch {
         if (!controller.signal.aborted)
-          setNotice("Your expedition is saved. Checking its status…");
+          setNotice("Checking your saved expedition…");
       }
       if (!controller.signal.aborted)
         timer = setTimeout(() => void poll(), 2500);
     }
-    timer = setTimeout(() => void poll(), 1000);
+    timer = setTimeout(() => void poll(), 2500);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [phase, settled, nonce, accept, busy]);
+  }, [nonce, waiting, pendingSettlement, busy, send]);
   useEffect(() => {
     const modal = dialog.current;
     if (open && !modal?.open) modal?.showModal();
@@ -215,73 +160,113 @@ export default function DungeonEntry({
           "Your saved expedition will resolve when your wallet next checks it.",
         ),
       );
-    setOpen(false);
+    setLaunch(false);
   }, [send]);
   async function begin() {
-    if (!sign || busy || blocked) return;
+    if (starting.current || checking || waiting || blocked) return;
     const current = latest.current;
-    const resuming = current?.phase === "preparing" && current.preparation;
-    let quote = resuming ? current : null;
-    if (!quote && (!offer || !rawStake)) return;
+    let expedition = current && !current.settled ? current : null;
+    if (
+      !expedition &&
+      (!sign || !rawStake || !stake || stake > BigInt(state.available))
+    )
+      return;
+    const artCat = expedition?.cat ?? cat;
+    const controller = new AbortController();
+    const { signal } = controller;
+    starting.current = controller;
     setBusy(true);
-    setNotice(null);
+    setNotice("Preparing your expedition…");
     let loaded = false;
     try {
-      setArtError(false);
-      const artwork = await loadDungeonArtwork(quote?.cat ?? cat);
+      const artwork = await loadDungeonArtwork(artCat);
+      signal.throwIfAborted();
       setArt(artwork);
       loaded = true;
-      if (!quote) {
-        if (!offer || !rawStake) return;
-        quote = await send({
-          kind: "quote",
-          stake: rawStake,
-          cat,
-          maxRooms: offer.maxRooms,
-          maxGross: offer.maxGross,
-          rulesHash: offer.rulesHash,
-        });
+      if (expedition?.phase === "preparing" && expedition.preparation) {
+        expedition = await send(
+          { kind: "status", nonce: expedition.nonce, client: client.current },
+          signal,
+        );
+        if (!expedition || expedition.settled) {
+          setNotice("The previous wager expired. Press Play to start again.");
+          return;
+        }
       }
-      if (
-        !quote?.preparation ||
-        quote.owner !== wallet ||
-        (!resuming && (quote.stake !== rawStake || quote.cat !== cat))
-      )
-        throw new Error("INVALID_DUNGEON_QUOTE");
-      setOpen(true);
-      approved.current = await approveDungeonReservation(
-        wallet,
-        quote,
-        sign,
-        approved.current,
-      );
-      await send({
-        kind: "submit",
-        nonce: quote.nonce,
-        transaction: approved.current.transaction,
-      });
+      if (!expedition && rawStake) {
+        expedition = await send(
+          { kind: "prepare", stake: rawStake, cat },
+          signal,
+        );
+        if (
+          !expedition?.preparation ||
+          expedition.stake !== rawStake ||
+          expedition.cat !== cat
+        )
+          throw new Error("INVALID_DUNGEON_QUOTE");
+      }
+      if (!expedition) return;
+      if (expedition.preparation) {
+        if (!sign) {
+          setNotice("Reconnect your wallet to approve this wager.");
+          return;
+        }
+        if (approved.current?.source !== expedition.preparation.transaction)
+          setNotice("Approve the wager in your wallet.");
+        approved.current = await approveDungeonReservation(
+          wallet,
+          expedition,
+          sign,
+          approved.current,
+        );
+        signal.throwIfAborted();
+        setNotice("Confirming your wager…");
+        expedition = await send(
+          {
+            kind: "submit",
+            nonce: expedition.nonce,
+            transaction: approved.current.transaction,
+          },
+          signal,
+        );
+      }
+      if (expedition?.phase === "cancelled") {
+        setNotice("The wager was not placed. Press Play to start again.");
+        return;
+      }
+      setLaunch(true);
       setNotice(null);
     } catch (error) {
-      if (!loaded) setArtError(true);
-      else
-        setNotice(
-          error instanceof WebApiError
+      if (signal.aborted) return;
+      setNotice(
+        !loaded
+          ? "The game could not load. Press Play to try again."
+          : error instanceof WebApiError
             ? webErrorMessage(error.code)
-            : "The expedition could not start. Your saved request will be checked.",
-        );
-      if (quote)
-        await send({
-          kind: "status",
-          nonce: quote.nonce,
-          client: client.current,
-        }).catch(() => null);
-      if (!quote && loaded) {
-        void webApi("/api/dungeon", { kind: "offer", stake: rawStake, cat })
-          .then((value) => setOffer(dungeonOfferSchema.parse(value)))
-          .catch(() => setOffer(null));
+            : error instanceof Error &&
+                error.message === "WALLET_CHANGED_DUNGEON_TRANSACTION"
+              ? "The wallet changed the transaction. The wager was not sent."
+              : "The expedition could not start. Press Play to continue.",
+      );
+      if (!loaded) return;
+      const saved = await send(
+        { kind: "status", nonce: expedition?.nonce, client: client.current },
+        signal,
+      ).catch(() => null);
+      if (
+        saved &&
+        !saved.settled &&
+        !saved.preparation &&
+        saved.cat === artCat
+      ) {
+        setLaunch(true);
+        setNotice(null);
       }
     } finally {
-      setBusy(false);
+      if (starting.current === controller) {
+        starting.current = null;
+        if (!signal.aborted) setBusy(false);
+      }
     }
   }
   return (
@@ -289,14 +274,19 @@ export default function DungeonEntry({
       {active ? (
         <div className="lobby-banner">
           <p>
-            Expedition #{view.nonce} ·{" "}
-            {view.phase === "preparing" ? "Preparing" : "Saved"}
+            {view.phase === "preparing"
+              ? `Wager ${displayUsdc(view.stake)} USDC · Up to ${displayUsdc(view.maxGross)} USDC across ${view.maxRooms} rooms`
+              : `Expedition #${view.nonce}`}
           </p>
           <button
             className="pixel-button"
             data-tone="gold"
             type="button"
-            onClick={() => setOpen(true)}
+            aria-busy={busy || waiting}
+            disabled={
+              blocked || busy || waiting || (view.preparation !== null && !sign)
+            }
+            onClick={() => void begin()}
           >
             Play
           </button>
@@ -313,6 +303,7 @@ export default function DungeonEntry({
               autoComplete="off"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
+              disabled={busy}
               aria-invalid={
                 amount !== "" && (!stake || stake > BigInt(state.available))
               }
@@ -322,12 +313,6 @@ export default function DungeonEntry({
           <p className="bet-available">
             Available {displayUsdc(state.available)} USDC
           </p>
-          {offer && (
-            <p className="dungeon-offer">
-              {offer.maxRooms} rooms · Maximum gross payout{" "}
-              {displayUsdc(offer.maxGross)} USDC
-            </p>
-          )}
           <button
             className="pixel-button lobby-play"
             aria-busy={busy}
@@ -337,7 +322,7 @@ export default function DungeonEntry({
               blocked ||
               busy ||
               !sign ||
-              !offer ||
+              checking ||
               !stake ||
               stake > BigInt(state.available)
             }
@@ -345,11 +330,6 @@ export default function DungeonEntry({
           >
             Play
           </button>
-          {artError && (
-            <output className="lobby-section-note">
-              The game could not load. Your wager has not been taken.
-            </output>
-          )}
           {!sign && (
             <output className="lobby-section-note">
               Reconnect your wallet to approve this wager.
@@ -366,8 +346,11 @@ export default function DungeonEntry({
           </p>
         </div>
       )}
-      {notice && !open && (
-        <output className="lobby-section-note">{notice}</output>
+      {!open && (notice || waiting || checking) && (
+        <output className="lobby-section-note">
+          {notice ??
+            (waiting ? "Confirming your wager…" : "Checking your expedition…")}
+        </output>
       )}
       <dialog
         ref={dialog}
@@ -396,11 +379,9 @@ export default function DungeonEntry({
             <DungeonScreen
               view={view}
               artwork={art}
-              busy={busy}
               notice={notice}
               client={client.current}
               send={send}
-              onPlay={() => void begin()}
               onClose={close}
             />
           </div>

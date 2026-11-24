@@ -1,14 +1,20 @@
 import { BN } from "@anchor-lang/core";
 import { Keypair } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { dungeonPrepareSchema } from "../../../../../apps/web/lib/dungeon/request";
 import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
-import { quoteDungeon } from "../../../../../apps/web/lib/server/dungeon-reservation";
+import {
+  quoteDungeon,
+  submitDungeon,
+} from "../../../../../apps/web/lib/server/dungeon-reservation";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
 import { owner, record, verifier } from "../dungeon/fixtures";
 
 const mocks = vi.hoisted(() => ({
   stored: null as DungeonRecord | null,
   setup: vi.fn(),
+  checkPlaySpend: vi.fn(async () => 25000n),
+  broadcast: vi.fn(),
 }));
 vi.mock("../../../../../apps/web/lib/server/dungeon-chain", () => ({
   dungeonSetup: mocks.setup,
@@ -33,9 +39,15 @@ vi.mock("../../../../../apps/web/lib/server/dungeon-store", () => ({
 }));
 vi.mock("../../../../../apps/web/lib/server/sponsorship", () => ({
   dedicatedSponsor: async () => Keypair.fromSeed(new Uint8Array(32).fill(3)),
-  checkPlaySpend: async () => 25000n,
+  checkPlaySpend: mocks.checkPlaySpend,
   admitSponsorCost: vi.fn(),
-  sendReviewed: vi.fn(),
+  sendReviewed: mocks.broadcast,
+}));
+vi.mock("../../../../../apps/web/lib/server/transaction-network", () => ({
+  checkedConnection: async () => ({
+    getSignatureStatuses: async () => ({ value: [null] }),
+    getBlockHeight: async () => 199,
+  }),
 }));
 vi.mock("../../../../../apps/web/lib/server/runtime", async (original) => ({
   ...(await original<
@@ -49,6 +61,9 @@ beforeEach(() => {
     Buffer.from(verifier.secretKey).toString("base64"),
   );
   mocks.stored = { ...record(), phase: "cancelled", settled: true };
+  mocks.setup.mockReset();
+  mocks.checkPlaySpend.mockClear();
+  mocks.broadcast.mockClear();
   mocks.setup.mockResolvedValue({
     rpc: {
       getLatestBlockhash: async () => ({
@@ -88,6 +103,25 @@ it("reuses the unchanged onchain nonce after cancellation, but never overwrites 
   const original = mocks.stored?.reserve.transaction;
   await expect(quoteDungeon(owner, input)).rejects.toThrow("DUNGEON_ACTIVE");
   expect(mocks.stored?.reserve.transaction).toBe(original);
+});
+
+it("calculates and freezes the exact funded terms from one Play request", async () => {
+  const input = dungeonPrepareSchema.parse({
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  });
+  const quote = await quoteDungeon(owner, input);
+  expect(mocks.setup).toHaveBeenCalledTimes(1);
+  expect(quote).toMatchObject({
+    phase: "preparing",
+    stake: input.stake,
+    cat: input.cat,
+    maxRooms: 5,
+    maxGross: "7214062",
+    rulesHash: "00".repeat(32),
+  });
+  expect(quote.preparation?.transaction).toBeTruthy();
 });
 
 it("reuses a validated wallet approval for the same preparation, but signs again for a new blockhash", async () => {
@@ -130,6 +164,55 @@ it("reuses a validated wallet approval for the same preparation, but signs again
       transaction: Buffer.from(tx.serialize()).toString("base64"),
     },
   };
+  await expect(
+    approveDungeonReservation(
+      owner,
+      quote,
+      async (unsigned) => {
+        unsigned.message.recentBlockhash = tx.message.recentBlockhash;
+        return sign(unsigned);
+      },
+      null,
+    ),
+  ).rejects.toThrow("WALLET_CHANGED_DUNGEON_TRANSACTION");
   await approveDungeonReservation(owner, changed, sign, first);
-  expect(sign).toHaveBeenCalledTimes(2);
+  expect(sign).toHaveBeenCalledTimes(3);
+});
+
+it("persists the single wallet approval and reuses its signature after a repeated submit", async () => {
+  const { approveDungeonReservation } = await import(
+    "../../../../../apps/web/lib/dungeon/transactions"
+  );
+  const quote = await quoteDungeon(owner, {
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  });
+  const signer = Keypair.fromSeed(new Uint8Array(32).fill(1));
+  const approved = await approveDungeonReservation(
+    owner,
+    quote,
+    async (tx) => {
+      tx.sign([signer]);
+      return tx;
+    },
+    null,
+  );
+  const first = await submitDungeon(owner, quote.nonce, approved.transaction);
+  const signature = mocks.stored?.reserve.signature;
+  expect(first.preparation).toBeNull();
+  expect(signature).toBeTruthy();
+  const repeated = await submitDungeon(
+    owner,
+    quote.nonce,
+    approved.transaction,
+  );
+  expect(repeated.preparation).toBeNull();
+  expect(mocks.stored?.reserve.signature).toBe(signature);
+  expect(mocks.checkPlaySpend).toHaveBeenCalledTimes(2);
+  expect(mocks.broadcast).toHaveBeenCalledTimes(2);
+  expect(mocks.broadcast.mock.calls.map((call) => call[3])).toEqual([
+    signature,
+    signature,
+  ]);
 });

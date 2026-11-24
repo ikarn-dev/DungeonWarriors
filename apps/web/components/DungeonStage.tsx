@@ -8,12 +8,10 @@ import { PHYSICS } from "../lib/dungeon/rules";
 import {
   budgetMs,
   type Control,
-  DEFEAT_HEAL,
   type DungeonFrame,
   nearbyGate,
   roomBudgetMs,
 } from "../lib/dungeon/simulation";
-import { WARRIORS } from "../lib/dungeon/warriors";
 import { displayUsdc } from "../lib/game/custody-client";
 import DungeonControls from "./DungeonControls";
 import DungeonHud from "./DungeonHud";
@@ -37,6 +35,7 @@ export default function DungeonStage({
     offset = useRef(0),
     sending = useRef(false),
     notified = useRef(false);
+  const autoStarted = useRef(false);
   const [frame, setFrame] = useState<DungeonFrame | null>(null);
   const [ready, setReady] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -106,6 +105,33 @@ export default function DungeonStage({
     },
     [send, client],
   );
+  const startFirstRoom = useCallback(() => {
+    if (!ready) {
+      setRenderAttempt((attempt) => attempt + 1);
+      return;
+    }
+    void action({
+      kind: "start",
+      nonce: current.current.nonce,
+      client,
+      room: 0,
+    }).then((next) => {
+      if (!next || next.phase === "ready")
+        setError("The room could not open. Press Play to continue.");
+    });
+  }, [action, client, ready]);
+  useEffect(() => {
+    if (!ready || view.phase !== "ready" || autoStarted.current) return;
+    const startWhenVisible = () => {
+      if (document.hidden || autoStarted.current) return;
+      autoStarted.current = true;
+      startFirstRoom();
+    };
+    startWhenVisible();
+    document.addEventListener("visibilitychange", startWhenVisible);
+    return () =>
+      document.removeEventListener("visibilitychange", startWhenVisible);
+  }, [ready, startFirstRoom, view.phase]);
   const leave = useCallback(() => {
     const state = current.current;
     if (state.settled) return;
@@ -180,21 +206,12 @@ export default function DungeonStage({
     const timer = setInterval(() => {
       if (runner.current) setFrame({ ...runner.current.frame });
     }, 100);
-    const hidden = () => {
-      if (document.hidden) {
-        notified.current = true;
-        leave();
-      } else
-        void action({ kind: "status", nonce: current.current.nonce, client });
-    };
     window.addEventListener("pagehide", leave);
-    document.addEventListener("visibilitychange", hidden);
     return () => {
       clearInterval(timer);
       window.removeEventListener("pagehide", leave);
-      document.removeEventListener("visibilitychange", hidden);
     };
-  }, [view.phase, leave, action, client]);
+  }, [view.phase, leave]);
   const input = useCallback((control: Control) => {
     if (current.current.phase === "playing" && !sending.current)
       runner.current?.input(control);
@@ -251,24 +268,21 @@ export default function DungeonStage({
         (frame.hourglass ? view.rules.hourglassMs : 0) -
         elapsed
       : remaining;
-  const warrior = WARRIORS[view.cat];
   const gate =
     frame && runner.current ? nearbyGate(frame, runner.current.room) : null;
   const title = frame?.timedOut
     ? "The gas caught you"
-    : view.phase === "preparing"
-      ? "Preparing your expedition…"
-      : view.phase === "ready"
-        ? "Enter the catacombs"
-        : view.phase === "intermission"
-          ? "Treasure found!"
-          : view.phase === "won"
-            ? "Treasure secured"
-            : view.phase === "lost"
-              ? "Expedition ended"
-              : view.phase === "refunded"
-                ? "Wager returned"
-                : "Expedition cancelled";
+    : view.phase === "ready"
+      ? "Opening the catacombs…"
+      : view.phase === "intermission"
+        ? "Treasure found!"
+        : view.phase === "won"
+          ? "Treasure secured"
+          : view.phase === "lost"
+            ? "Expedition ended"
+            : view.phase === "refunded"
+              ? "Wager returned"
+              : "Expedition cancelled";
   return (
     <section className="dungeon-stage" aria-label="Catacomb Quest">
       <div
@@ -304,43 +318,16 @@ export default function DungeonStage({
             </span>
             <h2>{title}</h2>
             {error && <output>{error}</output>}
-            {view.phase === "ready" && (
-              <>
-                <p>
-                  Fight through the room, defeat the warden and reach a gate
-                  before the green gas. Two gates hold treasure; one is a trap.
-                </p>
-                <ul className="dungeon-traits">
-                  {warrior.traits.map((t) => (
-                    <li key={t.id}>
-                      <strong>{t.name}</strong> {t.description}
-                    </li>
-                  ))}
-                </ul>
-                <p>
-                  Each beaten foe heals {DEFEAT_HEAL} health. Rooms get longer,
-                  busier and their foes bigger as you go deeper. Leaving during
-                  a room ends the expedition.
-                </p>
-                <button
-                  className="pixel-button"
-                  data-tone="gold"
-                  type="button"
-                  disabled={busy || (!ready && !error)}
-                  onClick={() => {
-                    if (!ready) setRenderAttempt((attempt) => attempt + 1);
-                    else
-                      void action({
-                        kind: "start",
-                        nonce: view.nonce,
-                        client,
-                        room: 0,
-                      });
-                  }}
-                >
-                  Play
-                </button>
-              </>
+            {view.phase === "ready" && error && (
+              <button
+                className="pixel-button"
+                data-tone="gold"
+                type="button"
+                disabled={busy}
+                onClick={startFirstRoom}
+              >
+                Play
+              </button>
             )}
             {view.phase === "intermission" && (
               <>
@@ -404,12 +391,6 @@ export default function DungeonStage({
                   Back to lobby
                 </button>
               </>
-            )}
-            {view.phase === "preparing" && (
-              <p>
-                Getting the dungeon ready. Your room timer starts when you tap
-                Start exploring.
-              </p>
             )}
           </div>
         </div>

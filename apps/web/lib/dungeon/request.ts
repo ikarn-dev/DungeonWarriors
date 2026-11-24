@@ -1,10 +1,19 @@
+import { z } from "zod";
 import { pause, WebApiError, webApi } from "../game/web-api";
-import type { DungeonRequest } from "./protocol";
+import { u64Input } from "../solana/program";
+import { catSchema, type DungeonRequest } from "./protocol";
+
+export const dungeonPrepareSchema = z.strictObject({
+  kind: z.literal("prepare"),
+  stake: u64Input.refine((value) => BigInt(value) > 0n),
+  cat: catSchema,
+});
+export type DungeonPrepare = z.infer<typeof dungeonPrepareSchema>;
 
 // A busy write lock rejects before changing the record. Repeat the same
 // request; never replace a wallet-approved transaction or cancel it here.
 export async function requestDungeon(
-  input: DungeonRequest,
+  input: DungeonRequest | DungeonPrepare,
   signal?: AbortSignal,
 ): Promise<unknown> {
   const deadline = AbortSignal.timeout(12000);

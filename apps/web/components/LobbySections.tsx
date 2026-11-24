@@ -104,7 +104,7 @@ export default function LobbySections({
         wallet: (
           <WalletPanel
             key={`wallet:${address}`}
-            revision={accountRevision}
+            revision={tab === "wallet" ? accountRevision : undefined}
             blocked={blocked}
             transfer={(kind, amount) =>
               perform((signal) =>
@@ -122,13 +122,15 @@ export default function LobbySections({
         ),
         history: (
           <>
-            <DungeonHistory revision={accountRevision} />
+            <DungeonHistory
+              revision={tab === "history" ? accountRevision : undefined}
+            />
             <details>
               <summary>Earlier runner records</summary>
               <HistoryPanel
                 key={`history:${address}`}
                 wallet={address}
-                revision={accountRevision}
+                revision={tab === "history" ? accountRevision : undefined}
                 media={state.assetBinding}
                 onSettled={reloadSoon}
               />
@@ -139,7 +141,7 @@ export default function LobbySections({
           <LeaderboardPanel
             key={`board:${address}`}
             wallet={address}
-            revision={accountRevision}
+            revision={tab === "leaderboard" ? accountRevision : undefined}
           />
         ),
       }}

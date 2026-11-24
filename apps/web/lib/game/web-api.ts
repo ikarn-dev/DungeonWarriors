@@ -25,6 +25,10 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",
   MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Try another wallet.",
   TRANSACTION_SIGNING_REQUIRED: "This wallet can't approve transactions.",
+  INVALID_SIGNATURE: "The wallet did not return a valid approval.",
+  TRANSACTION_REJECTED: "The approved transaction did not match this wager.",
+  SIMULATION_REJECTED: "Devnet rejected this wager before it was sent.",
+  RUN_BUDGET_CHANGED: "Devnet fees changed. Press Play to continue.",
   TRANSACTION_FAILED: "The transaction didn't go through. Please try again.",
   BLOCKHASH_EXPIRED: "That request expired. Please try again.",
   DRAW_STATUS_UNAVAILABLE:

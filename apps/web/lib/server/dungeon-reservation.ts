@@ -10,6 +10,7 @@ import {
   type DungeonRequest,
   dungeonOfferSchema,
 } from "../dungeon/protocol";
+import type { DungeonPrepare } from "../dungeon/request";
 import { payout } from "../dungeon/rules";
 import {
   reservationInstruction,
@@ -61,7 +62,10 @@ export async function offerDungeon(
   });
 }
 
-export async function quoteDungeon(owner: string, input: QuoteRequest) {
+export async function quoteDungeon(
+  owner: string,
+  input: QuoteRequest | DungeonPrepare,
+) {
   if ((await activeDungeon(owner)) !== null)
     throw new ApiError("DUNGEON_ACTIVE", 409);
   const setup = await dungeonSetup(owner),
@@ -83,9 +87,10 @@ export async function quoteDungeon(owner: string, input: QuoteRequest) {
       throw new ApiError("DUNGEON_ACTIVE", 409);
     const maxRooms = quoteDepth(stake, setup.free, setup.rules);
     if (
-      input.maxRooms !== maxRooms ||
-      input.maxGross !== payout(stake, maxRooms, setup.rules).toString() ||
-      input.rulesHash !== setup.ruleHash
+      input.kind === "quote" &&
+      (input.maxRooms !== maxRooms ||
+        input.maxGross !== payout(stake, maxRooms, setup.rules).toString() ||
+        input.rulesHash !== setup.ruleHash)
     )
       throw new ApiError("DUNGEON_QUOTE_CHANGED", 409);
     const sponsor = await dedicatedSponsor(setup.rpc),

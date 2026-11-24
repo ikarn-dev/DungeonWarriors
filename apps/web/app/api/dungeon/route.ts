@@ -1,9 +1,12 @@
 import { after } from "next/server";
+import { z } from "zod";
 import { dungeonRequestSchema } from "../../../lib/dungeon/protocol";
+import { dungeonPrepareSchema } from "../../../lib/dungeon/request";
 import { DUNGEON_V2, ENGINE } from "../../../lib/dungeon/rules";
 import { authenticate } from "../../../lib/server/auth";
 import { browserVerifierAddress } from "../../../lib/server/browser-config";
 import { recoverDungeonWallet } from "../../../lib/server/dungeon-recovery";
+import { quoteDungeon } from "../../../lib/server/dungeon-reservation";
 import { updateDungeon } from "../../../lib/server/dungeon-run";
 import {
   assertOrigin,
@@ -12,7 +15,14 @@ import {
   route,
   sessionToken,
 } from "../../../lib/server/http";
-import { assertAdmission, digest, runtime } from "../../../lib/server/runtime";
+import {
+  ApiError,
+  assertAdmission,
+  digest,
+  runtime,
+} from "../../../lib/server/runtime";
+
+const requestSchema = z.union([dungeonPrepareSchema, dungeonRequestSchema]);
 
 export function GET() {
   return json({
@@ -32,8 +42,18 @@ export async function POST(request: Request) {
       await runtime().browser.limit(`dungeon:${digest(wallet)}`),
     ]);
     // Up to PHYSICS.maxInputs controls of about 45 bytes each.
-    const input = await body(request, dungeonRequestSchema, 196608);
-    const view = await updateDungeon(wallet, input);
+    const input = await body(request, requestSchema, 196608);
+    const view = await (input.kind === "prepare"
+      ? quoteDungeon(wallet, input)
+      : updateDungeon(wallet, input)
+    ).catch((error: unknown) => {
+      if (["prepare", "quote", "submit"].includes(input.kind)) {
+        const code =
+          error instanceof ApiError ? error.code : "SERVICE_UNAVAILABLE";
+        process.stderr.write(`[dungeon] ${input.kind} ${code}\n`);
+      }
+      throw error;
+    });
     if (
       input.kind === "history" ||
       input.kind === "status" ||

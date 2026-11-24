@@ -117,7 +117,13 @@ export async function approveDungeonReservation(
     );
     return previous;
   }
+  const preparedMessage = tx.message.serialize();
   const signed = await sign(tx);
-  validateDungeonReservation(signed, owner, quote);
+  const signedMessage = signed.message.serialize();
+  if (
+    preparedMessage.length !== signedMessage.length ||
+    preparedMessage.some((byte, index) => byte !== signedMessage[index])
+  )
+    throw new Error("WALLET_CHANGED_DUNGEON_TRANSACTION");
   return { source, transaction: encodeBase64(signed.serialize()) };
 }

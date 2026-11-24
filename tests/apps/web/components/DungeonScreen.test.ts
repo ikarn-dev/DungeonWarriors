@@ -24,10 +24,8 @@ function screen(overrides: Partial<Parameters<typeof DungeonScreen>[0]>) {
       typeof DungeonScreen
     >[0]["artwork"],
     client: "fixture",
-    busy: false,
     notice: null,
     send: async () => null,
-    onPlay: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
   };
@@ -38,7 +36,6 @@ beforeEach(() => {
 });
 it("does not mount a game renderer while wallet approval is pending", () => {
   const html = screen({
-    busy: true,
     view: {
       ...ready,
       phase: "preparing",
@@ -51,26 +48,21 @@ it("does not mount a game renderer while wallet approval is pending", () => {
     },
   });
   expect(stage.mounts).toBe(0);
-  expect(html).toContain("Approve the wager in your wallet.");
-  expect(html).toContain("disabled");
+  expect(html).toBe("");
 });
 it("waits for reservation confirmation without creating renderer side effects", () => {
   const html = screen({
     view: { ...ready, phase: "preparing", preparation: null },
   });
   expect(stage.mounts).toBe(0);
-  expect(html).toContain("Confirming your wager");
+  expect(html).toBe("");
 });
-it("does not present an unsigned cancellation as a finalized zero payout", () => {
+it("keeps an unplaced wager in the lobby", () => {
   const html = screen({
     view: { ...ready, phase: "cancelled", settled: true },
-    notice: "Your expedition is saving.",
   });
   expect(stage.mounts).toBe(0);
-  expect(html).toContain("Wager not placed");
-  expect(html).toContain("Your expedition is saving.");
-  expect(html).not.toContain("0 USDC");
-  expect(html).not.toContain("finalized");
+  expect(html).toBe("");
 });
 it("mounts gameplay only after a confirmed ready expedition", () => {
   screen({});
