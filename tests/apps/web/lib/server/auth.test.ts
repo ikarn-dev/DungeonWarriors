@@ -22,6 +22,7 @@ const store = vi.hoisted(() => {
     ),
   };
 });
+const appOrigin = vi.hoisted(() => ({ value: "" }));
 vi.mock("server-only", () => ({}));
 vi.mock(
   "../../../../../apps/web/lib/server/runtime",
@@ -42,7 +43,7 @@ vi.mock(
         prefix: "test",
       }),
       serverConfig: () => ({
-        APP_ORIGIN: config.APP_ORIGIN,
+        APP_ORIGIN: appOrigin.value || config.APP_ORIGIN,
         UPSTASH_REDIS_REST_URL: config.UPSTASH_REDIS_REST_URL,
         UPSTASH_REDIS_REST_TOKEN: config.UPSTASH_REDIS_REST_TOKEN,
       }),
@@ -201,6 +202,26 @@ describe("wallet authentication", () => {
     expect(set).not.toContain("Domain=");
     expect(await response.json()).not.toHaveProperty("token");
     expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+  it("uses a non-Secure unprefixed cookie only for a loopback http origin", () => {
+    appOrigin.value = "http://localhost:3000";
+    try {
+      const set = cookie("a".repeat(43));
+      expect(set).toMatch(
+        /^purrps-session=a{43}; Path=\/; HttpOnly; SameSite=Strict/,
+      );
+      expect(set).not.toContain("Secure");
+      expect(
+        sessionToken(
+          new Request("http://localhost:3000", {
+            headers: { Cookie: `purrps-session=${"a".repeat(43)}` },
+          }),
+        ),
+      ).toBe("a".repeat(43));
+    } finally {
+      appOrigin.value = "";
+    }
+    expect(cookie("a".repeat(43))).toMatch(/^__Host-purrps-session=.*Secure/);
   });
   it("rejects foreign origins, forged progress, oversized bodies and duplicate cookies", async () => {
     const w = wallet();

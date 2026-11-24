@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 import { UiIcon } from "./UiIcon";
 
 const toasterStyle: CSSProperties & { "--width": string } = {
-  "--width": "20rem",
+  "--width": "min(28rem, calc(100vw - 2rem))",
 };
 
 // Sonner with its own styling switched off; the metal theme lives in CSS.

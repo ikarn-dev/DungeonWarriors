@@ -142,8 +142,12 @@ export default function StarterPanel() {
           setSessionWallet(null);
         } else {
           setRestoreFailed(true);
-          toast.error("Couldn't reconnect to PURRPS. Tap Retry.", {
+          toast.error("Couldn't reconnect to PURRPS.", {
             id: "restore",
+            action: {
+              label: "Retry",
+              onClick: () => setRestoreAttempt((attempt) => attempt + 1),
+            },
           });
         }
       } finally {

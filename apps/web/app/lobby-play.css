@@ -260,12 +260,14 @@
   align-items: center;
   gap: 0.625rem;
   inset-inline: 0;
+  box-sizing: border-box;
   width: max-content;
   max-width: 100%;
   margin-inline: auto;
   padding: 0.625rem 1.125rem 0.625rem 0.875rem;
+  line-height: 1.35;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 1.375rem;
   background:
     linear-gradient(#13221ff7, #0a1413f7) padding-box,
     var(--metal) border-box;
@@ -276,6 +278,7 @@
   font-weight: 500;
 }
 .pixel-toast-icon {
+  flex: none;
   display: grid;
   place-items: center;
 }
@@ -296,11 +299,14 @@
 .pixel-toast-mark[data-kind="info"] {
   color: var(--gold-hi);
 }
+/* Long messages wrap inside the pill instead of running past its rim. */
 .pixel-toast-title {
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pixel-toast-action {
+  flex: none;
   margin-left: 0.25rem;
   padding: 0.25rem 0.75rem;
   border: 0;

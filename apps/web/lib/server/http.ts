@@ -2,6 +2,7 @@ import "server-only";
 import { isIP } from "node:net";
 import { after } from "next/server";
 import type { z } from "zod";
+import { isLoopbackOrigin } from "../providers/config.ts";
 import { ApiError, serverConfig } from "./runtime";
 import {
   flushTelemetry,
@@ -11,9 +12,19 @@ import {
   telemetryEnabled,
 } from "./telemetry";
 
-export const SESSION_COOKIE = "__Host-purrps-session";
-export const cookie = (token: string, maxAge = 43200) =>
-  `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
+// `__Host-` cookies require Secure, which Safari refuses over
+// http://localhost. A loopback http origin uses an unprefixed, non-Secure
+// cookie; every https origin keeps the `__Host-` cookie.
+function local() {
+  return isLoopbackOrigin(serverConfig().APP_ORIGIN);
+}
+export function sessionCookieName(): string {
+  return local() ? "purrps-session" : "__Host-purrps-session";
+}
+export function cookie(token: string, maxAge = 43200): string {
+  const secure = local() ? "" : " Secure;";
+  return `${sessionCookieName()}=${token}; Path=/; HttpOnly;${secure} SameSite=Strict; Max-Age=${maxAge}`;
+}
 export function clientIp(request: Request) {
   const { VERCEL: platform } = process.env;
   const value =
@@ -75,12 +86,13 @@ export async function body<T>(
   }
 }
 export function sessionToken(request: Request) {
+  const name = sessionCookieName();
   const matches = (request.headers.get("cookie") ?? "")
     .split(";")
     .map((value) => value.trim())
-    .filter((value) => value.startsWith(`${SESSION_COOKIE}=`));
+    .filter((value) => value.startsWith(`${name}=`));
   if (matches.length !== 1) throw new ApiError("AUTH_REQUIRED", 401);
-  const token = matches[0]?.slice(SESSION_COOKIE.length + 1);
+  const token = matches[0]?.slice(name.length + 1);
   if (token === undefined || !/^[A-Za-z0-9_-]{43}$/.test(token))
     throw new ApiError("AUTH_REQUIRED", 401);
   return token;

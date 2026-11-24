@@ -48,6 +48,14 @@ const exponent = z
 
 // Pure parsing accepts a supplied environment; no process.env reads or secret
 // values are exported to a client bundle. The CLI reports field names only.
+// Local development may run on http://localhost (browsers treat loopback
+// hosts as secure contexts). Every other origin, and any Vercel deployment,
+// must use https.
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+export function isLoopbackOrigin(value: string): boolean {
+  const url = new URL(value);
+  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+}
 const structure = z.object({
   APP_ORIGIN: z
     .url()
@@ -55,7 +63,11 @@ const structure = z.object({
     .pipe(
       z.string().refine((value) => {
         const url = new URL(value);
-        return url.protocol === "https:" && url.origin === value;
+        return (
+          url.origin === value &&
+          (url.protocol === "https:" ||
+            (isLoopbackOrigin(value) && process.env["VERCEL"] !== "1"))
+        );
       }),
     ),
   HELIUS_DEVNET_RPC_URL: endpointSchema("https:", [

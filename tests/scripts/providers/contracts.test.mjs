@@ -98,6 +98,9 @@ test("provider configuration parses exact budgets and rejects unsafe or mismatch
     { ORACLE_MAX_AGE_SECONDS: "invalid" },
     { ORACLE_MIN_EXPONENT: "1", ORACLE_MAX_EXPONENT: "0" },
     { APP_ORIGIN: "https://purrps.example/path" },
+    { APP_ORIGIN: "http://purrps.example" },
+    { APP_ORIGIN: "http://192.168.1.4:3000" },
+    { APP_ORIGIN: "http://localhost:3000/" },
   ])
     assert.equal(
       providerConfigSchema.safeParse({ ...environment, ...change }).success,
@@ -105,6 +108,30 @@ test("provider configuration parses exact budgets and rejects unsafe or mismatch
     );
 });
 
+test("APP_ORIGIN accepts http only for loopback hosts outside Vercel", () => {
+  for (const origin of [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://[::1]:3000",
+  ])
+    assert.equal(
+      providerConfigSchema.safeParse({ ...environment, APP_ORIGIN: origin })
+        .success,
+      true,
+    );
+  process.env.VERCEL = "1";
+  try {
+    assert.equal(
+      providerConfigSchema.safeParse({
+        ...environment,
+        APP_ORIGIN: "http://localhost:3000",
+      }).success,
+      false,
+    );
+  } finally {
+    delete process.env.VERCEL;
+  }
+});
 test("oracle decoding preserves all signed fields and full-width integer precision", () => {
   const expectedHash = readFileSync(
     new URL("../../fixtures/providers/oracle-v3-full.sha256", import.meta.url),
