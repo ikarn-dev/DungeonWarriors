@@ -15,6 +15,9 @@
   background: #06100f;
   color: var(--cream);
   font-family: var(--font-geist-sans), sans-serif;
+  /* Lobby logo size and its drop from the top edge. */
+  --bar-logo-w: clamp(10rem, 4rem + 16dvh, 15rem);
+  --bar-logo-top: clamp(0.5rem, 3dvh, 2rem);
 }
 
 .lobby-head {
@@ -38,17 +41,27 @@
   height: auto;
   margin: calc(-100% * 3 / 1595) 0 0 calc(-100% * 89 / 1595);
 }
-/* Lobby navbar: small mark on the left, level with the wallet chip. */
+/* Lobby navbar: the logo centred at the top, above the menu; the wallet
+   chip and sound control sit in the corners. */
 .lobby-head[data-variant="bar"] {
-  justify-items: start;
+  justify-items: center;
   align-items: center;
-  height: 3.5rem;
-  margin-bottom: 0.75rem;
+  margin: var(--bar-logo-top) 0 0.75rem;
 }
 .lobby-head[data-variant="bar"] .lobby-title {
-  --logo-w: 6.25rem;
+  --logo-w: var(--bar-logo-w);
 }
-
+/* Main menu: a large logo and the options form one group centred on the
+   screen. Section cards and the starter screens keep the logo at the top. */
+.lobby:has(.lobby-options:not([hidden])) {
+  --bar-logo-w: clamp(14rem, 4rem + 28dvh, 26rem);
+  --bar-logo-top: 0rem;
+  grid-template-rows: auto auto;
+  align-content: center;
+}
+.lobby:has(.lobby-options:not([hidden])) .lobby-head[data-variant="bar"] {
+  margin-bottom: clamp(1rem, 3.5dvh, 2.5rem);
+}
 .lobby-body {
   grid-row: 2;
   grid-column: 1;
@@ -72,7 +85,18 @@
   display: grid;
   gap: 0.875rem;
   width: min(24rem, calc(100% - var(--edge-left) - var(--edge-right)));
-  max-height: calc(100dvh - 2 * (var(--edge-top) + 4rem));
+  /* Clears the centred logo above it (its height is 0.553 × its width). */
+  max-height: calc(
+    100dvh -
+    2 *
+    (
+      var(--edge-top) +
+      var(--bar-logo-top) +
+      var(--bar-logo-w) *
+      0.553 +
+      0.75rem
+    )
+  );
   overflow: auto;
   padding: 1.5rem;
   text-align: center;
@@ -91,7 +115,6 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 1.25rem 1.5rem;
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.9375rem;
   line-height: 1.45;
@@ -237,6 +260,64 @@
   box-shadow: inset 0 1px 0 #ffffff12;
   text-align: center;
 }
+/* Character cards (collection cards and the Play warrior tile): a faint
+   light sweep every 7s, staggered per card; still under reduced motion. */
+.lobby-card,
+.bet-hero {
+  position: relative;
+  overflow: hidden;
+}
+.lobby-card::after,
+.bet-hero::after {
+  position: absolute;
+  inset: -20% auto -20% -50%;
+  width: 35%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    #ffffff00,
+    #fff6d812 40%,
+    #ffffff24 50%,
+    #fff6d812 60%,
+    #ffffff00
+  );
+  transform: translateX(0) skewX(-14deg);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lobby-card::after,
+  .bet-hero::after {
+    animation: card-shimmer 7s ease-in-out 1.2s infinite;
+  }
+  .lobby-cards li:nth-child(2)::after {
+    animation-delay: 2.2s;
+  }
+  .lobby-cards li:nth-child(3)::after {
+    animation-delay: 3.2s;
+  }
+  .lobby-cards li:nth-child(4)::after {
+    animation-delay: 4.2s;
+  }
+}
+@keyframes card-shimmer {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-14deg);
+  }
+  8% {
+    opacity: 1;
+  }
+  32% {
+    opacity: 1;
+    transform: translateX(460%) skewX(-14deg);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: translateX(460%) skewX(-14deg);
+  }
+}
 .lobby-card p {
   margin: 0;
 }
@@ -248,13 +329,13 @@
     0 0 18px #e2b04e33;
 }
 
-@media (max-width: 48rem) {
-  .lobby-panel {
-    padding: 1rem;
-  }
-}
 @media (max-height: 30rem) {
   .lobby {
+    --bar-logo-w: 6.25rem;
+    --bar-logo-top: 0rem;
     gap: 0.5rem;
+  }
+  .lobby:has(.lobby-options:not([hidden])) {
+    --bar-logo-w: 9rem;
   }
 }

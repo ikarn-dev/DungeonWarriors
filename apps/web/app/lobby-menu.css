@@ -1,5 +1,5 @@
-/* Main menu (2026-11-24): a column of metal plaques on the misty left of the
-   castle backdrop. Choosing one swaps the column for that section's card. */
+/* Main menu (2026-11-24): a centred column of metal plaques over the castle
+   backdrop. Choosing one swaps the column for that section's card. */
 .lobby-menu-layout {
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
@@ -25,24 +25,17 @@
 
 .lobby-options {
   align-self: center;
-  justify-self: start;
-  width: min(25rem, 100%);
-  margin-left: clamp(0rem, 7vw - 1.5rem, 6rem);
+  justify-self: center;
+  width: min(23rem, 100%);
 }
 .lobby-options ul {
   display: grid;
-  gap: clamp(0.5rem, 1.6dvh, 0.875rem);
+  gap: clamp(0.875rem, 2.4dvh, 1.5rem);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.lobby-menu-view {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  height: 100%;
-}
-.lobby-menu-view[hidden],
+.lobby-options[hidden],
 .lobby-section-view[hidden] {
   display: none;
 }
@@ -51,12 +44,12 @@
    gold rim, dark gap, gold hairline and the steel-teal face. Each layer is
    inset a little further and shortens its 45° tips by the same amount. */
 .lobby-option {
-  --h: clamp(3rem, 2rem + 3.6dvh, 4.25rem);
+  --h: clamp(3rem, 1.75rem + 3.6dvh, 4rem);
   --tip: calc(var(--h) / 2);
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.75rem;
   width: 100%;
   height: var(--h);
   padding: 0 var(--tip) 0 calc(var(--tip) * 0.75);
@@ -115,7 +108,8 @@
     #172a27 100%
   );
 }
-/* Hover and focus: a teal glow from the left and one light sweep. */
+/* Hover and focus: the plaque lifts, a teal glow rises from the left and
+   one light sweeps across. */
 .lobby-option-face::before,
 .lobby-option-face::after {
   position: absolute;
@@ -150,8 +144,8 @@
   position: relative;
   z-index: 2;
   flex: none;
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.25rem;
+  height: 1.25rem;
   filter: drop-shadow(0 1px 1px #000000b3);
 }
 .lobby-option-gem path:nth-child(1) {
@@ -171,7 +165,7 @@
   position: relative;
   z-index: 2;
   font-family: var(--font-display), serif;
-  font-size: clamp(1.25rem, 0.75rem + 2.4dvh, 2rem);
+  font-size: clamp(1.25rem, 0.75rem + 1.9dvh, 1.75rem);
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -179,7 +173,7 @@
 }
 @media (hover: hover) {
   .lobby-option:hover {
-    transform: translateX(0.5rem);
+    transform: scale(1.04);
   }
   .lobby-option:hover .lobby-option-face::before {
     opacity: 1;
@@ -195,7 +189,7 @@
 }
 .lobby-option:focus-visible {
   outline: none;
-  transform: translateX(0.5rem);
+  transform: scale(1.04);
   filter: drop-shadow(0 0 6px #ffd27acc);
 }
 .lobby-option:focus-visible .lobby-option-plate {
@@ -205,7 +199,7 @@
   opacity: 1;
 }
 .lobby-option:active {
-  transform: translateX(0.5rem) translateY(1px);
+  transform: scale(1.02) translateY(1px);
 }
 @keyframes option-sheen {
   0% {
@@ -221,24 +215,61 @@
   }
 }
 
-/* A chosen section: Back above one card that scrolls inside itself. */
+/* A chosen section: one framed window as tall as its content, up to the
+   available height; longer content scrolls inside. The frame matches the
+   title screen: polished gold rim, dark gap, gold hairline and filigree
+   corners, with the close button on the top-right corner. */
 .lobby-section-view {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.75rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-self: center;
   justify-self: center;
-  width: min(42rem, 100%);
-  height: min(100%, 44rem);
+  width: min(40rem, 100%);
+  max-height: 100%;
 }
-.pixel-button.lobby-back {
-  justify-self: start;
-  padding-inline: 0.625rem 1rem;
+.lobby-section-view > .lobby-panel {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  padding: 1.75rem;
+  background:
+    radial-gradient(ellipse 90% 45% at 50% 0%, #1f4a4340, #1f4a4300) padding-box,
+    linear-gradient(170deg, #12211ff7, #0a1514fa 55%, #071010fc) padding-box,
+    var(--metal) border-box;
+  box-shadow:
+    inset 0 0 0 5px #08100f,
+    inset 0 0 0 6px #6e5420,
+    0 0 0 1px #000000a6,
+    0 24px 70px #000000b3,
+    0 0 60px #1f6b5e26;
+}
+.lobby-section-view > .title-corner {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.pixel-button.lobby-close {
+  position: absolute;
+  z-index: 2;
+  top: -0.375rem;
+  right: -0.375rem;
+  width: 2.75rem;
+  padding: 0;
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    0 0 0 3px #08100f,
+    0 4px 12px #000000b3;
+}
+/* Section titles sit over a gold rule and clear the close button. */
+.lobby-section-view :is(.lobby-section-head, .lobby-window-head) {
+  padding: 0 2.5rem 1rem 0;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, #e2b04ecc, #e2b04e33 70%, #e2b04e00) 1;
+}
+.lobby-window-head {
+  margin-bottom: 1.25rem;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .lobby-showcase {
-    animation: section-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
-  }
   .lobby-options li {
     animation: option-in 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
@@ -264,7 +295,7 @@
 @keyframes option-in {
   from {
     opacity: 0;
-    transform: translateX(-1.5rem);
+    transform: translateY(0.75rem);
   }
 }
 @keyframes section-in {
@@ -274,8 +305,8 @@
   }
 }
 
-/* Backdrop: shade the left behind the menu so the castle stays clear on the
-   right; dim the whole scene behind an open card. */
+/* Backdrop: a soft shade behind the centred menu so the plaques read
+   against the moon and castle; dim the whole scene behind an open card. */
 .lobby-backdrop-shade::before,
 .lobby-backdrop-shade::after {
   position: absolute;
@@ -285,11 +316,10 @@
   transition: opacity 400ms ease-in-out;
 }
 .lobby-backdrop-shade::before {
-  background: linear-gradient(
-    90deg,
-    #030706e6 0%,
-    #030706a6 32%,
-    #03070600 62%
+  background: radial-gradient(
+    ellipse 42% 62% at 50% 56%,
+    #030706bf,
+    #03070600 100%
   );
 }
 .lobby-backdrop-shade::after {
@@ -300,128 +330,15 @@
   opacity: 1;
 }
 
-/* Desktop: the selected warrior on a pedestal fills the right side. */
-.lobby-showcase {
-  display: none;
-}
-@media (min-width: 64rem) and (min-height: 32rem) {
-  .lobby-menu-view {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 2rem;
-  }
-  .lobby-showcase {
-    display: grid;
-    justify-items: center;
-    justify-self: end;
-    width: 22rem;
-    margin-right: clamp(0rem, 8vw - 4rem, 7rem);
-  }
-}
-.lobby-showcase-stage {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  margin-bottom: -0.75rem;
-}
-/* Glowing stone disc under the cat's feet (y 120 of 128). */
-.lobby-showcase-pedestal {
-  position: absolute;
-  bottom: 0.25rem;
-  width: 78%;
-  aspect-ratio: 4 / 1;
-  border: 2px solid #c9a04e99;
-  border-radius: 50%;
-  background:
-    radial-gradient(closest-side, #5fe0c84d, #2fb39a1f 60%, #2fb39a00),
-    radial-gradient(closest-side, #13221fe6, #0a1413f2);
-  box-shadow:
-    0 0 0 4px #050908b3,
-    0 0 40px #2fb39a40,
-    0 10px 30px #000000cc;
-}
-/* Mirrored so the warrior faces the menu. */
-.lobby-showcase-cat {
-  position: relative;
-  width: clamp(9rem, 30dvh, 17rem);
-  height: auto;
-  transform: scaleX(-1);
-  filter: drop-shadow(0 6px 12px #000000b3);
-}
-.lobby-showcase-card {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 0.625rem;
-  width: 100%;
-  padding: 1.125rem 1.25rem 1.25rem;
-  text-align: center;
-}
-.lobby-showcase-name {
-  margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-  text-wrap: balance;
-}
-.lobby-showcase-role {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  color: var(--soft);
-  font-size: 0.875rem;
-}
-.lobby-showcase-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: 100%;
-  margin: 0;
-  border-block: 1px solid var(--panel-hi);
-}
-.lobby-showcase-stats div {
-  display: grid;
-  gap: 0.125rem;
-  padding-block: 0.5rem;
-}
-.lobby-showcase-stats div + div {
-  border-left: 1px solid var(--panel-hi);
-}
-.lobby-showcase-stats dt {
-  color: var(--soft);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-.lobby-showcase-stats dd {
-  margin: 0;
-  color: var(--gold-hi);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 1.25rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-.lobby-showcase .lobby-traits {
-  margin: 0;
-}
-.lobby-showcase .pixel-button {
-  width: 100%;
-}
-
 @media (max-width: 48rem) {
-  .lobby-options {
-    justify-self: center;
-    margin-left: 0;
-  }
-  .lobby-backdrop-shade::before {
-    background: #030706a6;
+  .lobby-section-view > .lobby-panel {
+    padding: 1.25rem;
   }
 }
 @media (max-height: 30rem) {
   /* Short landscape phones: two columns of smaller plaques. */
   .lobby-options {
-    width: min(34rem, 100%);
+    width: min(30rem, 100%);
   }
   .lobby-options ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -439,7 +356,8 @@
   }
   .lobby-section-view {
     width: min(52rem, 100%);
-    height: 100%;
-    gap: 0.5rem;
+  }
+  .lobby-section-view > .lobby-panel {
+    padding: 1.25rem;
   }
 }

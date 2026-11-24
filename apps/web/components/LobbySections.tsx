@@ -11,7 +11,6 @@ import DungeonEntry from "./DungeonEntry";
 import DungeonHistory from "./DungeonHistory";
 import LeaderboardPanel from "./LeaderboardPanel";
 import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
-import { LobbyShowcase } from "./LobbyShowcase";
 import WalletPanel from "./WalletPanel";
 
 type Work = (fn: (signal: AbortSignal) => Promise<void>) => Promise<void>;
@@ -63,14 +62,12 @@ export default function LobbySections({
     <LobbyMenu
       tab={tab}
       onTab={setTab}
-      showcase={
-        selected && (
-          <LobbyShowcase cat={selected} onViewCats={() => setTab("cats")} />
-        )
-      }
       panels={{
         play: (
           <>
+            <header className="lobby-window-head">
+              <h2>Catacomb Quest</h2>
+            </header>
             {selected && <LobbyHero cat={selected} />}
             {selected && (
               <DungeonEntry

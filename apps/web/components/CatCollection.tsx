@@ -1,7 +1,8 @@
 import Image from "next/image";
-import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
+import { WARRIORS } from "../lib/dungeon/warriors";
 import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
+import { warriorAvatar } from "../lib/game/warrior-avatars";
 
 export default function CatCollection({
   state,
@@ -33,8 +34,7 @@ export default function CatCollection({
                 data-chosen={chosen || undefined}
               >
                 <Image
-                  unoptimized
-                  src={warriorPortrait(cat.id)}
+                  src={warriorAvatar(cat.id)}
                   width={96}
                   height={96}
                   alt=""

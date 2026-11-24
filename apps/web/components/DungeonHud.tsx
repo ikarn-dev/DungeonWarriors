@@ -1,9 +1,10 @@
 import Image from "next/image";
 import { displayMultiplier } from "../lib/dungeon/format";
 import type { DungeonFrame } from "../lib/dungeon/simulation";
-import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
+import { WARRIORS } from "../lib/dungeon/warriors";
 import type { CatId } from "../lib/game/catalog";
 import { displayUsdc } from "../lib/game/custody-client";
+import { warriorAvatar } from "../lib/game/warrior-avatars";
 
 function Icon({ name }: { readonly name: "atk" | "def" | "gas" | "foe" }) {
   const paths = {
@@ -60,13 +61,7 @@ export default function DungeonHud({
   return (
     <div className="dungeon-hud">
       <section className="hud-card hud-hero" aria-label="Your warrior">
-        <Image
-          unoptimized
-          src={warriorPortrait(cat)}
-          alt=""
-          width={52}
-          height={52}
-        />
+        <Image src={warriorAvatar(cat)} alt="" width={52} height={52} />
         <div className="hud-hero-body">
           <p className="hud-name">{warrior.name}</p>
           <div className="hud-health" aria-hidden="true">

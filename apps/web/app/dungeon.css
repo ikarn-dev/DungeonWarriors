@@ -130,38 +130,178 @@
   background: #221e35;
   padding: 8px 14px;
 }
-.dungeon-bet h2 {
-  font:
-    700 1.625rem var(--font-geist-sans),
-    sans-serif;
+/* Selected warrior tile: framed portrait, name and class, a three-cell stat
+   table and the trait pills along a ruled bottom row. */
+.bet-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.875rem;
+  border: 1px solid #c9a04e3d;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #16302c, #0c1a18);
+  box-shadow:
+    inset 0 1px 0 #ffffff0f,
+    0 6px 18px #00000059;
+}
+.bet-hero-portrait {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 40%, #24806f66, #0a1413 72%) padding-box,
+    var(--metal) border-box;
+  box-shadow:
+    inset 0 0 0 2px #050908cc,
+    0 3px 8px #000000aa;
+}
+.bet-hero-portrait img {
+  width: 4rem;
+  height: 4rem;
+}
+.bet-hero-copy {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.bet-hero h3 {
   color: var(--gold-hi);
-  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.375rem;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
 }
-.dungeon-bet > p {
+.bet-hero-copy p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0;
+  font-size: 0.875rem;
 }
-.dungeon-bet > label {
+.bet-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 3.75rem);
+  margin: 0;
+  border: 1px solid #c9a04e3d;
+  border-radius: 6px;
+  background: #08100f99;
+}
+.bet-hero-stats div {
+  display: grid;
+  justify-items: center;
+  gap: 0.125rem;
+  padding-block: 0.4375rem;
+}
+.bet-hero-stats div + div {
+  border-left: 1px solid #c9a04e2e;
+}
+.bet-hero-stats dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.bet-hero-stats dd {
+  margin: 0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.bet-hero-traits {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.875rem 0 0;
+  border-top: 1px solid #c9a04e24;
+  list-style: none;
+}
+.bet-hero-traits li {
+  padding: 0.1875rem 0.625rem;
+  border: 1px solid #c9a04e40;
+  border-radius: 999px;
+  background: #0a1413;
+  color: var(--cream);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Wager card: a labelled amount field with the balance on the same line,
+   a gold Play button and the rules note under a rule. */
+.dungeon-bet {
+  gap: 1rem;
+}
+.bet-field {
+  display: grid;
+  gap: 0.5rem;
+}
+.bet-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+.bet-field-head label {
+  color: var(--cream);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.bet-field-head span {
   color: var(--soft);
+  font-size: 0.8125rem;
+}
+.dungeon-bet .bet-amount {
+  border-color: #c9a04e4d;
+  background: #050b0a;
 }
 .dungeon-bet .bet-amount input {
   flex: 1;
   min-width: 0;
-  padding: 16px;
+  min-height: 3.5rem;
+  padding: 0 1rem;
   background: transparent;
   color: var(--cream);
   font:
-    600 22px var(--font-geist-mono),
+    600 1.375rem var(--font-geist-mono),
     monospace;
   border: 0;
   outline: none;
+}
+.dungeon-bet .bet-amount > span {
+  margin-right: 0.625rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #e2b04e66;
+  border-radius: 999px;
+  background: #e2b04e1a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.dungeon-bet .pixel-button.lobby-play {
+  min-height: 3.5rem;
+  margin-top: 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
 }
 .dungeon-offer {
   color: var(--gold-hi);
 }
 .dungeon-odds-note {
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid #c9a04e24;
   color: var(--soft);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 .dungeon-loading {
   display: grid;
@@ -249,5 +389,14 @@ fieldset.dungeon-controls {
 @media (prefers-reduced-motion: reduce) {
   .dungeon-result {
     animation: none;
+  }
+}
+@media (max-width: 40rem) {
+  .bet-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .bet-hero-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

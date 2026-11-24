@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { lobbySounds } from "../lib/audio/lobby-sounds";
-import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
+import { WARRIORS } from "../lib/dungeon/warriors";
 import { MEDIA_ROOT } from "../lib/game/assets";
 import { displayUsdc } from "../lib/game/custody-client";
 import {
@@ -12,6 +12,7 @@ import {
   type CapsuleReceipt,
   type LobbyState,
 } from "../lib/game/lobby-state";
+import { warriorAvatar } from "../lib/game/warrior-avatars";
 import DotsLoader from "./DotsLoader";
 import { LobbySoundToggle } from "./LobbySound";
 
@@ -90,10 +91,10 @@ export default function CapsuleReveal({
                 </header>
                 <div className="gacha-portrait">
                   <Image
-                    unoptimized
+                    unoptimized={reward.kind !== "cat"}
                     src={
                       reward.kind === "cat"
-                        ? warriorPortrait(reward.id)
+                        ? warriorAvatar(reward.id)
                         : `${MEDIA_ROOT}/upgrade-item.svg`
                     }
                     alt=""

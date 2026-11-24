@@ -315,31 +315,37 @@ export default function DungeonEntry({
         </div>
       ) : (
         <div className="bet-card dungeon-bet">
-          <h2>Catacomb Quest</h2>
-          <p>Beat the gas. Choose a gate. Bank your treasure.</p>
-          <label htmlFor={`dungeon-bet-${wallet}`}>Wager (Devnet USDC)</label>
-          <div className="bet-amount">
-            <input
-              id={`dungeon-bet-${wallet}`}
-              inputMode="decimal"
-              autoComplete="off"
-              value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
-              onChange={(event) => {
-                setAmount(event.target.value);
-                setFailure(null);
-              }}
-              disabled={busy || pendingWager !== null}
-              aria-invalid={
-                !pendingWager &&
-                amount !== "" &&
-                (!stake || stake > BigInt(state.available))
-              }
-            />
-            <span>USDC</span>
+          <div className="bet-field">
+            <div className="bet-field-head">
+              <label htmlFor={`dungeon-bet-${wallet}`}>Wager</label>
+              <span>
+                Available{" "}
+                <strong className="lobby-figure">
+                  {displayUsdc(state.available)}
+                </strong>{" "}
+                USDC
+              </span>
+            </div>
+            <div className="bet-amount">
+              <input
+                id={`dungeon-bet-${wallet}`}
+                inputMode="decimal"
+                autoComplete="off"
+                value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setFailure(null);
+                }}
+                disabled={busy || pendingWager !== null}
+                aria-invalid={
+                  !pendingWager &&
+                  amount !== "" &&
+                  (!stake || stake > BigInt(state.available))
+                }
+              />
+              <span>USDC</span>
+            </div>
           </div>
-          <p className="bet-available">
-            Available {displayUsdc(state.available)} USDC
-          </p>
           {pendingWager && busy && (
             <p className="dungeon-offer">
               {pendingWager.maxRooms} rooms · Up to{" "}
