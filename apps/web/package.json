@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node ../../scripts/program/dungeon-engine.mjs --check && next build --webpack",
+    "build": "node ../../scripts/program/dungeon-engine.mjs --check && node ../../scripts/assets/build-warrior-art.mjs --check && next build --webpack",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit"
   },

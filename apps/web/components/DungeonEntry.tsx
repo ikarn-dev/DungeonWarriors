@@ -322,6 +322,7 @@ export default function DungeonEntry({
           )}
           <button
             className="pixel-button lobby-play"
+            aria-busy={busy}
             data-tone="gold"
             type="button"
             disabled={
@@ -334,17 +335,11 @@ export default function DungeonEntry({
             }
             onClick={() => void begin()}
           >
-            {busy
-              ? art?.cat === cat
-                ? "Preparing…"
-                : "Loading dungeon…"
-              : artError
-                ? "Retry & explore"
-                : "Bet & explore"}
+            Play
           </button>
           {artError && (
             <output className="lobby-section-note">
-              The game could not load. Your wager has not been taken. Try again.
+              The game could not load. Your wager has not been taken.
             </output>
           )}
           {!sign && (

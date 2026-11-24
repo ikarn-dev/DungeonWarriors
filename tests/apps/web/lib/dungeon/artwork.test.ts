@@ -1,81 +1,69 @@
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CatId } from "../../../../../apps/web/lib/game/catalog";
 
-vi.mock(
-  "../../../../../apps/web/node_modules/phaser/dist/phaser.esm.js",
-  () => ({
+const phaser = "../../../../../apps/web/node_modules/phaser/dist/phaser.esm.js";
+function availableEngine() {
+  vi.doMock(phaser, () => ({
     default: { Game: class {}, Scene: class {} },
-  }),
-);
+  }));
+}
 vi.mock("../../../../../apps/web/lib/dungeon/render-dungeon", () => ({
   renderDungeon: vi.fn(),
 }));
-
-const fetchAssets = vi.fn(async (input: string | URL | Request) => {
-  const path = new URL(String(input), "https://purrps.test").pathname;
-  const bytes = readFileSync(
-    new URL(`../../../../../apps/web/public${path}`, import.meta.url),
-  );
-  return new Response(new Uint8Array(bytes));
+const fetch = vi.fn(() => {
+  throw new Error("Standalone artwork requests must not gate gameplay");
 });
-
 beforeEach(() => {
   vi.resetModules();
-  fetchAssets.mockClear();
-  vi.stubGlobal("fetch", fetchAssets);
+  availableEngine();
+  fetch.mockClear();
+  vi.stubGlobal("fetch", fetch);
 });
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
-describe("dungeon startup preflight", () => {
-  it("verifies every required image and shares a completed preload", async () => {
+describe("bundled dungeon startup", () => {
+  it.each<CatId>([
+    "collector",
+    "acrobat",
+    "guardian",
+    "sprinter",
+  ])("%s starts with bundled artwork even when standalone SVG requests fail", async (cat) => {
     const { loadDungeonArtwork } = await import(
       "../../../../../apps/web/lib/dungeon/artwork"
     );
-    const first = loadDungeonArtwork("collector");
-    expect(loadDungeonArtwork("collector")).toBe(first);
+    const first = loadDungeonArtwork(cat);
+    expect(loadDungeonArtwork(cat)).toBe(first);
     const loaded = await first;
-    expect(loaded.cat).toBe("collector");
-    expect([...loaded.images.keys()].sort()).toEqual(
-      [
-        "body-collector",
-        "weapon-spear",
-        "enemy-bat",
-        "enemy-skeleton",
-        "enemy-slime",
-        "enemy-warden",
-      ].sort(),
-    );
+    expect(loaded.cat).toBe(cat);
+    expect(loaded.images.size).toBe(6);
+    expect(await loaded.images.get(`body-${cat}`)?.text()).toContain("<svg");
+    for (const enemy of ["bat", "skeleton", "slime", "warden"])
+      expect(loaded.images.has(`enemy-${enemy}`)).toBe(true);
     expect(loaded.engine.Game).toBeTypeOf("function");
-    expect(loadDungeonArtwork("collector")).toBe(first);
-    expect(fetchAssets).toHaveBeenCalledTimes(7);
+    expect(loadDungeonArtwork(cat)).toBe(first);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("rejects altered art before approval and allows a clean retry", async () => {
-    vi.stubGlobal("fetch", async (input: string | URL | Request) => {
-      const response = await fetchAssets(input);
-      if (!String(input).includes("body-collector")) return response;
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      bytes[0] = 0;
-      return new Response(new Uint8Array(bytes));
+  it("does not retain a failed engine import", async () => {
+    vi.doMock(phaser, () => {
+      throw new Error("Engine chunk unavailable");
     });
     const { loadDungeonArtwork } = await import(
       "../../../../../apps/web/lib/dungeon/artwork"
     );
-    await expect(loadDungeonArtwork("collector")).rejects.toThrow(
-      "ASSETS_NOT_READY",
-    );
-    vi.stubGlobal("fetch", fetchAssets);
+    await expect(loadDungeonArtwork("collector")).rejects.toThrow();
+    availableEngine();
     await expect(loadDungeonArtwork("collector")).resolves.toMatchObject({
       cat: "collector",
     });
   });
 
-  it("expires a stalled startup instead of permanently locking entry", async () => {
+  it("bounds a stalled module import and allows Play again", async () => {
     vi.useFakeTimers();
-    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    vi.doMock(phaser, () => new Promise(() => {}));
     const { loadDungeonArtwork } = await import(
       "../../../../../apps/web/lib/dungeon/artwork"
     );
@@ -84,9 +72,10 @@ describe("dungeon startup preflight", () => {
     await vi.advanceTimersByTimeAsync(15000);
     await failed;
     vi.useRealTimers();
-    vi.stubGlobal("fetch", fetchAssets);
+    availableEngine();
     const retry = loadDungeonArtwork("collector");
     expect(retry).not.toBe(stalled);
     await expect(retry).resolves.toMatchObject({ cat: "collector" });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
