@@ -13,7 +13,7 @@ import {
 import type { DungeonRoom } from "../../../../../apps/web/lib/dungeon/rooms";
 import {
   affordableDepth,
-  DUNGEON_V1,
+  DUNGEON_V2,
   PHYSICS,
   payout,
 } from "../../../../../apps/web/lib/dungeon/rules";
@@ -39,8 +39,8 @@ const run = (
   ticks: number,
   controls: Parameters<typeof stepRoom>[4] = [],
 ) => {
-  let f = stepRoom(frame, room, cat, DUNGEON_V1, controls);
-  for (let i = 1; i < ticks; i++) f = stepRoom(f, room, cat, DUNGEON_V1, []);
+  let f = stepRoom(frame, room, cat, DUNGEON_V2, controls);
+  for (let i = 1; i < ticks; i++) f = stepRoom(f, room, cat, DUNGEON_V2, []);
   return f;
 };
 
@@ -75,11 +75,11 @@ describe("generated catacomb rooms", () => {
   it("gives harder rooms more time, never below the onchain minimum or above the cap", () => {
     for (let s = 0; s < 8; s++) {
       const times = [0, 1, 2, 3, 4].map((i) =>
-        roomTimeMs(generateRoom(seed(`t${s}`), i), DUNGEON_V1),
+        roomTimeMs(generateRoom(seed(`t${s}`), i), DUNGEON_V2),
       );
       times.forEach((ms, i) => {
         expect(ms).toBeGreaterThanOrEqual(
-          (DUNGEON_V1.roomSeconds[i] ?? 0) * 1000,
+          (DUNGEON_V2.roomSeconds[i] ?? 0) * 1000,
         );
         expect(ms).toBeLessThanOrEqual(PHYSICS.maxRoomMs);
         expect(ms % 1000).toBe(0);
@@ -167,8 +167,8 @@ describe("base-control routes", () => {
     s,
   }) => {
     const room = generateRoom(s, index);
-    const { frame, inputs } = autopilot(room, cat, DUNGEON_V1, 2);
-    const budget = budgetMs(frame, room, cat, DUNGEON_V1);
+    const { frame, inputs } = autopilot(room, cat, DUNGEON_V2, 2);
+    const budget = budgetMs(frame, room, cat, DUNGEON_V2);
     const used = (frame.tick * 1000) / PHYSICS.ticksPerSecond;
     const detail = JSON.stringify({
       index,
@@ -185,7 +185,7 @@ describe("base-control routes", () => {
     // The autopilot stops to fight every foe, so it is slower than a player
     // who jumps past optional ones; it must still finish with time left.
     expect(used, detail).toBeLessThan(budget * 0.97);
-    expect(replayRoom(room, cat, DUNGEON_V1, frame.tick, inputs)).toEqual(
+    expect(replayRoom(room, cat, DUNGEON_V2, frame.tick, inputs)).toEqual(
       frame,
     );
   });
@@ -193,7 +193,7 @@ describe("base-control routes", () => {
 
 describe("replay limits", () => {
   it("replays browser input identically and rejects reordered, future or excessive input", () => {
-    const runner = new DungeonRunner("acrobat", 0, seed("r"), DUNGEON_V1, 1000);
+    const runner = new DungeonRunner("acrobat", 0, seed("r"), DUNGEON_V2, 1000);
     runner.input({ kind: "move", axis: 1 });
     runner.advance(1400);
     runner.input({ kind: "attack" });
@@ -203,13 +203,13 @@ describe("replay limits", () => {
       replayRoom(
         runner.room,
         "acrobat",
-        DUNGEON_V1,
+        DUNGEON_V2,
         runner.frame.tick,
         runner.inputs,
       ),
     ).toEqual(runner.frame);
     expect(() =>
-      replayRoom(runner.room, "acrobat", DUNGEON_V1, 1, [
+      replayRoom(runner.room, "acrobat", DUNGEON_V2, 1, [
         { tick: 2, action: { kind: "jump" } },
       ]),
     ).toThrow("INVALID_DUNGEON_INPUT_ORDER");
@@ -217,7 +217,7 @@ describe("replay limits", () => {
       replayRoom(
         runner.room,
         "acrobat",
-        DUNGEON_V1,
+        DUNGEON_V2,
         1,
         Array.from({ length: 21 }, () => ({
           tick: 1,
@@ -227,7 +227,7 @@ describe("replay limits", () => {
     ).toThrow("DUNGEON_CONTROL_RATE");
   });
   it("drops held-key inputs over the per-second limit in the browser", () => {
-    const runner = new DungeonRunner("acrobat", 0, seed("h"), DUNGEON_V1, 0);
+    const runner = new DungeonRunner("acrobat", 0, seed("h"), DUNGEON_V2, 0);
     for (let i = 0; i < 40; i++) runner.input({ kind: "attack" });
     expect(runner.inputs).toHaveLength(PHYSICS.maxInputsPerSecond);
   });
@@ -236,16 +236,16 @@ describe("replay limits", () => {
     for (const cat of ["collector", "acrobat"] as const) {
       let f = run(room, cat, initialFrame(room, cat), 10, [{ kind: "jump" }]);
       const before = f.vy;
-      f = stepRoom(f, room, cat, DUNGEON_V1, [{ kind: "jump" }]);
+      f = stepRoom(f, room, cat, DUNGEON_V2, [{ kind: "jump" }]);
       expect(f.jumps).toBe(cat === "acrobat" ? 2 : 1);
       expect(f.vy < before).toBe(cat === "acrobat");
     }
   });
   it("quotes integer gross returns and never reserves above the vault cap", () => {
-    expect([1, 2, 3, 4, 5].map((n) => payout(1000000n, n, DUNGEON_V1))).toEqual(
+    expect([1, 2, 3, 4, 5].map((n) => payout(1000000n, n, DUNGEON_V2))).toEqual(
       [1425000n, 2137500n, 3206250n, 4809375n, 7214062n],
     );
-    expect(affordableDepth(1000000n, 4000000n, DUNGEON_V1)).toBe(3);
-    expect(affordableDepth(1000000n, 1000000n, DUNGEON_V1)).toBe(0);
+    expect(affordableDepth(1000000n, 4000000n, DUNGEON_V2)).toBe(3);
+    expect(affordableDepth(1000000n, 1000000n, DUNGEON_V2)).toBe(0);
   });
 });

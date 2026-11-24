@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Keypair } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { DUNGEON_V1 } from "../../../../../apps/web/lib/dungeon/rules";
+import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
 import { expeditionAddress } from "../../../../../apps/web/lib/dungeon/transactions";
 import {
   dungeonSecret,
@@ -196,7 +196,7 @@ it("keeps VRF and secret private until terminal settlement and derives gates fro
   expect(secretCommitment(Buffer.from(proof?.secret ?? "", "hex"))).toBe(
     r.commitment,
   );
-  expect(dungeonRecordSchema.parse(r).rules).toEqual(DUNGEON_V1);
+  expect(dungeonRecordSchema.parse(r).rules).toEqual(DUNGEON_V2);
 });
 it("starts a generated room from a public seed that never depends on the gate secret", async () => {
   const { generateRoom } = await import(
@@ -216,8 +216,8 @@ it("starts a generated room from a public seed that never depends on the gate se
   const room = generateRoom(started.seed, 0);
   expect(mocks.stored?.dueAt).toBe(
     100000 +
-      roomBudgetMs(room, "collector", DUNGEON_V1) +
-      DUNGEON_V1.hourglassMs,
+      roomBudgetMs(room, "collector", DUNGEON_V2) +
+      DUNGEON_V2.hourglassMs,
   );
   vi.stubEnv(
     "BROWSER_VERIFIER_SECRET_KEY",

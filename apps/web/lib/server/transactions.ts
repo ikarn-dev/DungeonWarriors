@@ -2,11 +2,8 @@ import "server-only";
 import { BN, type IdlInstructionAccountItem, utils } from "@anchor-lang/core";
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import {
-  ComputeBudgetProgram,
-  type MessageV0,
   PublicKey,
   SystemProgram,
-  type TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -16,6 +13,7 @@ import { runSponsor } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses.ts";
 import { verifyWalletSignature } from "./auth";
 import { coder, idl, nonceBytes, pda, program, u64Input } from "./chain";
+import { assertCurrentEntry } from "./entry-admission";
 import {
   gameInstructions,
   gameIntentSchema,
@@ -35,6 +33,7 @@ import {
   verifyPlayAuthorization,
 } from "./sponsorship";
 import { checkedConnection } from "./transaction-network";
+import { reviewedInstructions } from "./transaction-review";
 
 export const intentSchema = z.discriminatedUnion("operation", [
   gameIntentSchema,
@@ -77,7 +76,6 @@ export const submitInput = z
   .object({ intent: intentSchema, transaction: z.string().min(1).max(1800) })
   .strict();
 type Intent = z.infer<typeof intentSchema>;
-const MAX_SPONSORED_COMPUTE_UNITS = 200_000;
 const SPONSORED_FEE_LIMIT_LAMPORTS = 100_000n;
 const STARTER_SPONSORED_LIMIT_LAMPORTS = 5_000_000n;
 
@@ -85,48 +83,6 @@ function starterSponsorLimit(operationLimit: bigint) {
   return operationLimit < STARTER_SPONSORED_LIMIT_LAMPORTS
     ? operationLimit
     : STARTER_SPONSORED_LIMIT_LAMPORTS;
-}
-
-function reviewedInstructions(
-  message: MessageV0,
-  expected: readonly TransactionInstruction[],
-) {
-  let units: number | undefined;
-  let price: bigint | undefined;
-  let nextApplicationInstruction = 0;
-  const instructions = message.compiledInstructions.map((ix) => {
-    if (
-      !message.staticAccountKeys[ix.programIdIndex]?.equals(
-        ComputeBudgetProgram.programId,
-      )
-    ) {
-      const application = expected[nextApplicationInstruction++];
-      if (application === undefined)
-        throw new ApiError("TRANSACTION_REJECTED", 400);
-      return application;
-    }
-    if (ix.accountKeyIndexes.length !== 0)
-      throw new ApiError("TRANSACTION_REJECTED", 400);
-    const data = Buffer.from(ix.data);
-    if (data[0] === 2 && data.length === 5 && units === undefined) {
-      units = data.readUInt32LE(1);
-      if (units > 0 && units <= MAX_SPONSORED_COMPUTE_UNITS)
-        return ComputeBudgetProgram.setComputeUnitLimit({ units });
-    }
-    if (data[0] === 3 && data.length === 9 && price === undefined) {
-      price = data.readBigUInt64LE(1);
-      return ComputeBudgetProgram.setComputeUnitPrice({ microLamports: price });
-    }
-    throw new ApiError("TRANSACTION_REJECTED", 400);
-  });
-  if (
-    nextApplicationInstruction !== expected.length ||
-    (price ?? 0n) *
-      BigInt(units ?? expected.length * MAX_SPONSORED_COMPUTE_UNITS) >
-      SPONSORED_FEE_LIMIT_LAMPORTS * 1_000_000n
-  )
-    throw new ApiError("TRANSACTION_REJECTED", 400);
-  return instructions;
 }
 
 function accountRoles(items: IdlInstructionAccountItem[]): string[] {
@@ -271,6 +227,7 @@ async function connectionFor(wallet: string, intent: Intent) {
 }
 
 export async function prepare(wallet: string, intent: Intent) {
+  assertCurrentEntry(intent);
   const built = instructionsFor(wallet, intent);
   const network = networkFor(intent);
   const rpc = await connectionFor(wallet, intent);
@@ -447,6 +404,7 @@ export function validateTransaction(
   return tx;
 }
 export async function submit(wallet: string, intent: Intent, encoded: string) {
+  assertCurrentEntry(intent);
   const tx = validateTransaction(wallet, intent, encoded);
   const network = networkFor(intent);
   if (intent.operation === "game" && intent.playSponsor)

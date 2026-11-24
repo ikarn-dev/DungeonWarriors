@@ -4,10 +4,12 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { validatedClientSource } from "../../apps/web/lib/solana/build-artifacts.mts";
+import { checkEngine } from "./dungeon-engine.mjs";
 
 // Build/generation are explicit user actions. This only validates/copies their
 // existing public artifacts, and never reads a wallet/keypair or submits a tx.
 export function exportClient() {
+  checkEngine();
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const target = join(root, "apps/purrps-game-program/target");
   const jsonPath = join(target, "idl/purrps_game.json");

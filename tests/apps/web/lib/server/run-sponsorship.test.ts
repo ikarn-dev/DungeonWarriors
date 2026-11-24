@@ -1,9 +1,6 @@
-import { BN } from "@anchor-lang/core";
 import {
-  ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  SystemProgram,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -12,7 +9,6 @@ import { runAddresses } from "../../../../../apps/web/lib/game/run-accounts";
 import {
   type GameIntent,
   gameInstructions,
-  validatePreparedGame,
 } from "../../../../../apps/web/lib/game/run-transactions";
 import { coder, program } from "../../../../../apps/web/lib/solana/program";
 import { config } from "./fixtures";
@@ -101,96 +97,11 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-it("adds the budget and the SOL floor to the player-signed reservation within the wallet packet limit", async () => {
-  const { owner, play, sponsor, wallet, intent, run } = launch();
-  const loader = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
-  const programData = Buffer.alloc(45);
-  programData.writeUInt32LE(3);
-  programData[12] = 1;
-  owner.publicKey.toBuffer().copy(programData, 13);
-  const player = await coder.accounts.encode("playerAccount", {
-    schemaVersion: 1,
-    bump: 255,
-    owner: owner.publicKey,
-    availableBaseUnits: new BN(1_000_000),
-    lockedStakeBaseUnits: new BN(0),
-    purchaseEscrowBaseUnits: new BN(0),
-    nextRunNonce: new BN(intent.action.nonce),
-    nextDrawNonce: new BN(1),
-    nextSessionNonce: new BN(intent.action.sessionNonce),
-    settledRuns: new BN(intent.action.nonce),
-    wins: new BN(intent.action.nonce),
-    losses: new BN(0),
-    technicalRefunds: new BN(0),
-  });
-  const send = vi.fn().mockResolvedValue("sent");
-  const simulate = vi.fn().mockResolvedValue({ value: { err: null } });
-  const rent = 1_544_320;
-  mock.rpc.mockResolvedValue({
-    getMultipleAccountsInfo: async () => [
-      { owner: program, data: player },
-      null,
-      null,
-    ],
-    getAccountInfo: async () => ({ owner: loader, data: programData }),
-    getLatestBlockhash: async () => ({
-      blockhash: PublicKey.default.toBase58(),
-      lastValidBlockHeight: 100,
-    }),
-    getBalance: async () => 1_100_000_000,
-    getMinimumBalanceForRentExemption: async () => rent,
-    getFeeForMessage: async () => ({ value: 15_000 }),
-    simulateTransaction: simulate,
-    sendRawTransaction: send,
-  });
-  mock.admit.mockResolvedValue(1);
-  const prepared = await prepare(wallet, intent);
-  const tx = VersionedTransaction.deserialize(
-    Buffer.from(prepared.transaction, "base64"),
-  );
-  validatePreparedGame(tx, wallet, intent, prepared);
-  const message = TransactionMessage.decompile(tx.message);
-  expect(instructionNames(tx)).toEqual([
-    "fundSponsorship",
-    SystemProgram.programId.toBase58(),
-    "KeyspM2ssCJbqUhQ4k7sveSiY4WjnYsrXkC8oDbwde5",
-    "authorizeSession",
-    "reserveQuotedRun",
-  ]);
-  expect(prepared.operationId).toBe(run.toBase58());
-  expect(message.payerKey.equals(owner.publicKey)).toBe(true);
-  message.instructions.unshift(
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
-  );
-  const withWalletFees = new VersionedTransaction(message.compileToV0Message());
-  withWalletFees.sign([owner, play]);
-  expect(withWalletFees.serialize().length).toBeLessThanOrEqual(1232);
-  const encoded = Buffer.from(withWalletFees.serialize()).toString("base64");
-  const moreFunds = {
-    ...intent,
-    action: {
-      ...intent.action,
-      completionFunding: {
-        ...intent.action.completionFunding,
-        lamports: "90000000",
-      },
-    },
-  };
-  expect(() => validateTransaction(wallet, moreFunds, encoded)).toThrow(
-    "INVALID_RUN_SPONSOR",
-  );
-  await expect(submit(wallet, intent, encoded)).resolves.toMatchObject({
-    network: "base",
-  });
-  expect(mock.admit).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.arrayContaining([`test:sponsor:attempt:${run.toBase58()}`]),
-    [3, "51544320", "100000000"],
-  );
-  const sent = VersionedTransaction.deserialize(send.mock.calls[0]?.[0]);
-  expect(sent.message.staticAccountKeys).toContainEqual(sponsor.publicKey);
-  expect(sent.signatures.every((sig) => sig.some(Boolean))).toBe(true);
+it("rejects retired runner launch preparation without sponsor spend", async () => {
+  const { wallet, intent } = launch();
+  await expect(prepare(wallet, intent)).rejects.toThrow("ADMISSION_CLOSED");
+  expect(mock.rpc).not.toHaveBeenCalled();
+  expect(mock.admit).not.toHaveBeenCalled();
 });
 
 it("moves the existing budget into the action account before delegating the same nonce", () => {
@@ -247,78 +158,34 @@ it("omits the writable Hydra accounts when settling a run that never activated",
   );
 });
 
-it("reconciles an expired launch without paying fees and keeps the scoped key as the sole player signer", async () => {
-  const { owner, play, sponsor, wallet, intent } = launch();
-  const { sponsor: address, floor } = intent.action.completionFunding;
-  const value = { ...intent, playSponsor: { sponsor: address, floor } };
+it("rejects signed legacy launch submissions while recovery actions remain available", async () => {
+  const { wallet, intent, play, sponsor } = launch();
+  const value = {
+    ...intent,
+    playSponsor: {
+      sponsor: sponsor.publicKey.toBase58(),
+      floor: intent.action.completionFunding.floor,
+    },
+  };
   const built = gameInstructions(wallet, value);
-  const msg = new TransactionMessage({
-    payerKey: built.payer,
-    recentBlockhash: PublicKey.default.toBase58(),
-    instructions: built.instructions,
-  }).compileToV0Message();
-  const tx = new VersionedTransaction(msg);
-  expect(instructionNames(tx)).toEqual([
-    "fundSponsorship",
-    "reserveQuotedRun",
-    "fundRunCompletion",
-    "delegateRun",
-    SystemProgram.programId.toBase58(),
-  ]);
-  expect(tx.serialize().length).toBeLessThanOrEqual(1232);
-  expect(
-    msg.staticAccountKeys.slice(0, msg.header.numRequiredSignatures),
-  ).toEqual([sponsor.publicKey, play.publicKey]);
-  const encoded = () => Buffer.from(tx.serialize()).toString("base64");
-  expect(() => validateTransaction(wallet, value, encoded())).toThrow(
-    "INVALID_SIGNATURE",
+  const tx = new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: built.payer,
+      recentBlockhash: PublicKey.default.toBase58(),
+      instructions: built.instructions,
+    }).compileToV0Message(),
   );
   tx.sign([play]);
-  const programData = Buffer.alloc(45);
-  programData.writeUInt32LE(3);
-  programData[12] = 1;
-  owner.publicKey.toBuffer().copy(programData, 13);
-  const send = vi.fn().mockResolvedValue("sent");
-  const simulate = vi.fn().mockResolvedValue({
-    context: { slot: 30 },
-    value: { err: null, accounts: [{ lamports: 1_100_000_000 }] },
-  });
-  mock.rpc.mockResolvedValue({
-    getAccountInfo: async () => ({
-      owner: new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
-      data: programData,
-    }),
-    getSignatureStatuses: async () => ({ value: [null] }),
-    getBalanceAndContext: async () => ({
-      context: { slot: 30 },
-      value: 1_195_000_000,
-    }),
-    getBalance: async () => 1_195_000_000,
-    simulateTransaction: simulate,
-    sendRawTransaction: send,
-  });
-  simulate.mockResolvedValueOnce({ value: { err: "BlockhashNotFound" } });
-  mock.admit.mockResolvedValue(1);
-  const expired = await submit(wallet, value, encoded());
-  expect(expired).toMatchObject({
-    network: "base",
-    unknownResponse: true,
-    signature: expect.any(String),
-  });
-  expect(send).not.toHaveBeenCalled();
-  expect(mock.admit).not.toHaveBeenCalled();
-  await expect(submit(wallet, value, encoded())).resolves.toMatchObject({
-    network: "base",
-    signature: expired.signature,
-  });
-  expect(
-    VersionedTransaction.deserialize(send.mock.calls[0]?.[0]).signatures.every(
-      (sig) => sig.some(Boolean),
+  expect(() =>
+    validateTransaction(
+      wallet,
+      value,
+      Buffer.from(tx.serialize()).toString("base64"),
     ),
-  ).toBe(true);
-  expect(mock.admit).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.any(Array),
-    [3, "95000000", "100000000"],
-  );
+  ).not.toThrow();
+  await expect(
+    submit(wallet, value, Buffer.from(tx.serialize()).toString("base64")),
+  ).rejects.toThrow("ADMISSION_CLOSED");
+  expect(mock.rpc).not.toHaveBeenCalled();
+  expect(mock.admit).not.toHaveBeenCalled();
 });

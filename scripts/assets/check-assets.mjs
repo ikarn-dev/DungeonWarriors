@@ -5,9 +5,9 @@ import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assetManifestBytes,
-  FIRST_SCENE_ASSETS,
   missingSceneAssets,
   parseAssetManifest,
+  requiredSceneAssets,
 } from "../../apps/web/lib/game/assets.ts";
 
 const webRequire = createRequire(
@@ -25,7 +25,7 @@ export async function checkGameAssets(publicDirectory, version) {
     return {
       ready: false,
       reason: "USER_ASSETS_PENDING",
-      missing: [...FIRST_SCENE_ASSETS],
+      missing: [...requiredSceneAssets(version)],
     };
   const inside = (path) => {
     const actual = realpathSync(path);

@@ -1,7 +1,7 @@
 import { BN } from "@anchor-lang/core";
 import { Keypair } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { DUNGEON_V1 } from "../../../../../apps/web/lib/dungeon/rules";
+import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
 import { quoteDungeon } from "../../../../../apps/web/lib/server/dungeon-reservation";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
 import { owner, record, verifier } from "../dungeon/fixtures";
@@ -62,7 +62,7 @@ beforeEach(() => {
       nextRunNonce: new BN(0),
     },
     collection: { ownedMask: 1, cats: [{}] },
-    rules: DUNGEON_V1,
+    rules: DUNGEON_V2,
     ruleHash: "00".repeat(32),
     free: 100000000n,
   });

@@ -1,5 +1,5 @@
 import { Keypair } from "@solana/web3.js";
-import { DUNGEON_V1, payout } from "../../../../../apps/web/lib/dungeon/rules";
+import { DUNGEON_V2, payout } from "../../../../../apps/web/lib/dungeon/rules";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
 export const owner = Keypair.fromSeed(
   new Uint8Array(32).fill(1),
@@ -11,11 +11,11 @@ export function record(): DungeonRecord {
     nonce: "0",
     owner,
     cat: "collector",
-    rules: { ...DUNGEON_V1 },
+    rules: { ...DUNGEON_V2 },
     rulesHash: "00".repeat(32),
     commitment: "11".repeat(32),
     stake: "1000000",
-    maxGross: payout(1000000n, 5, DUNGEON_V1).toString(),
+    maxGross: payout(1000000n, 5, DUNGEON_V2).toString(),
     maxRooms: 5,
     cleared: 0,
     gates: [],

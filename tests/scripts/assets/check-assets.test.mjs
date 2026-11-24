@@ -65,7 +65,7 @@ async function fixture(work) {
 test("a version without a manifest leaves the scene pending", async () => {
   const result = await checkGameAssets(
     fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    3,
+    4,
   );
   assert.equal(result.ready, false);
   assert.equal(result.reason, "USER_ASSETS_PENDING");
@@ -131,3 +131,13 @@ test("rejects files symlinked outside the public root", async () =>
       rmSync(outside);
     }
   }));
+
+test("the complete warrior pack is ready without legacy runner dependencies", async () => {
+  const root = fileURLToPath(
+    new URL("../../../apps/web/public/", import.meta.url),
+  );
+  const result = await checkGameAssets(root, 3);
+  assert.equal(result.ready, true);
+  assert.equal(result.checkedFiles, 16);
+  assert.deepEqual(result.missing, []);
+});

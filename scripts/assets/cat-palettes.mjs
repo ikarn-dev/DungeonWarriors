@@ -1,4 +1,4 @@
-// Colors follow the reference avatars in apps/web/public/cats_avatars.
+// Frozen legacy cat palettes; retained for published v1/v2 media recovery.
 export const ink = "#1e1626";
 export const shared = {
   ink,

@@ -11,7 +11,7 @@ import type {
 } from "./rooms";
 import { type DungeonRules, PHYSICS } from "./rules";
 
-export const MAX_LEVEL = 10;
+export const MAX_LEVEL = 5;
 export const AMBUSH_WARNING_TICKS = 36;
 const HEIGHT = 600;
 const TOP = 352;

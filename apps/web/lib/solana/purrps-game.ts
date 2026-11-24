@@ -5408,6 +5408,12 @@ export type PurrpsGame = {
             type: "u32";
           },
           {
+            name: "engineHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
             name: "rooms";
             type: "u8";
           },
@@ -12969,6 +12975,12 @@ export const PURRPS_GAME_IDL = {
           {
             name: "version",
             type: "u32",
+          },
+          {
+            name: "engine_hash",
+            type: {
+              array: ["u8", 32],
+            },
           },
           {
             name: "rooms",

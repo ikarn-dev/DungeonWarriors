@@ -3,6 +3,7 @@ pub mod constants;
 pub mod contracts;
 pub mod draw;
 pub mod dungeon;
+pub mod dungeon_engine;
 pub mod economy;
 pub mod error;
 pub mod instruction_args;

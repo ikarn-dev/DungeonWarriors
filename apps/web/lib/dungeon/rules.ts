@@ -1,10 +1,19 @@
 import { z } from "zod";
+import { ENGINE_HASH } from "./engine-binding.ts";
 
 // Financial and timing envelope frozen onchain in DungeonConfig. The program
-// hashes these exact fields; gameplay tables live in the versioned ENGINE.
+// hashes the envelope and the exact shared engine binding.
 export const dungeonRulesSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
+    engineHash: z
+      .array(z.number().int().min(0).max(255))
+      .length(32)
+      .refine(
+        (bytes) =>
+          bytes.map((b) => b.toString(16).padStart(2, "0")).join("") ===
+          ENGINE_HASH,
+      ),
     rooms: z.number().int().min(1).max(5),
     returnBps: z.number().int().min(6667).max(10000),
     roomSeconds: z
@@ -20,8 +29,11 @@ export const dungeonRulesSchema = z
   })
   .strict();
 export type DungeonRules = z.infer<typeof dungeonRulesSchema>;
-export const DUNGEON_V1: DungeonRules = {
-  version: 1,
+export const DUNGEON_V2: DungeonRules = {
+  version: 2,
+  engineHash: Array.from({ length: 32 }, (_, i) =>
+    Number.parseInt(ENGINE_HASH.slice(i * 2, i * 2 + 2), 16),
+  ),
   rooms: 5,
   returnBps: 9500,
   // Minimum room time; generated rooms add time for their length and foes.

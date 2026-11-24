@@ -9,6 +9,7 @@ pub const MAX_ROOMS: usize = 5;
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DungeonRules {
     pub version: u32,
+    pub engine_hash: [u8; 32],
     pub rooms: u8,
     pub return_bps: u16,
     pub room_seconds: [u16; MAX_ROOMS],
@@ -18,8 +19,9 @@ pub struct DungeonRules {
     pub sprint_bps: u16,
     pub vrf_timeout_seconds: u16,
 }
-pub const DUNGEON_V1: DungeonRules = DungeonRules {
-    version: 1,
+pub const DUNGEON_V2: DungeonRules = DungeonRules {
+    version: 2,
+    engine_hash: crate::dungeon_engine::DUNGEON_ENGINE_HASH,
     rooms: 5,
     return_bps: 9500,
     room_seconds: [30, 28, 26, 24, 22],
@@ -32,7 +34,8 @@ pub const DUNGEON_V1: DungeonRules = DungeonRules {
 impl DungeonRules {
     pub fn validate(&self) -> Result<()> {
         require!(
-            self.version > 0
+            self.version == 2
+                && self.engine_hash == crate::dungeon_engine::DUNGEON_ENGINE_HASH
                 && self.rooms > 0
                 && usize::from(self.rooms) <= MAX_ROOMS
                 && (6667..=10000).contains(&self.return_bps)

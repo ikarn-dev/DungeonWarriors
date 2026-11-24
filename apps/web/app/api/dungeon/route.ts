@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { dungeonRequestSchema } from "../../../lib/dungeon/protocol";
-import { ENGINE } from "../../../lib/dungeon/rules";
+import { DUNGEON_V2, ENGINE } from "../../../lib/dungeon/rules";
 import { authenticate } from "../../../lib/server/auth";
 import { browserVerifierAddress } from "../../../lib/server/browser-config";
 import { recoverDungeonWallet } from "../../../lib/server/dungeon-recovery";
@@ -16,7 +16,10 @@ import { assertAdmission, digest, runtime } from "../../../lib/server/runtime";
 
 export function GET() {
   return json({
-    version: 1,
+    version: DUNGEON_V2.version,
+    engineHash: DUNGEON_V2.engineHash
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
     engine: ENGINE,
     verifier: browserVerifierAddress(),
   });

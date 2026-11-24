@@ -13,6 +13,7 @@ import {
   dungeonViewSchema,
 } from "../lib/dungeon/protocol";
 import { validateDungeonReservation } from "../lib/dungeon/transactions";
+import { mergeDungeonView } from "../lib/dungeon/view-state";
 import type { CatId } from "../lib/game/catalog";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
@@ -59,23 +60,11 @@ export default function DungeonEntry({
     latest.current = view;
   }, [view]);
   const accept = useCallback(
-    (next: DungeonView | null) => {
+    (incoming: DungeonView | null, newApproval = false) => {
+      const next = mergeDungeonView(latest.current, incoming, newApproval);
       if (next && next.owner !== wallet)
         throw new Error("INVALID_DUNGEON_RESPONSE");
-      const prior = latest.current;
-      if (
-        prior &&
-        next &&
-        (BigInt(prior.nonce) > BigInt(next.nonce) ||
-          (prior.nonce === next.nonce &&
-            ((prior.settled && !next.settled) ||
-              prior.gates.length > next.gates.length ||
-              (["won", "lost", "refunded", "cancelled"].includes(prior.phase) &&
-                !["won", "lost", "refunded", "cancelled"].includes(
-                  next.phase,
-                )))))
-      )
-        return prior;
+      if (newApproval && next?.phase === "preparing") finalized.current = null;
       latest.current = next;
       setView(next);
       if (next?.settled && finalized.current !== next.nonce) {
@@ -96,6 +85,7 @@ export default function DungeonEntry({
           .parse(
             await webApi("/api/dungeon", input, AbortSignal.timeout(12000)),
           ),
+        input.kind === "quote",
       );
     },
     [accept],

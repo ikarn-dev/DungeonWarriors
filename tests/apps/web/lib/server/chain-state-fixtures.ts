@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { BN, type IdlAccounts } from "@anchor-lang/core";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { DUNGEON_V1 } from "../../../../../apps/web/lib/dungeon/rules";
+import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
 import { runAddresses } from "../../../../../apps/web/lib/game/run-accounts";
 import { coder, pda } from "../../../../../apps/web/lib/server/chain";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
@@ -115,7 +115,7 @@ export async function dungeon(
       nonce: new BN(nonce.toString()),
       cat: { collector: {} },
       verifier: owner,
-      rules: DUNGEON_V1,
+      rules: DUNGEON_V2,
       rulesHash: Array(32).fill(0),
       stake: new BN(1000000),
       maxRooms: 5,

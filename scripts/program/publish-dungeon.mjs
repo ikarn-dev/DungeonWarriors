@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import process from "node:process";
-import { DUNGEON_V1, ENGINE } from "../../apps/web/lib/dungeon/rules.ts";
+import { DUNGEON_V2, ENGINE } from "../../apps/web/lib/dungeon/rules.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
 import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
+import { checkEngine } from "./dungeon-engine.mjs";
+import { waitForFinalized } from "./publication-status.mjs";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
 
 const { BorshCoder, convertIdlToCamelCase } = requireWeb("@anchor-lang/core");
@@ -17,9 +19,11 @@ const {
 } = requireWeb("@solana/web3.js");
 const [mode, path, extra] = process.argv.slice(2);
 check(
-  mode === undefined || (mode === "--publish" && path && extra === undefined),
-  "Usage: node --env-file=apps/web/.env scripts/program/publish-dungeon.mjs [--publish admin-keypair.json]",
+  mode === undefined ||
+    (["--publish", "--stage"].includes(mode) && path && extra === undefined),
+  "Usage: node --env-file=apps/web/.env scripts/program/publish-dungeon.mjs [--stage|--publish admin-keypair.json]",
 );
+const engineHash = checkEngine();
 const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
 const program = new PublicKey(DEVNET.program);
 const pda = (seed) =>
@@ -29,6 +33,8 @@ const config = pda("game-config"),
 const rpc = new Connection(process.env.HELIUS_DEVNET_RPC_URL, {
   commitment: "finalized",
   disableRetryOnRateLimit: true,
+  fetch: (url, init) =>
+    fetch(url, { ...init, signal: AbortSignal.timeout(12000) }),
 });
 check((await rpc.getGenesisHash()) === DEVNET.genesisHash, "WRONG_NETWORK");
 const [configInfo, dungeonInfo] = await rpc.getMultipleAccountsInfo([
@@ -44,7 +50,7 @@ if (dungeonInfo) {
 }
 const hash = createHash("sha256")
   .update("purrps:dungeon-rules:v1")
-  .update(coder.types.encode("dungeonRules", DUNGEON_V1))
+  .update(coder.types.encode("dungeonRules", DUNGEON_V2))
   .digest("hex");
 const secret = Buffer.from(
   process.env.BROWSER_VERIFIER_SECRET_KEY ?? "",
@@ -58,29 +64,40 @@ check(
   "VERIFIER_MUST_BE_DEDICATED",
 );
 let signature;
-if (mode === "--publish") {
-  check(
-    game.allowReservations,
-    "ENABLE_RESERVATIONS_BEFORE_DUNGEON_PUBLICATION",
-  );
-  const hosted = await fetch(new URL("/api/dungeon", process.env.APP_ORIGIN), {
-    signal: AbortSignal.timeout(8000),
-  });
-  check(hosted.ok, "PUBLISH_THE_DUNGEON_WEB_BUILD_FIRST");
-  const ready = await hosted.json();
-  check(
-    ready.engine === ENGINE &&
-      ready.version === 1 &&
-      ready.verifier === verifier.toBase58(),
-    "HOSTED_DUNGEON_MISMATCH",
-  );
+if (mode === "--publish" || mode === "--stage") {
+  const enable = mode === "--publish";
+  if (enable) {
+    check(
+      game.allowReservations,
+      "ENABLE_RESERVATIONS_BEFORE_DUNGEON_PUBLICATION",
+    );
+    const hosted = await fetch(
+      new URL("/api/dungeon", process.env.APP_ORIGIN),
+      {
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    check(hosted.ok, "PUBLISH_THE_DUNGEON_WEB_BUILD_FIRST");
+    const ready = await hosted.json();
+    check(
+      ready.engine === ENGINE &&
+        ready.version === 2 &&
+        ready.engineHash === engineHash &&
+        ready.verifier === verifier.toBase58(),
+      "HOSTED_DUNGEON_MISMATCH",
+    );
+  }
   if (current)
     check(
-      current.rules.version === 1 &&
+      current.rules.version === 2 &&
         Buffer.from(current.rulesHash).toString("hex") === hash,
       "DUNGEON_RULES_MISMATCH",
     );
-  if (!current?.enabled || !current.verifier.equals(verifier)) {
+  if (
+    !current ||
+    current.enabled !== enable ||
+    !current.verifier.equals(verifier)
+  ) {
     const admin = Keypair.fromSecretKey(
       Uint8Array.from(JSON.parse(readFileSync(path, "utf8"))),
     );
@@ -94,9 +111,9 @@ if (mode === "--publish") {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: coder.instruction.encode("configureDungeon", {
-        rules: DUNGEON_V1,
+        rules: DUNGEON_V2,
         verifier,
-        enabled: true,
+        enabled: enable,
       }),
     });
     const block = await rpc.getLatestBlockhash("confirmed");
@@ -111,16 +128,14 @@ if (mode === "--publish") {
     signature = await rpc.sendRawTransaction(transaction.serialize(), {
       preflightCommitment: "confirmed",
     });
-    check(
-      (await rpc.confirmTransaction({ ...block, signature }, "finalized")).value
-        .err === null,
-      "DUNGEON_PUBLICATION_FAILED",
-    );
+    // Use bounded HTTP polling: some operator networks block RPC WebSockets.
+    // Keep the signature in any ambiguous error; never send a replacement here.
+    await waitForFinalized(rpc, signature);
     const published = await rpc.getAccountInfo(dungeon);
     check(published?.owner.equals(program), "DUNGEON_PUBLICATION_NOT_VISIBLE");
     current = coder.accounts.decode("dungeonConfig", published.data);
     check(
-      current.enabled &&
+      current.enabled === enable &&
         current.verifier.equals(verifier) &&
         Buffer.from(current.rulesHash).toString("hex") === hash,
       "DUNGEON_PUBLICATION_MISMATCH",
@@ -131,6 +146,7 @@ process.stdout.write(
   `${JSON.stringify({
     network: "solana-devnet",
     engine: ENGINE,
+    engineHash,
     program: program.toBase58(),
     dungeon: dungeon.toBase58(),
     configured: current !== null,

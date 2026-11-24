@@ -184,9 +184,20 @@ export function parseAssetManifest(input: unknown): AssetManifest {
   }
   return manifest;
 }
+export const WARRIOR_SCENE_ASSETS = [
+  ...["collector", "acrobat", "guardian", "sprinter"].flatMap((cat) => [
+    `body-${cat}`,
+    `warrior-${cat}`,
+  ]),
+  ...["spear", "longsword", "sword", "axe"].map((weapon) => `weapon-${weapon}`),
+  ...["slime", "skeleton", "bat", "warden"].map((enemy) => `enemy-${enemy}`),
+] as const;
+export function requiredSceneAssets(version: number): readonly string[] {
+  return version === 3 ? WARRIOR_SCENE_ASSETS : FIRST_SCENE_ASSETS;
+}
 export function missingSceneAssets(manifest: AssetManifest): string[] {
   const ids = new Set(manifest.assets.map((a) => a.id));
-  return FIRST_SCENE_ASSETS.filter((id) => !ids.has(id));
+  return requiredSceneAssets(manifest.version).filter((id) => !ids.has(id));
 }
 // Zod fixes field order; asset IDs and clip names must be sorted. The hash binds
 // these canonical UTF-8 bytes, never whitespace or a self-referential hash field.
