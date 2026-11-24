@@ -327,64 +327,74 @@
   border-radius: 50%;
 }
 
-/* Loader: Pip Spearpaw marching on the spot (smooth vector art). */
-.pixel-loader {
-  display: grid;
-  justify-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
+/* Loader: three gold dots rising in turn (2026-11-24, minimal). */
+.dots-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  height: 2rem;
 }
-.pixel-loader-cat {
-  width: 96px;
-  height: 96px;
-  background:
-    url("/game-assets/v3/warrior-collector.svg") center / contain no-repeat;
-  transform-origin: 50% 94%;
-}
-.pixel-loader-dots {
-  display: flex;
-  gap: 6px;
-}
-.pixel-loader-dots span {
-  width: 7px;
-  height: 7px;
+.dots-loader > span[aria-hidden] {
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 50%;
-  background: var(--gold-hi);
-  box-shadow: 0 0 8px #e2b04e99;
-  opacity: 0.3;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fff6d8,
+    var(--gold) 60%,
+    #9c6c1e
+  );
+  box-shadow: 0 0 10px #e2b04e80;
+  animation: dots-pulse 1.2s ease-in-out infinite;
+}
+.dots-loader > span[aria-hidden]:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots-loader > span[aria-hidden]:nth-child(3) {
+  animation-delay: 0.3s;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .pixel-loader-cat {
-    animation: loader-march 520ms ease-in-out infinite alternate;
-  }
-  .pixel-loader-dots span {
-    animation: loader-dot 900ms ease-in-out infinite;
-  }
-  .pixel-loader-dots span:nth-child(2) {
-    animation-delay: 300ms;
-  }
-  .pixel-loader-dots span:nth-child(3) {
-    animation-delay: 600ms;
+  .dots-loader > span[aria-hidden] {
+    animation-name: dots-rise;
   }
   .pixel-spinner {
     animation: spinner-turn 800ms linear infinite;
   }
 }
-@keyframes loader-march {
-  from {
-    transform: translateY(0) rotate(-4deg);
+@keyframes dots-rise {
+  0%,
+  60%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0);
   }
-  to {
-    transform: translateY(-6px) rotate(4deg);
+  30% {
+    opacity: 1;
+    transform: translateY(-0.5rem);
   }
 }
-@keyframes loader-dot {
-  0% {
+@keyframes dots-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+  }
+  30% {
     opacity: 1;
   }
-  34% {
-    opacity: 0.3;
-  }
+}
+/* A waiting step shows only the loader and its caption, without a panel. */
+.lobby-start[data-bare] {
+  justify-items: center;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+.lobby-start-caption {
+  font-size: 0.875rem;
+  text-shadow: 0 1px 6px #000000;
 }
 @keyframes spinner-turn {
   to {

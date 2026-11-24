@@ -24,7 +24,6 @@ export default function LobbyBackdrop() {
         alt=""
         fill
         sizes="100vw"
-        quality={80}
         className="lobby-backdrop-image"
       />
       <div className="lobby-backdrop-shade" />

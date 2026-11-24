@@ -1,11 +1,15 @@
 import type { useWallet } from "@solana/wallet-adapter-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import type { LobbyState } from "../lib/game/lobby-state";
 import DotsLoader from "./DotsLoader";
 
 // The single next step before the lobby menu opens: connect (in the wallet
 // pop-up), sign in (prompted automatically), create the player account, then
 // claim the free starter cat.
+const noSubscription = () => () => {};
+// Wallet ready states the provider reconnects automatically.
+const AUTO_CONNECT: ReadonlySet<string> = new Set(["Installed", "Loadable"]);
+
 export default function LobbyStart({
   wallet,
   busy,
@@ -33,12 +37,26 @@ export default function LobbyStart({
   readonly onCreatePlayer: () => void;
   readonly onClaimStarter: () => void;
 }) {
+  // Until hydration, and while a remembered wallet reconnects silently, show
+  // the loader rather than a Connect button that would flash and vanish.
+  const hydrated = useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+  const remembered = wallet.wallet;
+  const linking =
+    !hydrated ||
+    wallet.connecting ||
+    (remembered !== null && AUTO_CONNECT.has(remembered.readyState));
   let body: ReactNode;
-  // Waiting states show only the loader, without the panel around it.
-  let waiting = false;
+  // Waiting states show only the loader (and its caption), with no panel.
+  const waiting = !wallet.connected
+    ? linking
+    : restoring || (!authenticated ? busy && !restoreFailed : state === null);
   if (!wallet.connected)
-    body = wallet.connecting ? (
-      ((waiting = true), <DotsLoader label="Connecting your wallet" />)
+    body = linking ? (
+      <DotsLoader label="Connecting your wallet" />
     ) : (
       <>
         <p>Connect a Solana wallet to enter the catacombs.</p>
@@ -58,7 +76,9 @@ export default function LobbyStart({
       busy && !restoreFailed ? (
         <>
           <DotsLoader label="Waiting for your wallet" />
-          <p>Approve the sign-in message in your wallet.</p>
+          <p className="lobby-start-caption">
+            Approve the sign-in message in your wallet.
+          </p>
         </>
       ) : (
         <>
@@ -141,7 +161,11 @@ export default function LobbyStart({
       </>
     );
   return (
-    <section className="lobby-start pixel-panel" aria-label="Get started">
+    <section
+      className={waiting ? "lobby-start" : "lobby-start pixel-panel"}
+      data-bare={waiting || undefined}
+      aria-label="Get started"
+    >
       {body}
     </section>
   );

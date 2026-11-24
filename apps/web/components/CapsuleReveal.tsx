@@ -12,8 +12,8 @@ import {
   type CapsuleReceipt,
   type LobbyState,
 } from "../lib/game/lobby-state";
-import { LobbySoundToggle } from "./LobbySound";
 import DotsLoader from "./DotsLoader";
+import { LobbySoundToggle } from "./LobbySound";
 
 export default function CapsuleReveal({
   kind,
