@@ -105,11 +105,12 @@ export function renderDungeon(
           .setVisible(false),
         started: -Infinity,
       }));
+      // The weapon is held in front of the body, as in the portraits.
       this.weapon = this.add
         .image(0, 0, weaponId)
         .setOrigin(grip.x / 96, grip.y / 96)
         .setDisplaySize(96 * WEAPON_SCALE, 96 * WEAPON_SCALE)
-        .setDepth(9);
+        .setDepth(11);
       this.body = this.add
         .image(0, 0, `body-${cat}`)
         .setOrigin(61 / 128, 120 / 128)

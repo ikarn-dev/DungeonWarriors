@@ -1,0 +1,274 @@
+/* Castle backdrop, rising embers and the metallic title frame (2026-11-24). */
+.lobby-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.lobby-backdrop-image {
+  object-fit: cover;
+  object-position: 58% 50%;
+}
+/* Darken toward the edges and the bottom so panels and text stay readable. */
+.lobby-backdrop-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 65% at 50% 46%,
+      #04090800 0%,
+      #04090866 55%,
+      #030706e6 100%
+    ),
+    linear-gradient(#071110a6, #0711104d 35%, #050b0ad9);
+}
+.lobby-embers {
+  position: absolute;
+  inset: 0;
+}
+.lobby-embers span {
+  --drift: 0px;
+  position: absolute;
+  bottom: -12px;
+  border-radius: 50%;
+  background: #ffd27a;
+  box-shadow:
+    0 0 6px 2px #ffb54799,
+    0 0 14px 4px #ff8a3d33;
+  opacity: 0;
+  animation-name: ember-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+.lobby-embers span[data-tone="bright"] {
+  background: #fff3c9;
+}
+/* A few cool motes catch the moonlight. */
+.lobby-embers span[data-tone="cool"] {
+  background: #b9fff0;
+  box-shadow: 0 0 8px 2px #5fe0c866;
+}
+.lobby-embers span[data-drift="0"] {
+  --drift: -48px;
+}
+.lobby-embers span[data-drift="1"] {
+  --drift: -18px;
+}
+.lobby-embers span[data-drift="3"] {
+  --drift: 22px;
+}
+.lobby-embers span[data-drift="4"] {
+  --drift: 52px;
+}
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  12% {
+    opacity: 0.95;
+  }
+  45% {
+    transform: translate3d(calc(var(--drift) * 0.45), -48dvh, 0) scale(0.85);
+  }
+  70% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), -104dvh, 0) scale(0.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lobby-embers {
+    display: none;
+  }
+}
+
+/* Title screen: one ornate metallic frame, centred. */
+.lobby[data-screen="title"] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+}
+.title-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.title-frame {
+  --metal: linear-gradient(
+    135deg,
+    #fbeab0,
+    #b9852f 22%,
+    #fff3c4 45%,
+    #7d561a 68%,
+    #e7c06a 88%,
+    #9b6c22
+  );
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: clamp(1rem, 3dvh, 1.75rem);
+  width: min(26rem, 100%);
+  padding: clamp(1.75rem, 5dvh, 2.75rem) clamp(1.5rem, 5vw, 2.5rem);
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background:
+    linear-gradient(170deg, #12211ff2, #0a1514f5 55%, #071010f7) padding-box,
+    var(--metal) border-box;
+  box-shadow:
+    inset 0 0 0 5px #08100f,
+    inset 0 0 0 6px #6e5420,
+    inset 0 1px 24px #2b8c7a1f,
+    0 0 0 1px #00000099,
+    0 24px 70px #000000b3,
+    0 0 60px #1f6b5e33;
+}
+.title-corner {
+  position: absolute;
+  z-index: 1;
+  width: 2.75rem;
+  height: 2.75rem;
+  filter: drop-shadow(0 2px 2px #000000a6);
+}
+.title-corner[data-corner="tl"] {
+  top: -9px;
+  left: -9px;
+}
+.title-corner[data-corner="tr"] {
+  top: -9px;
+  right: -9px;
+  transform: scaleX(-1);
+}
+.title-corner[data-corner="bl"] {
+  bottom: -9px;
+  left: -9px;
+  transform: scaleY(-1);
+}
+.title-corner[data-corner="br"] {
+  right: -9px;
+  bottom: -9px;
+  transform: scale(-1);
+}
+/* A slow light sweep across the frame gives the metal its sheen. */
+.title-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.title-sheen::before {
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 45%;
+  content: "";
+  background: linear-gradient(
+    105deg,
+    #ffffff00 0%,
+    #fff6d81f 45%,
+    #ffffff33 50%,
+    #fff6d81f 55%,
+    #ffffff00 100%
+  );
+  transform: translateX(0) skewX(-12deg);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .title-sheen::before {
+    animation: title-sheen 7s ease-in-out 1.2s infinite;
+  }
+}
+@keyframes title-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-12deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 1;
+    transform: translateX(420%) skewX(-12deg);
+  }
+  39%,
+  100% {
+    opacity: 0;
+    transform: translateX(420%) skewX(-12deg);
+  }
+}
+.title-frame .lobby-title {
+  /* Fills the frame width; the wide wordmark sets the frame's scale. */
+  --logo-w: clamp(13rem, 40dvh, 21rem);
+  filter: drop-shadow(0 6px 14px #000000b3);
+}
+.title-frame .lobby-brand {
+  background: #050b0acc;
+  box-shadow:
+    inset 0 0 0 1px #c9963c80,
+    0 2px 6px #00000080;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.title-frame .lobby-brand strong {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.875rem;
+}
+/* Metallic teal button with a gold rim. */
+.title-start {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.5rem;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background:
+    linear-gradient(#55b8a3, #24806f 38%, #17594e 62%, #1d6c5e) padding-box,
+    linear-gradient(#fbeab0, #b9852f 40%, #e7c06a 70%, #7d561a) border-box;
+  box-shadow:
+    inset 0 1px 0 #c8fff1a6,
+    inset 0 -2px 0 #0b2f2899,
+    0 4px 14px #000000a6,
+    0 0 22px #2fb39a33;
+  color: #fff7df;
+  font:
+    700 1.375rem / 1 var(--font-geist-sans),
+    sans-serif;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-shadow:
+    0 1px 0 #0b2f28,
+    0 0 12px #9ff5e066;
+  white-space: nowrap;
+  transition:
+    transform 150ms ease-out,
+    filter 150ms ease-out;
+}
+@media (hover: hover) {
+  .title-start:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+  }
+}
+.title-start:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+.title-start:focus-visible {
+  outline: 2px solid #ffe7a1;
+  outline-offset: 4px;
+}
+@media (max-height: 30rem) {
+  .title-frame {
+    gap: 0.75rem;
+    padding-block: 1.25rem;
+  }
+  .title-frame .lobby-title {
+    --logo-w: 11rem;
+  }
+}

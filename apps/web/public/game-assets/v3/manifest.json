@@ -5,8 +5,8 @@
     {
       "id": "body-acrobat",
       "path": "/game-assets/v3/body-acrobat.svg",
-      "sha256": "c19d6a41dac6dd38b8a5001f39ad7204de8a0084dd331eb03fd0d37049aa3f39",
-      "bytes": 4896,
+      "sha256": "180fa7ebbb7f7e735b556414f250b5be8169fbc03728a1bb344fcc7978c1aba6",
+      "bytes": 10658,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -23,8 +23,8 @@
     {
       "id": "body-collector",
       "path": "/game-assets/v3/body-collector.svg",
-      "sha256": "0d8e8e48d4c47377bb514371b72a4704840240ff76fa5871e6b2b31455d06835",
-      "bytes": 4879,
+      "sha256": "4fe58b7ec27e24f6d4e4c203763470954c992005eb181c66cea86f9ea5e6c43e",
+      "bytes": 12175,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -41,8 +41,8 @@
     {
       "id": "body-guardian",
       "path": "/game-assets/v3/body-guardian.svg",
-      "sha256": "e9e2435a6f484980d6e49867c8fc2ca9f675731594d146f6e36fc0023e04c55f",
-      "bytes": 5341,
+      "sha256": "47d599284bd1ed397ea9473dfb109819153feee7c0a5b3445ccf22bd2d566acf",
+      "bytes": 12661,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -59,8 +59,8 @@
     {
       "id": "body-sprinter",
       "path": "/game-assets/v3/body-sprinter.svg",
-      "sha256": "2b1615fa1d3b83d471ee764bcda039a9598025be07abc0477d46eb1eb33b291b",
-      "bytes": 6437,
+      "sha256": "b667b2c44690fd438cfa8262ece9b2757224294ae770ad23602abc3dcc29284c",
+      "bytes": 12737,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -149,8 +149,8 @@
     {
       "id": "warrior-acrobat",
       "path": "/game-assets/v3/warrior-acrobat.svg",
-      "sha256": "8b8b5ae834cda7912d9adce2ab911c057157e0d20804693a72e65e133a8d914c",
-      "bytes": 5901,
+      "sha256": "d008c3458271c257feaa7e1764b05356a35e3874aab57cdf5a33b06be7c6d18e",
+      "bytes": 13219,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -167,8 +167,8 @@
     {
       "id": "warrior-collector",
       "path": "/game-assets/v3/warrior-collector.svg",
-      "sha256": "22eee0ec54be44db7fe250255cdfa05d4296d9b5962a61b69fc9e6daaf9e4ebf",
-      "bytes": 5785,
+      "sha256": "3179b61810237fb3b5e0ec1034cd500dc61b16ee4ec7f01305b24051cbc8167c",
+      "bytes": 14652,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -185,8 +185,8 @@
     {
       "id": "warrior-guardian",
       "path": "/game-assets/v3/warrior-guardian.svg",
-      "sha256": "178174e202d5de3c55a9b0cbe8d77f2cfc29ef0dbd7014fd94dfbd1894d4e1cd",
-      "bytes": 6221,
+      "sha256": "e03a5327c2d48c77df974b645727f168966a986af82451135b545d1b398f138c",
+      "bytes": 14592,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -203,8 +203,8 @@
     {
       "id": "warrior-sprinter",
       "path": "/game-assets/v3/warrior-sprinter.svg",
-      "sha256": "03b5d718d89c522b4870d14478e9c5b5d0815b3eca5ffbf2bbe023afd42a0e2b",
-      "bytes": 7270,
+      "sha256": "97ccd455fa0e83354208ac72f7a5209e946b27acc2413e552aea4aa3b6d03a1b",
+      "bytes": 15073,
       "width": 128,
       "height": 128,
       "frameWidth": 128,
@@ -221,16 +221,16 @@
     {
       "id": "weapon-axe",
       "path": "/game-assets/v3/weapon-axe.svg",
-      "sha256": "d860fdce228208ec26bc515d9bc25ecfa63fcffcc5feee05aad72971812d61c1",
-      "bytes": 846,
+      "sha256": "62920875c8e5a5f0ab8cc2b1ab9fefe9cb553d6ee4a460f13d4a9ae271c82076",
+      "bytes": 2131,
       "width": 96,
       "height": 96,
       "frameWidth": 96,
       "frameHeight": 96,
       "frames": 1,
       "anchor": {
-        "x": 48,
-        "y": 74
+        "x": 40,
+        "y": 76
       },
       "repeat": "none",
       "reducedMotionFrame": 0,
@@ -239,8 +239,8 @@
     {
       "id": "weapon-longsword",
       "path": "/game-assets/v3/weapon-longsword.svg",
-      "sha256": "7070983e7669163d17d8e8493d314ef0c558e0b3d2c47dacc4d49dd0e27055ff",
-      "bytes": 1018,
+      "sha256": "1af1c49dcdcf48b2b16290dbd139af65096036b0d869c38379b281bd52a0ae93",
+      "bytes": 2350,
       "width": 96,
       "height": 96,
       "frameWidth": 96,
@@ -248,7 +248,7 @@
       "frames": 1,
       "anchor": {
         "x": 48,
-        "y": 72
+        "y": 70
       },
       "repeat": "none",
       "reducedMotionFrame": 0,
@@ -257,8 +257,8 @@
     {
       "id": "weapon-spear",
       "path": "/game-assets/v3/weapon-spear.svg",
-      "sha256": "6e87188e3bdd577da196c9c774b91cd30f4fec41a45e3649a9c51d16191e466b",
-      "bytes": 919,
+      "sha256": "5ae1e3d61e3509e080dc5f0fed448f00726d5d13117356a73f84425c211eb699",
+      "bytes": 2266,
       "width": 96,
       "height": 96,
       "frameWidth": 96,
@@ -266,7 +266,7 @@
       "frames": 1,
       "anchor": {
         "x": 48,
-        "y": 64
+        "y": 62
       },
       "repeat": "none",
       "reducedMotionFrame": 0,
@@ -275,8 +275,8 @@
     {
       "id": "weapon-sword",
       "path": "/game-assets/v3/weapon-sword.svg",
-      "sha256": "af27249f69a148bc557efed72811ff4e13a7c828966576ea95fd60204dd9fcd5",
-      "bytes": 893,
+      "sha256": "462acb9a91d4bb0b545291bf460fee3c20d2b19aec63ebc95cc95b55a0ea813a",
+      "bytes": 1726,
       "width": 96,
       "height": 96,
       "frameWidth": 96,

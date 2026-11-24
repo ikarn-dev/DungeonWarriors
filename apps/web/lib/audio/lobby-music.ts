@@ -23,7 +23,6 @@ class LobbyMusic {
   private readonly holds = new Set<string>();
   private playing: Playing | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
-  private lastHop = -Infinity;
 
   // Browsers allow audio only after a user gesture; call this from one.
   unlock() {
@@ -83,15 +82,6 @@ class LobbyMusic {
     if (!this.synth) return;
     void this.synth.ctx.resume();
     this.synth.cue(on, this.synth.ctx.currentTime + 0.02);
-  }
-  // A lobby cat hopped. Meows are rationed so several cats never overlap,
-  // and panned to where the cat is on screen (-1 left, 1 right).
-  hop(pan: number) {
-    if (!this.synth || !this.effects()) return;
-    const now = this.synth.ctx.currentTime;
-    if (now - this.lastHop < 2.5 || Math.random() > 0.6) return;
-    this.lastHop = now;
-    this.synth.meow(now + 0.02, Math.random() < 0.5, pan);
   }
 
   private effects() {

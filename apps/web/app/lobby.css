@@ -1,9 +1,6 @@
-/* Full-screen lobby: pixel scene, title, menu and section panels. */
+/* Full-screen lobby (2026-11-24): the moonlit castle backdrop with rising
+   embers behind the title, menu and section panels. */
 .lobby {
-  /* Scenery scale keeps each 2 px art cell whole; cats (1 px cells) use --ck. */
-  --k: 2;
-  --ck: 3;
-  --ground: calc(40px * var(--k));
   position: relative;
   isolation: isolate;
   display: grid;
@@ -11,83 +8,10 @@
   gap: 0.75rem;
   height: 100dvh;
   overflow: hidden;
-  padding: var(--edge-top) var(--edge-right)
-    calc(var(--ground) + 30px * var(--k)) var(--edge-left);
-  background: var(--sky);
+  padding: var(--edge-top) var(--edge-right) var(--edge-bottom) var(--edge-left);
+  background: #06100f;
   color: var(--cream);
   font-family: var(--font-pixel), var(--font-geist-sans), sans-serif;
-}
-@media (min-height: 46rem) {
-  .lobby {
-    --k: 2.5;
-    --ck: 3.5;
-  }
-}
-@media (min-height: 58rem) {
-  .lobby {
-    --k: 3;
-    --ck: 4;
-  }
-}
-@media (max-height: 30rem) {
-  .lobby {
-    --k: 1.5;
-    --ck: 2.5;
-  }
-}
-
-.lobby-scene {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  background:
-    url("/game-assets/v2/background-forest-near.svg") center bottom
-    calc(var(--ground) * 0.55) / auto 100% repeat-x,
-    url("/game-assets/v2/background-forest-far.svg") center bottom
-    calc(var(--ground) * 0.55) / auto 100% repeat-x,
-    url("/game-assets/v2/background-sky.svg") center bottom / auto 100% repeat-x,
-    var(--sky);
-  image-rendering: pixelated;
-}
-.lobby-ground {
-  position: absolute;
-  inset: auto 0 0;
-  height: var(--ground);
-  background:
-    url("/game-assets/v2/terrain-grass.svg") 0 0 / calc(32px * var(--k))
-    calc(16px * var(--k)) repeat-x,
-    url("/game-assets/v2/terrain-fill.svg") 0 calc(8px * var(--k)) /
-    calc(32px * var(--k)) calc(32px * var(--k)) repeat,
-    #2a2640;
-  image-rendering: pixelated;
-}
-/* Warrior art is 128 px with feet 8 px above the bottom; --ck scales it. */
-.lobby-cat {
-  position: absolute;
-  left: 0;
-  bottom: calc(var(--ground) - 2px * var(--k) - 2.5px * var(--ck));
-  width: calc(40px * var(--ck));
-  height: calc(40px * var(--ck));
-  background: center / contain no-repeat;
-  transform-origin: 50% 94%;
-  visibility: hidden;
-  will-change: transform;
-}
-.lobby-cat[data-cat="acrobat"] {
-  background-image: url("/game-assets/v3/warrior-acrobat.svg");
-}
-.lobby-cat[data-cat="collector"] {
-  background-image: url("/game-assets/v3/warrior-collector.svg");
-}
-.lobby-cat[data-cat="guardian"] {
-  background-image: url("/game-assets/v3/warrior-guardian.svg");
-}
-.lobby-cat[data-cat="sprinter"] {
-  background-image: url("/game-assets/v3/warrior-sprinter.svg");
-}
-.lobby-cat:first-of-type {
-  z-index: 1;
 }
 
 .lobby-head {
@@ -95,21 +19,21 @@
   justify-items: center;
   gap: 0.75rem;
 }
-/* The logo PNG is cropped to its visible bounds (x 60–1195, y 125–1095 of
-   1254 px) so spacing comes from CSS, not transparent padding. */
+/* The logo PNG is cropped to its visible bounds (x 89–1683, y 3–884 of
+   1774 × 887 px) so spacing comes from CSS, not transparent padding. */
 .lobby-title {
-  --logo-w: clamp(6.5rem, 21dvh, 12.5rem);
+  --logo-w: clamp(11rem, 36dvh, 21rem);
   width: var(--logo-w);
-  aspect-ratio: 1135 / 970;
+  aspect-ratio: 1595 / 882;
   margin: 0;
   overflow: hidden;
   line-height: 0;
 }
 .lobby-logo {
-  width: calc(100% * 1254 / 1135);
+  width: calc(100% * 1774 / 1595);
   max-width: none;
   height: auto;
-  margin: calc(-100% * 125 / 1135) 0 0 calc(-100% * 60 / 1135);
+  margin: calc(-100% * 3 / 1595) 0 0 calc(-100% * 89 / 1595);
 }
 /* Lobby navbar: small mark on the left, level with the wallet chip. */
 .lobby-head[data-variant="bar"] {
@@ -118,7 +42,7 @@
   height: 3.5rem;
 }
 .lobby-head[data-variant="bar"] .lobby-title {
-  --logo-w: 4rem;
+  --logo-w: 6.25rem;
 }
 
 .lobby-body {
@@ -328,9 +252,6 @@
 }
 
 @media (max-width: 48rem) {
-  .lobby {
-    padding-bottom: calc(var(--ground) + 12px * var(--k));
-  }
   .lobby-menu-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
@@ -357,15 +278,11 @@
   .lobby-panel {
     padding: 1rem;
   }
-  .lobby[data-screen="title"] .lobby-title {
-    --logo-w: 8rem;
-  }
 }
 @media (max-height: 30rem) {
   /* Short landscape phones: the menu becomes one row above the panel. */
   .lobby {
     gap: 0.5rem;
-    padding-bottom: calc(var(--ground) + 4px * var(--k));
   }
   .lobby-menu-layout {
     grid-template-columns: minmax(0, 52rem);

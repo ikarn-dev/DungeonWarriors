@@ -4,7 +4,6 @@ import { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { verifyManifestBinding } from "../lib/game/assets";
-import { CATALOG_V1 } from "../lib/game/catalog";
 import {
   type PlayerIntent,
   validatePreparedPlayerAction,
@@ -32,8 +31,8 @@ import {
 } from "../lib/game/web-api";
 import { useCapsuleReceipt } from "./account-data";
 import CapsuleReveal from "./CapsuleReveal";
+import LobbyBackdrop from "./LobbyBackdrop";
 import type { LobbyTab } from "./LobbyMenu";
-import LobbyScene from "./LobbyScene";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
 import LobbyToaster from "./LobbyToaster";
@@ -370,15 +369,9 @@ export default function StarterPanel() {
     state?.configured === true &&
     state.hasPlayer &&
     state.starter === "fulfilled";
-  // Owned cats wander the lobby, selected first; before any draw the catalog cats do.
-  const first = (id: string) => Number(id !== state?.selected);
-  const owned = authenticated ? (state?.cats.map(({ id }) => id) ?? []) : [];
-  const scene = owned.length
-    ? [...owned].sort((a, b) => first(a) - first(b))
-    : CATALOG_V1.cats.map(({ id }) => id);
   return (
     <>
-      <LobbyScene cats={scene} />
+      <LobbyBackdrop />
       <LobbyToaster />
       {wallet.connected && address !== null && (
         <WalletChip

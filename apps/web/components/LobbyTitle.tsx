@@ -13,11 +13,11 @@ export default function LobbyTitle({
     <header className="lobby-head" data-variant={bar ? "bar" : undefined}>
       <h1 className="lobby-title">
         <Image
-          src="/logo-no-bg.png"
-          alt="PURRPS"
-          width={1254}
-          height={1254}
-          sizes={bar ? "5rem" : "(max-height: 40rem) 8rem, 14rem"}
+          src="/game_logo.png"
+          alt="Dungeon Warriors"
+          width={1774}
+          height={887}
+          sizes={bar ? "8rem" : "(max-height: 40rem) 14rem, 21rem"}
           preload
           className="lobby-logo"
         />

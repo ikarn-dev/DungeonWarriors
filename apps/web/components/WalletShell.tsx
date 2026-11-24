@@ -5,8 +5,7 @@ import {
   type WalletProviderProps,
 } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
-import { CATALOG_V1 } from "../lib/game/catalog";
-import LobbyScene from "./LobbyScene";
+import LobbyBackdrop from "./LobbyBackdrop";
 import PixelLoader from "./PixelLoader";
 import StarterPanel from "./StarterLobby";
 
@@ -17,7 +16,7 @@ export default function WalletShell() {
   if (endpoint === null)
     return (
       <>
-        <LobbyScene cats={CATALOG_V1.cats.map(({ id }) => id)} />
+        <LobbyBackdrop />
         <div className="lobby-body">
           <div className="lobby-start pixel-panel">
             <PixelLoader />
