@@ -18,7 +18,7 @@ use crate::{
     state::{
         collection::{Collection, PlayerAccount},
         config::{CatalogVersion, GameConfig},
-        draws::{CapsuleDraw, DrawStatus},
+        draws::{CapsuleDraw, CapsuleKind, DrawStatus},
         economy::HouseState,
     },
 };
@@ -54,6 +54,10 @@ pub fn handle_purchase_capsule(
 ) -> Result<()> {
     let a = ctx.accounts;
     require!(a.config.allow_purchases, ErrorCode::AdmissionClosed);
+    require!(
+        args.kind == CapsuleKind::PaidCat,
+        ErrorCode::AdmissionClosed
+    );
     require!(
         a.config.rules.is_some()
             && a.config.catalog == Some(a.catalog.binding)

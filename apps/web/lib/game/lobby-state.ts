@@ -38,11 +38,12 @@ const rawSchema = z
       .max(6),
   })
   .strict();
+// Display names (2026-11-24); the catalog type IDs stay the onchain identity.
 export const CAT_NAMES: Record<CatId, string> = {
-  collector: "Collector",
-  acrobat: "Acrobat",
-  guardian: "Guardian",
-  sprinter: "Sprinter",
+  collector: "Pip Spearpaw",
+  acrobat: "Rosie Bladewhisk",
+  guardian: "Sir Bastion",
+  sprinter: "Bjorn Ironclaw",
 };
 const ids = ["collector", "acrobat", "guardian", "sprinter"] as const;
 const grades = ["common", "rare", "epic"] as const;

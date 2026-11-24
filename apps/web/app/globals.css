@@ -7,6 +7,8 @@
 @import "./lobby-sections.css";
 @import "./lobby-play.css";
 @import "./capsule-reveal.css";
+@import "./dungeon.css";
+@import "./dungeon-hud.css";
 
 :root {
   --background: #ffffff;

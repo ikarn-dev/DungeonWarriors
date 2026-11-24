@@ -21,6 +21,8 @@ mod browser_run;
 mod credit_contention;
 #[path = "delegation.rs"]
 mod delegation;
+#[path = "dungeon.rs"]
+mod dungeon;
 #[path = "paid-capsules.rs"]
 mod paid_capsules;
 #[path = "support/play-setup.rs"]

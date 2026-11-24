@@ -47,3 +47,10 @@ pub use settle_returned::*;
 pub use sponsorship::*;
 pub use starter::*;
 pub use upgrade::*;
+
+pub mod dungeon_config;
+pub mod dungeon_reserve;
+pub mod dungeon_settle;
+pub use dungeon_config::*;
+pub use dungeon_reserve::*;
+pub use dungeon_settle::*;

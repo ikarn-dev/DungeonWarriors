@@ -15,7 +15,6 @@ const percent = new Intl.NumberFormat("en-US", {
   style: "percent",
   maximumFractionDigits: 2,
 });
-type Capsule = "paidCat" | "upgrade";
 
 function Offer({
   title,
@@ -114,19 +113,11 @@ export default function CapsuleShop({
         <p>The shop catalog is unavailable.</p>
       </div>
     );
-  const { catPriceBaseUnits: catPrice, upgradePriceBaseUnits: upgradePrice } =
-    shopCatalog;
+  const { catPriceBaseUnits: catPrice } = shopCatalog;
   const eligible = shopCatalog.cats.filter(
     ({ id }) => !state.cats.some((cat) => cat.id === id),
   );
   const total = eligible.reduce((sum, cat) => sum + cat.weight, 0);
-  const upgradeTotal = shopCatalog.upgrades.reduce(
-    (sum, grade) => sum + grade.weight,
-    0,
-  );
-  const upgradable = state.cats.some(
-    (cat) => cat.level < shopCatalog.maxCatLevel,
-  );
   const paused = !state.allowPurchases;
   const unavailable =
     blocked || paused || pending || nonce === null || inventoryVersion === null;
@@ -135,11 +126,11 @@ export default function CapsuleShop({
     available < price
       ? `Needs ${displayUsdc(price.toString())} USDC available.`
       : null;
-  const buy = (capsule: Capsule) => {
+  const buy = () => {
     if (unavailable || nonce === null || inventoryVersion === null) return;
     action({
       kind: "purchaseCapsule",
-      capsule,
+      capsule: "paidCat",
       nonce: nonce.toString(),
       inventoryVersion: inventoryVersion.toString(),
       catalogVersion,
@@ -219,30 +210,7 @@ export default function CapsuleShop({
           }
           blocked={unavailable}
           opening={pending && !canRefund && draw?.kind === "paidCat"}
-          onBuy={() => buy("paidCat")}
-        />
-        <Offer
-          title="Upgrade capsule"
-          art={[`${MEDIA_ROOT}/upgrade-item.svg`]}
-          price={upgradePrice}
-          odds={shopCatalog.upgrades.map((grade) => {
-            const { rarity } = grade;
-            const label = rarity.charAt(0).toUpperCase() + rarity.slice(1);
-            return [
-              `${label} · +${grade.levelGain} ${grade.levelGain === 1 ? "level" : "levels"}`,
-              grade.weight / upgradeTotal,
-            ];
-          })}
-          reason={
-            !upgradable
-              ? "All your cats are fully upgraded."
-              : paused || pending
-                ? null
-                : funds(upgradePrice)
-          }
-          blocked={unavailable}
-          opening={pending && !canRefund && draw?.kind === "upgrade"}
-          onBuy={() => buy("upgrade")}
+          onBuy={buy}
         />
       </div>
       <p className="lobby-section-note">

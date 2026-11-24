@@ -1,11 +1,10 @@
-import { readFileSync } from "node:fs";
-import { BN, type IdlAccounts } from "@anchor-lang/core";
+import { BN } from "@anchor-lang/core";
 import {
   AccountLayout,
   AccountState,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   displaySol,
@@ -22,94 +21,18 @@ import {
   DEVNET,
   LEADERBOARD_SEED,
 } from "../../../../../apps/web/lib/solana/addresses";
-import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game";
 
-const owner = Keypair.generate().publicKey;
-const wallet = owner.toBase58();
-const playerSeed = [Buffer.from("player"), owner.toBytes()];
-const program = new PublicKey(DEVNET.program);
-const playerAddress = pda("player", owner.toBytes());
-const slot = 200;
-type Accounts = IdlAccounts<PurrpsGame>;
-
-async function player(
-  nextRunNonce = "10",
-  overrides: Partial<Accounts["playerAccount"]> = {},
-) {
-  return {
-    owner: program,
-    data: await coder.accounts.encode("playerAccount", {
-      schemaVersion: 1,
-      bump: PublicKey.findProgramAddressSync(playerSeed, program)[1],
-      owner,
-      availableBaseUnits: new BN("9007199254740993"),
-      lockedStakeBaseUnits: new BN("4000000"),
-      purchaseEscrowBaseUnits: new BN("2000000"),
-      nextRunNonce: new BN(nextRunNonce),
-      nextDrawNonce: new BN(0),
-      nextSessionNonce: new BN(0),
-      settledRuns: new BN(3),
-      wins: new BN(1),
-      losses: new BN(1),
-      technicalRefunds: new BN(1),
-      ...overrides,
-    }),
-    executable: false,
-    lamports: 1_000_000,
-  };
-}
-
-const noData = {
-  owner: SystemProgram.programId,
-  data: Buffer.alloc(0),
-  executable: false,
-  lamports: 1,
-};
-
-async function result(
-  nonce: bigint,
-  refund = false,
-  aliases: Partial<Accounts["resultReceipt"]> = {},
-) {
-  const addresses = runAddresses({ owner: wallet, nonce });
-  const path = new URL(
-    "../../../../fixtures/run-delivery/terminal.hex",
-    import.meta.url,
-  );
-  const fixture = coder.accounts.decode<Accounts["runGameState"]>(
-    "runGameState",
-    Buffer.from(readFileSync(path, "utf8").trim(), "hex"),
-  );
-  return {
-    owner: program,
-    data: await coder.accounts.encode("resultReceipt", {
-      schemaVersion: 1,
-      bump: addresses.receipt[1],
-      run: addresses.run[0],
-      owner,
-      nonce: new BN(nonce.toString()),
-      market: { sol: {} },
-      snapshotHash: fixture.snapshotHash,
-      rules: fixture.snapshot.rulesBinding,
-      cat: fixture.snapshot.cat,
-      oracle: fixture.snapshot.oracle,
-      startObservation: null,
-      stakeBaseUnits: new BN("1000000"),
-      terminal: {
-        ...fixture.terminal,
-        reason: refund ? { technicalAbort: {} } : { cashOut: {} },
-        score: new BN(22),
-        refundBaseUnits: new BN(refund ? "1000000" : "0"),
-        grossPayoutBaseUnits: new BN(refund ? "0" : "1100000"),
-      },
-      settledAtSeconds: new BN(1_700_000_000),
-      settledAtSlot: new BN(slot - 1),
-      ...aliases,
-    }),
-    executable: false,
-    lamports: 1_000_000,
-  };
-}
+import {
+  dungeon,
+  noData,
+  owner,
+  player,
+  playerAddress,
+  program,
+  result,
+  slot,
+  wallet,
+} from "./chain-state-fixtures";
 
 beforeEach(() => {
   vi.stubEnv(
@@ -312,11 +235,18 @@ describe("finalized wallet and receipt records", () => {
       .spyOn(Connection.prototype, "getMultipleAccountsInfoAndContext")
       .mockResolvedValueOnce({
         context: { slot: slot + 1 },
-        value: [await result(9n), noData, await result(7n, true)],
+        value: [
+          await result(9n),
+          noData,
+          await result(7n, true),
+          null,
+          null,
+          null,
+        ],
       })
       .mockResolvedValueOnce({
         context: { slot: slot + 2 },
-        value: [null, null, null],
+        value: [null, null, null, null, null, null],
       });
     await expect(
       readState(wallet, stateInput.parse({ kind: "history", limit: 3 })),
@@ -351,9 +281,16 @@ describe("finalized wallet and receipt records", () => {
     });
     expect(pages).toHaveBeenNthCalledWith(
       1,
-      [9n, 8n, 7n].map(
-        (nonce) => runAddresses({ owner: wallet, nonce }).receipt[0],
-      ),
+      [
+        ...[9n, 8n, 7n].map(
+          (nonce) => runAddresses({ owner: wallet, nonce }).receipt[0],
+        ),
+        ...[9n, 8n, 7n].map((nonce) => {
+          const bytes = Buffer.alloc(8);
+          bytes.writeBigUInt64LE(nonce);
+          return pda("expedition", owner.toBytes(), bytes);
+        }),
+      ],
       { commitment: "finalized", minContextSlot: slot },
     );
     await expect(
@@ -379,7 +316,7 @@ describe("finalized wallet and receipt records", () => {
       });
     const pages = vi
       .spyOn(Connection.prototype, "getMultipleAccountsInfoAndContext")
-      .mockResolvedValue({ context: { slot }, value: [null] });
+      .mockResolvedValue({ context: { slot }, value: [null, null] });
     await expect(
       readState(
         wallet,
@@ -420,9 +357,13 @@ describe("finalized wallet and receipt records", () => {
         context: { slot },
         value: [
           await result(9n, false, { owner: Keypair.generate().publicKey }),
+          null,
         ],
       })
-      .mockResolvedValueOnce({ context: { slot: slot - 1 }, value: [null] });
+      .mockResolvedValueOnce({
+        context: { slot: slot - 1 },
+        value: [null, null],
+      });
     const input = stateInput.parse({ kind: "history", limit: 1 });
     await expect(readState(wallet, input)).rejects.toThrow(
       "INVALID_CHAIN_ACCOUNT",
@@ -434,175 +375,27 @@ describe("finalized wallet and receipt records", () => {
   });
 });
 
-it("offers automatic budget funding while quoting against unencumbered vault credit", async () => {
-  const fixture = coder.accounts.decode<Accounts["runGameState"]>(
-    "runGameState",
-    Buffer.from(
-      readFileSync(
-        new URL(
-          "../../../../fixtures/run-delivery/active.hex",
-          import.meta.url,
-        ),
-        "utf8",
-      ).trim(),
-      "hex",
-    ),
-  );
-  const configAddress = pda("game-config");
-  const house = pda("house");
-  const mint = new PublicKey(DEVNET.usdcMint);
-  const tokenProgram = new PublicKey(DEVNET.tokenProgram);
-  const vault = getAssociatedTokenAddressSync(mint, house, true, tokenProgram);
-  const authority = Keypair.generate().publicKey;
-  vi.stubEnv("SPONSOR_PUBLIC_KEY", authority.toBase58());
-  vi.stubEnv("SPONSOR_MIN_BALANCE_LAMPORTS", "1000000000");
-  vi.stubEnv("SPONSOR_OPERATION_LIMIT_LAMPORTS", "2000000");
-  vi.stubEnv("SPONSOR_COMPLETION_RESERVE_LAMPORTS", "30000");
-  vi.stubEnv("SPONSOR_MAX_ATTEMPTS", "3");
-  const run = runAddresses({ owner: wallet, nonce: 10n }).run[0];
-  const account = async (
-    name: string,
-    state: object,
-    lamports = 1_000_000,
-  ) => ({
-    ...noData,
-    owner: program,
-    data: await coder.accounts.encode(name, state),
-    lamports,
+it("keeps dungeon nonces out of legacy pending-run history", async () => {
+  vi.spyOn(Connection.prototype, "getAccountInfoAndContext").mockResolvedValue({
+    context: { slot },
+    value: await player(),
   });
-  const common = { schemaVersion: 1, bump: 255 };
-  const config = (allowReservations: boolean) =>
-    account("gameConfig", {
-      ...common,
-      admin: authority,
-      usdcMint: mint,
-      tokenProgram,
-      usdcDecimals: 6,
-      rules: fixture.snapshot.rulesBinding,
-      catalog: fixture.snapshot.cat.definingCatalog,
-      oracleBindings: Array.from({ length: 3 }, () => fixture.snapshot.oracle),
-      vrfProgram: PublicKey.default,
-      vrfQueue: PublicKey.default,
-      vrfCallbackAuthority: PublicKey.default,
-      allowStarter: true,
-      allowPurchases: false,
-      allowReservations,
-    });
-  const policy = await account("sponsorPolicy", {
-    ...common,
-    config: configAddress,
-    authority,
-    maxOperationLamports: new BN(100_000),
-    minCompletionLamports: new BN(20_000),
-    maxAttempts: 2,
-    paused: false,
-  });
-  const budget = await account("sponsorBudget", {
-    ...common,
-    operation: run,
-    beneficiary: owner,
-    authority,
-    feePayer: authority,
-    purpose: { runCompletion: {} },
-    limitLamports: new BN(60_000),
-    spentLamports: new BN(0),
-    reservedCompletionLamports: new BN(30_000),
-    maxAttempts: 2,
-    attempts: 0,
-    expiresAtSeconds: new BN(1_700_000_301),
-  });
-  const houseInfo = await account("houseState", {
-    ...common,
-    config: configAddress,
-    usdcMint: mint,
-    vault,
-    totalAvailableBaseUnits: new BN(1_000_000),
-    totalPurchaseEscrowBaseUnits: new BN(200_000),
-    totalMaxGrossBaseUnits: new BN(300_000),
-    bufferBaseUnits: new BN(400_000),
-  });
-  const tokenData = Buffer.alloc(AccountLayout.span);
-  AccountLayout.encode(
-    {
-      mint,
-      owner: house,
-      amount: 9_999_999n,
-      state: AccountState.Initialized,
-      delegateOption: 0,
-      delegate: PublicKey.default,
-      isNativeOption: 0,
-      isNative: 0n,
-      delegatedAmount: 0n,
-      closeAuthorityOption: 0,
-      closeAuthority: PublicKey.default,
-    },
-    tokenData,
-  );
-  const clockData = Buffer.alloc(40);
-  clockData.writeBigInt64LE(1_700_000_000n, 32);
-  const clock = {
-    ...noData,
-    owner: new PublicKey(DEVNET.sysvarOwner),
-    data: clockData,
-  };
-  const usdc = { ...noData, owner: tokenProgram, data: tokenData };
-  const input = stateInput.parse({ kind: "runEntry" });
-  const query = vi.spyOn(
+  const pages = vi.spyOn(
     Connection.prototype,
     "getMultipleAccountsInfoAndContext",
   );
-  const initial = {
+  pages.mockResolvedValueOnce({
     context: { slot },
-    value: [await config(true), await player(), policy],
-  };
-  const ready = {
-    context: { slot: slot + 1 },
-    value: [budget, houseInfo, usdc, clock],
-  };
-  vi.spyOn(
-    Connection.prototype,
-    "getMinimumBalanceForRentExemption",
-  ).mockResolvedValue(900_000);
-  query.mockResolvedValueOnce({
-    ...initial,
-    value: [await config(false), null, null],
+    value: [null, await dungeon(9n)],
   });
-  await expect(readState(wallet, input)).resolves.toMatchObject({
-    entry: { status: "closed" },
+  await expect(
+    readState(wallet, stateInput.parse({ kind: "history", limit: 1 })),
+  ).resolves.toMatchObject({ history: { entries: [], nextFromNonce: "9" } });
+  pages.mockResolvedValueOnce({
+    context: { slot },
+    value: [null, await dungeon(9n, { owner: Keypair.generate().publicKey })],
   });
-  expect(query).toHaveBeenCalledTimes(1);
-  query
-    .mockResolvedValueOnce(initial)
-    .mockResolvedValueOnce({ ...ready, value: [null, houseInfo, usdc, clock] });
-  await expect(readState(wallet, input)).resolves.toMatchObject({
-    entry: {
-      status: "ready",
-      completionFunding: {
-        sponsor: authority.toBase58(),
-        lamports: "30000",
-        floor: "1000000000",
-        attempts: 2,
-      },
-    },
-  });
-  query.mockResolvedValueOnce(initial).mockResolvedValueOnce(ready);
-  await expect(readState(wallet, input)).resolves.toMatchObject({
-    slot: slot + 1,
-    entry: {
-      status: "ready",
-      maxStake: "899999",
-      nonce: "10",
-      sessionNonce: "0",
-      clockSeconds: 1_700_000_000,
-      completionSponsor: authority.toBase58(),
-    },
-  });
-  clockData.writeBigInt64LE(1_700_000_301n, 32);
-  query.mockResolvedValueOnce(initial).mockResolvedValueOnce(ready);
-  await expect(readState(wallet, input)).resolves.toMatchObject({
-    entry: {
-      status: "ready",
-      completionFunding: { lamports: "30000" },
-    },
-  });
+  await expect(
+    readState(wallet, stateInput.parse({ kind: "history", limit: 1 })),
+  ).rejects.toThrow("INVALID_CHAIN_ACCOUNT");
 });

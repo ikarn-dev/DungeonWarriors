@@ -2,32 +2,24 @@ import "server-only";
 import type { IdlAccounts } from "@anchor-lang/core";
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import {
-  getAssociatedTokenAddressSync,
-  unpackAccount,
-} from "@solana/spl-token";
-import {
   type AccountInfo,
   Connection,
   PublicKey,
   SystemProgram,
 } from "@solana/web3.js";
 import { z } from "zod";
-import { requiredVaultBalance } from "../game/economy";
-import { RULES_V1, rulesForVersion, U64_MAX } from "../game/rules";
 import {
   decodeEscrowAccount,
   decodeRunAccount,
   enumTag,
   runAddresses,
 } from "../game/run-accounts";
-import type { CompletionOffer } from "../game/run-transactions";
 import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
-import { coder, nonceBytes, pda, program, u64Input } from "../solana/program";
+import { nonceBytes, pda, program, u64Input } from "../solana/program";
 import type { PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
-import { ApiError, baseRpcConfig, sponsorshipConfig } from "./runtime";
+import { ApiError, baseRpcConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
-import { browserConfigured } from "./browser-config";
 import { readWalletFunds } from "./wallet-funds";
 
 export {
@@ -45,23 +37,16 @@ export function connection() {
     fetch: providerFetch("solana"),
   });
 }
-export function account<T>(
-  name: string,
-  value: AccountInfo<Buffer> | null,
-): T | null {
-  if (value === null) return null;
-  if (
-    !value.owner.equals(program) ||
-    value.executable ||
-    value.data.length > 10240
-  )
-    throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-  try {
-    return coder.accounts.decode<T>(name, value.data);
-  } catch {
-    throw new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-  }
-}
+export { account } from "./chain-account";
+
+import {
+  account,
+  invalidChainAccount as invalidAccount,
+  readFinalizedPlayer,
+  stateContext,
+  uninitialized,
+} from "./chain-account";
+import { readRunEntry } from "./chain-run-entry";
 export const stateInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wallet") }).strict(),
   z.object({ kind: z.literal("balances") }).strict(),
@@ -80,28 +65,6 @@ export const stateInput = z.discriminatedUnion("kind", [
 ]);
 
 type Accounts = IdlAccounts<PurrpsGame>;
-const invalidAccount = () => new ApiError("INVALID_CHAIN_ACCOUNT", 502);
-
-function readPlayer(owner: PublicKey, info: AccountInfo<Buffer> | null) {
-  const player = account<Accounts["playerAccount"]>("playerAccount", info);
-  if (player === null) return null;
-  const [, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from("player"), owner.toBytes()],
-    program,
-  );
-  if (
-    player.schemaVersion !== 1 ||
-    !player.owner.equals(owner) ||
-    player.bump !== bump ||
-    !player.wins
-      .add(player.losses)
-      .add(player.technicalRefunds)
-      .eq(player.settledRuns) ||
-    player.settledRuns.gt(player.nextRunNonce)
-  )
-    throw invalidAccount();
-  return player;
-}
 
 function walletView(player: Accounts["playerAccount"] | null) {
   if (player === null) return null;
@@ -256,15 +219,6 @@ export async function finalizedRunState(
   };
 }
 
-function uninitialized(info: AccountInfo<Buffer> | null) {
-  return (
-    info === null ||
-    (info.owner.equals(SystemProgram.programId) &&
-      !info.executable &&
-      info.data.length === 0)
-  );
-}
-
 function wireAccount(address: PublicKey, info: AccountInfo<Buffer> | null) {
   if (
     info !== null &&
@@ -281,208 +235,6 @@ function wireAccount(address: PublicKey, info: AccountInfo<Buffer> | null) {
             data: info.data.toString("base64"),
             executable: false,
           },
-  };
-}
-
-function stateContext(slot: number) {
-  return {
-    network: "solana-devnet" as const,
-    commitment: "finalized" as const,
-    slot,
-    fetchedAt: new Date().toISOString(),
-  };
-}
-
-async function readFinalizedPlayer(rpc: Connection, owner: PublicKey) {
-  const { value, context } = await rpc.getAccountInfoAndContext(
-    pda("player", owner.toBytes()),
-    "finalized",
-  );
-  return {
-    context,
-    player: readPlayer(owner, uninitialized(value) ? null : value),
-  };
-}
-
-async function readRunEntry(rpc: Connection, owner: PublicKey) {
-  const configAddress = pda("game-config");
-  const houseAddress = pda("house");
-  const clockAddress = new PublicKey(DEVNET.clock);
-  const ownerAddress = pda("player", owner.toBytes());
-  const mint = new PublicKey(DEVNET.usdcMint);
-  const tokenProgram = new PublicKey(DEVNET.tokenProgram);
-  const vaultAddress = getAssociatedTokenAddressSync(
-    mint,
-    houseAddress,
-    true,
-    tokenProgram,
-  );
-  const policyAddress = pda("sponsor-policy");
-  const state = await rpc.getMultipleAccountsInfoAndContext(
-    [configAddress, ownerAddress, policyAddress],
-    { commitment: "finalized" },
-  );
-  const [configInfo, playerInfo, policyInfo] = state.value;
-  const context = stateContext(state.context.slot);
-  const config = account<Accounts["gameConfig"]>(
-    "gameConfig",
-    configInfo ?? null,
-  );
-  if (!config?.allowReservations || (config.rules?.version === 4 && !browserConfigured()))
-    return { ...context, entry: { status: "closed" } };
-  if (
-    config.schemaVersion !== 1 ||
-    !config.rules ||
-    !rulesForVersion(config.rules.version)
-  )
-    throw invalidAccount();
-  const player = readPlayer(owner, playerInfo ?? null);
-  const policy = account<Accounts["sponsorPolicy"]>(
-    "sponsorPolicy",
-    policyInfo ?? null,
-  );
-  if (player === null || policy === null || policy.paused)
-    return { ...context, entry: { status: "budgetUnavailable" } };
-  if (policy.schemaVersion !== 1 || !policy.config.equals(configAddress))
-    throw invalidAccount();
-  const run = runAddresses({
-    owner: owner.toBase58(),
-    nonce: BigInt(player.nextRunNonce.toString()),
-  }).run[0];
-  const {
-    context: snapshot,
-    value: [budgetInfo, houseInfo, vaultInfo, clock],
-  } = await rpc.getMultipleAccountsInfoAndContext(
-    [pda("sponsor", run.toBytes()), houseAddress, vaultAddress, clockAddress],
-    { commitment: "finalized", minContextSlot: state.context.slot },
-  );
-  const budget = uninitialized(budgetInfo ?? null)
-    ? null
-    : account<Accounts["sponsorBudget"]>("sponsorBudget", budgetInfo ?? null);
-  if (
-    !clock?.owner.equals(new PublicKey(DEVNET.sysvarOwner)) ||
-    clock.executable ||
-    clock.data.length !== 40
-  )
-    throw invalidAccount();
-  const clockSeconds = clock.data.readBigInt64LE(32);
-  if (
-    clockSeconds <= 0n ||
-    clockSeconds > BigInt(Number.MAX_SAFE_INTEGER - 1800)
-  )
-    throw invalidAccount();
-  const balanceContext = stateContext(snapshot.slot);
-  const sponsor = policy.authority.toBase58();
-  const settings = sponsorshipConfig();
-  const spend = settings.SPONSOR_COMPLETION_RESERVE_LAMPORTS;
-  const attempts = Math.min(settings.SPONSOR_MAX_ATTEMPTS, policy.maxAttempts);
-  const unavailable = {
-    ...balanceContext,
-    entry: { status: "budgetUnavailable" },
-  };
-  if (settings.SPONSOR_PUBLIC_KEY !== sponsor || attempts < 1)
-    return unavailable;
-  let completionFunding: CompletionOffer | undefined;
-  const expired =
-    budget && BigInt(budget.expiresAtSeconds.toString()) <= clockSeconds;
-  if (budget && budgetInfo && !expired) {
-    const remaining =
-      BigInt(budget.limitLamports.toString()) -
-      BigInt(budget.spentLamports.toString());
-    if (
-      budget.schemaVersion !== 1 ||
-      !budget.operation.equals(run) ||
-      !budget.beneficiary.equals(owner) ||
-      !budget.authority.equals(policy.authority) ||
-      !budget.feePayer.equals(policy.authority) ||
-      enumTag(budget.purpose) !== "runCompletion" ||
-      budget.limitLamports.gt(policy.maxOperationLamports) ||
-      budget.reservedCompletionLamports.lt(policy.minCompletionLamports) ||
-      remaining < BigInt(budget.reservedCompletionLamports.toString()) ||
-      budget.maxAttempts > policy.maxAttempts ||
-      budget.attempts >= budget.maxAttempts ||
-      BigInt(budget.expiresAtSeconds.toString()) <
-        clockSeconds + BigInt(RULES_V1.activationTimeoutSeconds)
-    )
-      return unavailable;
-    const rent = await rpc.getMinimumBalanceForRentExemption(
-      budgetInfo.data.length,
-      "finalized",
-    );
-    if (BigInt(budgetInfo.lamports) < BigInt(rent) + remaining)
-      return unavailable;
-  } else {
-    const rent = await rpc.getMinimumBalanceForRentExemption(
-      coder.accounts.size("sponsorBudget"),
-      "finalized",
-    );
-    if (
-      spend < BigInt(policy.minCompletionLamports.toString()) ||
-      spend > BigInt(policy.maxOperationLamports.toString()) ||
-      spend + BigInt(rent) > settings.SPONSOR_OPERATION_LIMIT_LAMPORTS
-    )
-      return unavailable;
-    completionFunding = {
-      sponsor,
-      lamports: spend.toString(),
-      floor: settings.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
-      attempts,
-    };
-  }
-  const house = account<Accounts["houseState"]>(
-    "houseState",
-    houseInfo ?? null,
-  );
-  const vault = unpackAccount(vaultAddress, vaultInfo ?? null, tokenProgram);
-  if (
-    !house ||
-    house.schemaVersion !== 1 ||
-    !house.config.equals(configAddress) ||
-    !house.usdcMint.equals(mint) ||
-    !house.vault.equals(vaultAddress) ||
-    !vault.mint.equals(mint) ||
-    !vault.owner.equals(houseAddress) ||
-    !vault.isInitialized ||
-    vault.isFrozen
-  )
-    throw invalidAccount();
-  const obligations = requiredVaultBalance(
-    BigInt(house.totalAvailableBaseUnits.toString()),
-    BigInt(house.totalPurchaseEscrowBaseUnits.toString()),
-    BigInt(house.totalMaxGrossBaseUnits.toString()),
-    BigInt(house.bufferBaseUnits.toString()),
-  );
-  const maxMultiplier = BigInt(RULES_V1.maxMultiplierBps) / 10_000n;
-  const headroom =
-    vault.amount > obligations
-      ? (vault.amount - obligations) / (maxMultiplier - 1n)
-      : 0n;
-  const maxStake = [
-    BigInt(player.availableBaseUnits.toString()),
-    headroom,
-    U64_MAX / maxMultiplier,
-  ].reduce((available, limit) => (available < limit ? available : limit));
-  return {
-    ...balanceContext,
-    entry: {
-      status: "ready",
-      playSponsor: {
-        sponsor,
-        floor: settings.SPONSOR_MIN_BALANCE_LAMPORTS.toString(),
-      },
-      maxStake: maxStake.toString(),
-      available: player.availableBaseUnits.toString(),
-      houseHeadroom: (vault.amount > obligations
-        ? vault.amount - obligations
-        : 0n
-      ).toString(),
-      maxMultiplierBps: RULES_V1.maxMultiplierBps,
-      nonce: player.nextRunNonce.toString(),
-      sessionNonce: player.nextSessionNonce.toString(),
-      clockSeconds: Number(clockSeconds),
-      completionSponsor: sponsor,
-      ...(completionFunding === undefined ? {} : { completionFunding }),
-    },
   };
 }
 
@@ -505,19 +257,39 @@ async function readHistory(
     count === 0
       ? { context, value: [] }
       : await rpc.getMultipleAccountsInfoAndContext(
-          rows.map(({ addresses }) => addresses.receipt[0]),
+          [
+            ...rows.map(({ addresses }) => addresses.receipt[0]),
+            ...rows.map(({ identity }) =>
+              pda("expedition", owner.toBytes(), nonceBytes(identity.nonce)),
+            ),
+          ],
           {
             commitment: "finalized",
             minContextSlot: context.slot,
           },
         );
-  if (page.value.length !== count || page.context.slot < context.slot)
+  if (page.value.length !== count * 2 || page.context.slot < context.slot)
     throw invalidAccount();
   const accounts = rows.map(({ addresses }, i) => {
     const info = page.value[i] ?? null;
     return wireAccount(addresses.receipt[0], uninitialized(info) ? null : info);
   });
-  const entries = rows.map(({ identity, addresses }, i) => {
+  type Entry =
+    | ReturnType<typeof resultView>
+    | { status: "pending"; nonce: string; run: string };
+  const entries = rows.flatMap<Entry>(({ identity, addresses }, i) => {
+    const dungeon = account<Accounts["dungeonExpedition"]>(
+      "dungeonExpedition",
+      page.value[count + i] ?? null,
+    );
+    if (dungeon) {
+      if (
+        dungeon.owner.toBase58() !== identity.owner ||
+        BigInt(dungeon.nonce.toString()) !== identity.nonce
+      )
+        throw invalidAccount();
+      return [];
+    }
     const info = page.value[i] ?? null;
     const receipt = readResult(
       identity,
@@ -525,14 +297,16 @@ async function readHistory(
       uninitialized(info) ? null : info,
     );
     if (receipt === null)
-      return {
-        status: "pending" as const,
-        nonce: identity.nonce.toString(),
-        run: addresses.run[0].toBase58(),
-      };
+      return [
+        {
+          status: "pending" as const,
+          nonce: identity.nonce.toString(),
+          run: addresses.run[0].toBase58(),
+        },
+      ];
     if (BigInt(receipt.settledAtSlot.toString()) > BigInt(page.context.slot))
       throw invalidAccount();
-    return resultView(receipt, addresses.receipt[0]);
+    return [resultView(receipt, addresses.receipt[0])];
   });
   const next = start - BigInt(count);
   return {

@@ -146,7 +146,7 @@ pub(super) fn validate_terminal(
     Ok(status)
 }
 
-fn insert_score(board: &mut Leaderboard, entry: LeaderboardEntry) -> Result<()> {
+pub(crate) fn insert_score(board: &mut Leaderboard, entry: LeaderboardEntry) -> Result<()> {
     let count = usize::from(board.count);
     require!(count <= board.entries.len(), ErrorCode::InvalidRun);
     let rank = (Reverse(entry.score), entry.run.to_bytes());

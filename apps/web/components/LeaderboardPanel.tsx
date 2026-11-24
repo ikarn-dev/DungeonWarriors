@@ -1,7 +1,24 @@
 "use client";
 
-import { readLeaderboard, useFinalized } from "./account-data";
+import { z } from "zod";
+import { webApi } from "../lib/game/web-api";
+import { publicKeySchema } from "../lib/solana/addresses";
+import { u64Input } from "../lib/solana/program";
+import { useFinalized } from "./account-data";
 
+const boardSchema = z
+  .array(
+    z.object({
+      rank: z.number().int().min(1).max(20),
+      wallet: publicKeySchema,
+      score: u64Input,
+    }),
+  )
+  .max(20);
+const readLeaderboard = async (signal: AbortSignal) =>
+  boardSchema.parse(
+    await webApi("/api/dungeon", { kind: "leaderboard" }, signal),
+  );
 const count = (value: string) =>
   new Intl.NumberFormat("en-US").format(BigInt(value));
 const short = (wallet: string) => `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
@@ -29,7 +46,9 @@ export default function LeaderboardPanel({
           </button>
         </div>
       ) : value !== null && value.length === 0 ? (
-        <p className="lobby-empty">The first finalized score appears here.</p>
+        <p className="lobby-empty">
+          The first finalized expedition appears here.
+        </p>
       ) : (
         <table className="lobby-table" aria-busy={value === null}>
           <thead>
@@ -37,7 +56,7 @@ export default function LeaderboardPanel({
               <th scope="col">Rank</th>
               <th scope="col">Player</th>
               <th scope="col" data-number>
-                Score
+                Rooms cleared
               </th>
             </tr>
           </thead>

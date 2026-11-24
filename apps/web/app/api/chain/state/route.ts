@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authenticate } from "../../../../lib/server/auth";
 import { recoverWallet } from "../../../../lib/server/browser-recovery";
 import { readState, stateInput, u64Input } from "../../../../lib/server/chain";
+import { recoverDungeonWallet } from "../../../../lib/server/dungeon-recovery";
 import {
   assertOrigin,
   body,
@@ -36,7 +37,12 @@ export async function POST(request: Request) {
     const requestState = await body(request, input);
     // Opening the lobby settles any run this wallet left behind.
     if (requestState.kind === "wallet")
-      after(() => recoverWallet(session.wallet));
+      after(async () => {
+        await Promise.allSettled([
+          recoverWallet(session.wallet),
+          recoverDungeonWallet(session.wallet),
+        ]);
+      });
     if (requestState.kind === "playSessionRent")
       return json(
         await playSessionRent(

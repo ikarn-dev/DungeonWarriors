@@ -591,6 +591,78 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "configureDungeon";
+      discriminator: [61, 11, 66, 64, 227, 8, 109, 245];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+        },
+        {
+          name: "admin";
+          writable: true;
+          signer: true;
+          relations: ["config"];
+        },
+        {
+          name: "dungeon";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  100,
+                  117,
+                  110,
+                  103,
+                  101,
+                  111,
+                  110,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "rules";
+          type: {
+            defined: {
+              name: "dungeonRules";
+            };
+          };
+        },
+        {
+          name: "verifier";
+          type: "pubkey";
+        },
+        {
+          name: "enabled";
+          type: "bool";
+        },
+      ];
+    },
+    {
       name: "configureSponsorship";
       discriminator: [79, 11, 99, 120, 73, 223, 182, 148];
       accounts: [
@@ -1058,6 +1130,56 @@ export type PurrpsGame = {
                 kind: "account";
                 path: "payment.draw.catalog.version";
                 account: "resolveCapsule";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "randomness";
+          type: {
+            array: ["u8", 32];
+          };
+        },
+        {
+          name: "seed";
+          type: {
+            array: ["u8", 32];
+          };
+        },
+      ];
+    },
+    {
+      name: "fulfillDungeon";
+      discriminator: [133, 82, 51, 82, 30, 9, 163, 215];
+      accounts: [
+        {
+          name: "vrfProgramIdentity";
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ];
+          signer: true;
+        },
+        {
+          name: "expedition";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "expedition.owner";
+                account: "dungeonExpedition";
+              },
+              {
+                kind: "account";
+                path: "expedition.nonce";
+                account: "dungeonExpedition";
               },
             ];
           };
@@ -2366,6 +2488,79 @@ export type PurrpsGame = {
       args: [];
     },
     {
+      name: "refundDungeonRandomness";
+      discriminator: [118, 192, 155, 9, 155, 99, 17, 155];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house"];
+        },
+        {
+          name: "expedition";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "expedition.owner";
+                account: "dungeonExpedition";
+              },
+              {
+                kind: "account";
+                path: "expedition.nonce";
+                account: "dungeonExpedition";
+              },
+            ];
+          };
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "expedition.owner";
+                account: "dungeonExpedition";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+      ];
+      args: [];
+    },
+    {
       name: "requestCompletion";
       discriminator: [139, 93, 162, 68, 8, 54, 15, 62];
       accounts: [
@@ -2458,6 +2653,163 @@ export type PurrpsGame = {
         {
           name: "expectedAttempt";
           type: "u16";
+        },
+      ];
+    },
+    {
+      name: "reserveDungeon";
+      discriminator: [68, 198, 191, 174, 58, 27, 220, 9];
+      accounts: [
+        {
+          name: "config";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+              },
+            ];
+          };
+          relations: ["house"];
+        },
+        {
+          name: "dungeon";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  100,
+                  117,
+                  110,
+                  103,
+                  101,
+                  111,
+                  110,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "owner";
+          signer: true;
+          relations: ["player", "collection"];
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "player";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "collection";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "house";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [104, 111, 117, 115, 101];
+              },
+            ];
+          };
+        },
+        {
+          name: "vault";
+        },
+        {
+          name: "expedition";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+              {
+                kind: "arg";
+                path: "args.nonce";
+              },
+            ];
+          };
+        },
+        {
+          name: "oracleQueue";
+          writable: true;
+        },
+        {
+          name: "programIdentity";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [105, 100, 101, 110, 116, 105, 116, 121];
+              },
+            ];
+          };
+        },
+        {
+          name: "vrfProgram";
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz";
+        },
+        {
+          name: "slotHashes";
+          address: "SysvarS1otHashes111111111111111111111111111";
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "reserveDungeonArgs";
+            };
+          };
         },
       ];
     },
@@ -3199,6 +3551,138 @@ export type PurrpsGame = {
       ];
     },
     {
+      name: "settleDungeon";
+      discriminator: [65, 53, 130, 56, 60, 17, 62, 123];
+      accounts: [
+        {
+          name: "resolution";
+          accounts: [
+            {
+              name: "config";
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+                  },
+                ];
+              };
+              relations: ["house"];
+            },
+            {
+              name: "expedition";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110];
+                  },
+                  {
+                    kind: "account";
+                    path: "expedition.owner";
+                    account: "dungeonExpedition";
+                  },
+                  {
+                    kind: "account";
+                    path: "expedition.nonce";
+                    account: "dungeonExpedition";
+                  },
+                ];
+              };
+            },
+            {
+              name: "player";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [112, 108, 97, 121, 101, 114];
+                  },
+                  {
+                    kind: "account";
+                    path: "expedition.owner";
+                    account: "dungeonExpedition";
+                  },
+                ];
+              };
+            },
+            {
+              name: "house";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [104, 111, 117, 115, 101];
+                  },
+                ];
+              };
+            },
+            {
+              name: "vault";
+            },
+          ];
+        },
+        {
+          name: "verifier";
+          signer: true;
+        },
+        {
+          name: "payer";
+          writable: true;
+          signer: true;
+        },
+        {
+          name: "leaderboard";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [
+                  100,
+                  117,
+                  110,
+                  103,
+                  101,
+                  111,
+                  110,
+                  45,
+                  108,
+                  101,
+                  97,
+                  100,
+                  101,
+                  114,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                ];
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "dungeonResult";
+            };
+          };
+        },
+      ];
+    },
+    {
       name: "settleReturnedRun";
       discriminator: [184, 160, 77, 196, 31, 157, 194, 116];
       accounts: [
@@ -3719,6 +4203,14 @@ export type PurrpsGame = {
     {
       name: "counter";
       discriminator: [255, 176, 4, 245, 188, 253, 124, 25];
+    },
+    {
+      name: "dungeonConfig";
+      discriminator: [184, 220, 216, 249, 250, 211, 99, 227];
+    },
+    {
+      name: "dungeonExpedition";
+      discriminator: [183, 26, 246, 43, 9, 250, 97, 45];
     },
     {
       name: "gameConfig";
@@ -4695,6 +5187,279 @@ export type PurrpsGame = {
           },
           {
             name: "fulfilled";
+          },
+          {
+            name: "refunded";
+          },
+        ];
+      };
+    },
+    {
+      name: "dungeonConfig";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "enabled";
+            type: "bool";
+          },
+          {
+            name: "verifier";
+            type: "pubkey";
+          },
+          {
+            name: "rules";
+            type: {
+              defined: {
+                name: "dungeonRules";
+              };
+            };
+          },
+          {
+            name: "rulesHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "dungeonExpedition";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "schemaVersion";
+            type: "u16";
+          },
+          {
+            name: "bump";
+            type: "u8";
+          },
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catId";
+              };
+            };
+          },
+          {
+            name: "verifier";
+            type: "pubkey";
+          },
+          {
+            name: "rules";
+            type: {
+              defined: {
+                name: "dungeonRules";
+              };
+            };
+          },
+          {
+            name: "rulesHash";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "stake";
+            type: "u64";
+          },
+          {
+            name: "maxRooms";
+            type: "u8";
+          },
+          {
+            name: "maxGross";
+            type: "u64";
+          },
+          {
+            name: "commitment";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "vrfProgram";
+            type: "pubkey";
+          },
+          {
+            name: "vrfQueue";
+            type: "pubkey";
+          },
+          {
+            name: "callbackAuthority";
+            type: "pubkey";
+          },
+          {
+            name: "requestSeed";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "requestedAt";
+            type: "i64";
+          },
+          {
+            name: "randomnessDeadline";
+            type: "i64";
+          },
+          {
+            name: "randomness";
+            type: {
+              option: {
+                array: ["u8", 32];
+              };
+            };
+          },
+          {
+            name: "status";
+            type: {
+              defined: {
+                name: "dungeonStatus";
+              };
+            };
+          },
+          {
+            name: "secret";
+            type: {
+              option: {
+                array: ["u8", 32];
+              };
+            };
+          },
+          {
+            name: "gates";
+            type: {
+              array: ["u8", 5];
+            };
+          },
+          {
+            name: "gateCount";
+            type: "u8";
+          },
+          {
+            name: "cleared";
+            type: "u8";
+          },
+          {
+            name: "payout";
+            type: "u64";
+          },
+          {
+            name: "completedAt";
+            type: {
+              option: "i64";
+            };
+          },
+        ];
+      };
+    },
+    {
+      name: "dungeonResult";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "secret";
+            type: {
+              array: ["u8", 32];
+            };
+          },
+          {
+            name: "gates";
+            type: {
+              array: ["u8", 5];
+            };
+          },
+          {
+            name: "gateCount";
+            type: "u8";
+          },
+          {
+            name: "outcome";
+            type: "u8";
+          },
+        ];
+      };
+    },
+    {
+      name: "dungeonRules";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "version";
+            type: "u32";
+          },
+          {
+            name: "rooms";
+            type: "u8";
+          },
+          {
+            name: "returnBps";
+            type: "u16";
+          },
+          {
+            name: "roomSeconds";
+            type: {
+              array: ["u16", 5];
+            };
+          },
+          {
+            name: "collectorBonusMs";
+            type: "u16";
+          },
+          {
+            name: "guardianGraceMs";
+            type: "u16";
+          },
+          {
+            name: "hourglassMs";
+            type: "u16";
+          },
+          {
+            name: "sprintBps";
+            type: "u16";
+          },
+          {
+            name: "vrfTimeoutSeconds";
+            type: "u16";
+          },
+        ];
+      };
+    },
+    {
+      name: "dungeonStatus";
+      type: {
+        kind: "enum";
+        variants: [
+          {
+            name: "awaitingRandomness";
+          },
+          {
+            name: "ready";
+          },
+          {
+            name: "won";
+          },
+          {
+            name: "lost";
           },
           {
             name: "refunded";
@@ -5922,6 +6687,48 @@ export type PurrpsGame = {
               defined: {
                 name: "capsuleKind";
               };
+            };
+          },
+          {
+            name: "maxPayerDebitLamports";
+            type: "u64";
+          },
+        ];
+      };
+    },
+    {
+      name: "reserveDungeonArgs";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "nonce";
+            type: "u64";
+          },
+          {
+            name: "rulesVersion";
+            type: "u32";
+          },
+          {
+            name: "cat";
+            type: {
+              defined: {
+                name: "catId";
+              };
+            };
+          },
+          {
+            name: "stake";
+            type: "u64";
+          },
+          {
+            name: "maxRooms";
+            type: "u8";
+          },
+          {
+            name: "commitment";
+            type: {
+              array: ["u8", 32];
             };
           },
           {
@@ -7656,6 +8463,66 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "configure_dungeon",
+      discriminator: [61, 11, 66, 64, 227, 8, 109, 245],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+        },
+        {
+          name: "admin",
+          writable: true,
+          signer: true,
+          relations: ["config"],
+        },
+        {
+          name: "dungeon",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100, 117, 110, 103, 101, 111, 110, 45, 99, 111, 110, 102, 105,
+                  103,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "rules",
+          type: {
+            defined: {
+              name: "DungeonRules",
+            },
+          },
+        },
+        {
+          name: "verifier",
+          type: "pubkey",
+        },
+        {
+          name: "enabled",
+          type: "bool",
+        },
+      ],
+    },
+    {
       name: "configure_sponsorship",
       discriminator: [79, 11, 99, 120, 73, 223, 182, 148],
       accounts: [
@@ -8111,6 +8978,56 @@ export const PURRPS_GAME_IDL = {
                 kind: "account",
                 path: "payment.draw.catalog.version",
                 account: "ResolveCapsule",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "randomness",
+          type: {
+            array: ["u8", 32],
+          },
+        },
+        {
+          name: "seed",
+          type: {
+            array: ["u8", 32],
+          },
+        },
+      ],
+    },
+    {
+      name: "fulfill_dungeon",
+      discriminator: [133, 82, 51, 82, 30, 9, 163, 215],
+      accounts: [
+        {
+          name: "vrf_program_identity",
+          docs: [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program.",
+          ],
+          signer: true,
+        },
+        {
+          name: "expedition",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "expedition.owner",
+                account: "DungeonExpedition",
+              },
+              {
+                kind: "account",
+                path: "expedition.nonce",
+                account: "DungeonExpedition",
               },
             ],
           },
@@ -9364,6 +10281,79 @@ export const PURRPS_GAME_IDL = {
       args: [],
     },
     {
+      name: "refund_dungeon_randomness",
+      discriminator: [118, 192, 155, 9, 155, 99, 17, 155],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house"],
+        },
+        {
+          name: "expedition",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "expedition.owner",
+                account: "DungeonExpedition",
+              },
+              {
+                kind: "account",
+                path: "expedition.nonce",
+                account: "DungeonExpedition",
+              },
+            ],
+          },
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "expedition.owner",
+                account: "DungeonExpedition",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+      ],
+      args: [],
+    },
+    {
       name: "request_completion",
       discriminator: [139, 93, 162, 68, 8, 54, 15, 62],
       accounts: [
@@ -9456,6 +10446,151 @@ export const PURRPS_GAME_IDL = {
         {
           name: "expected_attempt",
           type: "u16",
+        },
+      ],
+    },
+    {
+      name: "reserve_dungeon",
+      discriminator: [68, 198, 191, 174, 58, 27, 220, 9],
+      accounts: [
+        {
+          name: "config",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+              },
+            ],
+          },
+          relations: ["house"],
+        },
+        {
+          name: "dungeon",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100, 117, 110, 103, 101, 111, 110, 45, 99, 111, 110, 102, 105,
+                  103,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "owner",
+          signer: true,
+          relations: ["player", "collection"],
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "player",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "collection",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [99, 111, 108, 108, 101, 99, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "house",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [104, 111, 117, 115, 101],
+              },
+            ],
+          },
+        },
+        {
+          name: "vault",
+        },
+        {
+          name: "expedition",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+              {
+                kind: "arg",
+                path: "args.nonce",
+              },
+            ],
+          },
+        },
+        {
+          name: "oracle_queue",
+          writable: true,
+        },
+        {
+          name: "program_identity",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [105, 100, 101, 110, 116, 105, 116, 121],
+              },
+            ],
+          },
+        },
+        {
+          name: "vrf_program",
+          address: "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz",
+        },
+        {
+          name: "slot_hashes",
+          address: "SysvarS1otHashes111111111111111111111111111",
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "ReserveDungeonArgs",
+            },
+          },
         },
       ],
     },
@@ -10173,6 +11308,121 @@ export const PURRPS_GAME_IDL = {
       ],
     },
     {
+      name: "settle_dungeon",
+      discriminator: [65, 53, 130, 56, 60, 17, 62, 123],
+      accounts: [
+        {
+          name: "resolution",
+          accounts: [
+            {
+              name: "config",
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+                  },
+                ],
+              },
+              relations: ["house"],
+            },
+            {
+              name: "expedition",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [101, 120, 112, 101, 100, 105, 116, 105, 111, 110],
+                  },
+                  {
+                    kind: "account",
+                    path: "expedition.owner",
+                    account: "DungeonExpedition",
+                  },
+                  {
+                    kind: "account",
+                    path: "expedition.nonce",
+                    account: "DungeonExpedition",
+                  },
+                ],
+              },
+            },
+            {
+              name: "player",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [112, 108, 97, 121, 101, 114],
+                  },
+                  {
+                    kind: "account",
+                    path: "expedition.owner",
+                    account: "DungeonExpedition",
+                  },
+                ],
+              },
+            },
+            {
+              name: "house",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [104, 111, 117, 115, 101],
+                  },
+                ],
+              },
+            },
+            {
+              name: "vault",
+            },
+          ],
+        },
+        {
+          name: "verifier",
+          signer: true,
+        },
+        {
+          name: "payer",
+          writable: true,
+          signer: true,
+        },
+        {
+          name: "leaderboard",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100, 117, 110, 103, 101, 111, 110, 45, 108, 101, 97, 100, 101,
+                  114, 98, 111, 97, 114, 100,
+                ],
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "DungeonResult",
+            },
+          },
+        },
+      ],
+    },
+    {
       name: "settle_returned_run",
       discriminator: [184, 160, 77, 196, 31, 157, 194, 116],
       accounts: [
@@ -10693,6 +11943,14 @@ export const PURRPS_GAME_IDL = {
     {
       name: "Counter",
       discriminator: [255, 176, 4, 245, 188, 253, 124, 25],
+    },
+    {
+      name: "DungeonConfig",
+      discriminator: [184, 220, 216, 249, 250, 211, 99, 227],
+    },
+    {
+      name: "DungeonExpedition",
+      discriminator: [183, 26, 246, 43, 9, 250, 97, 45],
     },
     {
       name: "GameConfig",
@@ -11492,6 +12750,279 @@ export const PURRPS_GAME_IDL = {
           },
           {
             name: "Fulfilled",
+          },
+          {
+            name: "Refunded",
+          },
+        ],
+      },
+    },
+    {
+      name: "DungeonConfig",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "enabled",
+            type: "bool",
+          },
+          {
+            name: "verifier",
+            type: "pubkey",
+          },
+          {
+            name: "rules",
+            type: {
+              defined: {
+                name: "DungeonRules",
+              },
+            },
+          },
+          {
+            name: "rules_hash",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "DungeonExpedition",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "schema_version",
+            type: "u16",
+          },
+          {
+            name: "bump",
+            type: "u8",
+          },
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatId",
+              },
+            },
+          },
+          {
+            name: "verifier",
+            type: "pubkey",
+          },
+          {
+            name: "rules",
+            type: {
+              defined: {
+                name: "DungeonRules",
+              },
+            },
+          },
+          {
+            name: "rules_hash",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "stake",
+            type: "u64",
+          },
+          {
+            name: "max_rooms",
+            type: "u8",
+          },
+          {
+            name: "max_gross",
+            type: "u64",
+          },
+          {
+            name: "commitment",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "vrf_program",
+            type: "pubkey",
+          },
+          {
+            name: "vrf_queue",
+            type: "pubkey",
+          },
+          {
+            name: "callback_authority",
+            type: "pubkey",
+          },
+          {
+            name: "request_seed",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "requested_at",
+            type: "i64",
+          },
+          {
+            name: "randomness_deadline",
+            type: "i64",
+          },
+          {
+            name: "randomness",
+            type: {
+              option: {
+                array: ["u8", 32],
+              },
+            },
+          },
+          {
+            name: "status",
+            type: {
+              defined: {
+                name: "DungeonStatus",
+              },
+            },
+          },
+          {
+            name: "secret",
+            type: {
+              option: {
+                array: ["u8", 32],
+              },
+            },
+          },
+          {
+            name: "gates",
+            type: {
+              array: ["u8", 5],
+            },
+          },
+          {
+            name: "gate_count",
+            type: "u8",
+          },
+          {
+            name: "cleared",
+            type: "u8",
+          },
+          {
+            name: "payout",
+            type: "u64",
+          },
+          {
+            name: "completed_at",
+            type: {
+              option: "i64",
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: "DungeonResult",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "secret",
+            type: {
+              array: ["u8", 32],
+            },
+          },
+          {
+            name: "gates",
+            type: {
+              array: ["u8", 5],
+            },
+          },
+          {
+            name: "gate_count",
+            type: "u8",
+          },
+          {
+            name: "outcome",
+            type: "u8",
+          },
+        ],
+      },
+    },
+    {
+      name: "DungeonRules",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "version",
+            type: "u32",
+          },
+          {
+            name: "rooms",
+            type: "u8",
+          },
+          {
+            name: "return_bps",
+            type: "u16",
+          },
+          {
+            name: "room_seconds",
+            type: {
+              array: ["u16", 5],
+            },
+          },
+          {
+            name: "collector_bonus_ms",
+            type: "u16",
+          },
+          {
+            name: "guardian_grace_ms",
+            type: "u16",
+          },
+          {
+            name: "hourglass_ms",
+            type: "u16",
+          },
+          {
+            name: "sprint_bps",
+            type: "u16",
+          },
+          {
+            name: "vrf_timeout_seconds",
+            type: "u16",
+          },
+        ],
+      },
+    },
+    {
+      name: "DungeonStatus",
+      type: {
+        kind: "enum",
+        variants: [
+          {
+            name: "AwaitingRandomness",
+          },
+          {
+            name: "Ready",
+          },
+          {
+            name: "Won",
+          },
+          {
+            name: "Lost",
           },
           {
             name: "Refunded",
@@ -12719,6 +14250,48 @@ export const PURRPS_GAME_IDL = {
               defined: {
                 name: "CapsuleKind",
               },
+            },
+          },
+          {
+            name: "max_payer_debit_lamports",
+            type: "u64",
+          },
+        ],
+      },
+    },
+    {
+      name: "ReserveDungeonArgs",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "nonce",
+            type: "u64",
+          },
+          {
+            name: "rules_version",
+            type: "u32",
+          },
+          {
+            name: "cat",
+            type: {
+              defined: {
+                name: "CatId",
+              },
+            },
+          },
+          {
+            name: "stake",
+            type: "u64",
+          },
+          {
+            name: "max_rooms",
+            type: "u8",
+          },
+          {
+            name: "commitment",
+            type: {
+              array: ["u8", 32],
             },
           },
           {

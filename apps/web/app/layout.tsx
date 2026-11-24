@@ -21,7 +21,7 @@ const pixel = Pixelify_Sans({
 export const metadata: Metadata = {
   title: "PURRPS",
   description:
-    "Endless, price-action-driven pixel-art arcade runner on Solana Devnet.",
+    "Explore timed catacombs with collectible cats, treasure gates and MagicBlock-verifiable randomness on Solana Devnet.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

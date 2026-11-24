@@ -1,17 +1,17 @@
 import Image from "next/image";
-import { MEDIA_ROOT } from "../lib/game/assets";
-import { type CatId, catStats } from "../lib/game/catalog";
+import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
+import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
-import { POWER_LABELS } from "./RunHud";
 
-const level = new Intl.NumberFormat("en-US");
 export default function CatCollection({
   state,
   blocked,
+  selected,
   onSelect,
 }: {
   state: LobbyState;
   blocked: boolean;
+  selected: CatId | null;
   onSelect: (cat: CatId) => void;
 }) {
   return (
@@ -24,8 +24,8 @@ export default function CatCollection({
       ) : (
         <ul className="lobby-cards">
           {state.cats.map((cat) => {
-            const stats = catStats(cat.id, cat.level);
-            const chosen = state.selected === cat.id;
+            const warrior = WARRIORS[cat.id];
+            const chosen = selected === cat.id;
             return (
               <li
                 key={cat.id}
@@ -34,7 +34,7 @@ export default function CatCollection({
               >
                 <Image
                   unoptimized
-                  src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
+                  src={warriorPortrait(cat.id)}
                   width={96}
                   height={96}
                   alt=""
@@ -44,17 +44,23 @@ export default function CatCollection({
                   <span className="lobby-rarity" data-rarity={cat.rarity}>
                     {cat.rarity}
                   </span>{" "}
-                  Level {level.format(cat.level)}
                 </p>
-                <p>
-                  {POWER_LABELS[stats.power]} · {stats.powerCooldownTicks / 60}s
-                  cooldown
+                <p className="lobby-card-title">{warrior.title}</p>
+                <p className="lobby-card-stats">
+                  {warrior.hp} HP · {warrior.atk} ATK · {warrior.def} DEF
                 </p>
+                <ul className="lobby-traits">
+                  {warrior.traits.map((t) => (
+                    <li key={t.id} title={t.description}>
+                      {t.name}
+                    </li>
+                  ))}
+                </ul>
                 <button
                   type="button"
                   className="pixel-button"
                   data-tone={chosen ? undefined : "green"}
-                  disabled={blocked || state.pendingDraw !== null || chosen}
+                  disabled={blocked || chosen}
                   onClick={() => onSelect(cat.id)}
                 >
                   {chosen ? "Selected" : "Select cat"}

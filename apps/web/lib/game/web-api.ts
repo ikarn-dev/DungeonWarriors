@@ -7,6 +7,17 @@ export class WebApiError extends Error {
 }
 // Player-facing copy for expected failures; anything else stays generic.
 const FRIENDLY: Readonly<Record<string, string>> = {
+  DUNGEON_NOT_PUBLISHED:
+    "The dungeon update is awaiting activation. Your wager has not been taken.",
+  DUNGEON_COLLATERAL_UNAVAILABLE:
+    "There is not enough treasure backing this bet. Try a smaller amount.",
+  DUNGEON_QUOTE_CHANGED:
+    "The available expedition changed. Review the new quote and try again.",
+  DUNGEON_ACTIVE:
+    "Your previous expedition is being resolved. Check it before placing another bet.",
+  DUNGEON_BUSY: "Your expedition is saving. Please try again in a moment.",
+  CAT_NOT_OWNED: "Choose a cat in your collection.",
+  INSUFFICIENT_CREDIT: "Add USDC to your game balance or lower your bet.",
   AUTH_REQUIRED: "Please sign in again to continue.",
   ACCOUNT_STATE_UNAVAILABLE: "Couldn't load your account. Please refresh.",
   WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",

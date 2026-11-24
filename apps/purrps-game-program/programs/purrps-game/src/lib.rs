@@ -2,6 +2,7 @@ pub mod catalog;
 pub mod constants;
 pub mod contracts;
 pub mod draw;
+pub mod dungeon;
 pub mod economy;
 pub mod error;
 pub mod instruction_args;
@@ -33,6 +34,31 @@ declare_id!("F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx");
 #[program]
 pub mod purrps_game {
     use super::*;
+
+    pub fn configure_dungeon(
+        ctx: Context<ConfigureDungeon>,
+        rules: dungeon::DungeonRules,
+        verifier: Pubkey,
+        enabled: bool,
+    ) -> Result<()> {
+        instructions::dungeon_config::handle_configure_dungeon(ctx, rules, verifier, enabled)
+    }
+    pub fn reserve_dungeon(ctx: Context<ReserveDungeon>, args: ReserveDungeonArgs) -> Result<()> {
+        instructions::dungeon_reserve::handle_reserve_dungeon(ctx, args)
+    }
+    pub fn fulfill_dungeon(
+        ctx: Context<FulfillDungeon>,
+        randomness: [u8; 32],
+        seed: [u8; 32],
+    ) -> Result<()> {
+        instructions::dungeon_settle::handle_fulfill_dungeon(ctx, randomness, seed)
+    }
+    pub fn settle_dungeon(ctx: Context<SettleDungeon>, args: DungeonResult) -> Result<()> {
+        instructions::dungeon_settle::handle_settle_dungeon(ctx, args)
+    }
+    pub fn refund_dungeon_randomness(ctx: Context<ResolveDungeon>) -> Result<()> {
+        instructions::dungeon_settle::handle_refund_dungeon_randomness(ctx)
+    }
 
     pub fn abort_undelegated_reservation(ctx: Context<AbortUndelegatedReservation>) -> Result<()> {
         crate::instructions::abort_reservation::handle_abort_undelegated_reservation(ctx)
@@ -119,10 +145,16 @@ pub mod purrps_game {
         crate::instructions::run_crank::handle_activate_run(ctx, args)
     }
 
-    pub fn configure_browser_verifier(ctx: Context<ConfigureBrowserVerifier>, authority: Pubkey) -> Result<()> {
+    pub fn configure_browser_verifier(
+        ctx: Context<ConfigureBrowserVerifier>,
+        authority: Pubkey,
+    ) -> Result<()> {
         crate::instructions::browser_run::configure(ctx, authority)
     }
-    pub fn record_browser_result(ctx: Context<RecordBrowserResult>, args: BrowserResult) -> Result<()> {
+    pub fn record_browser_result(
+        ctx: Context<RecordBrowserResult>,
+        args: BrowserResult,
+    ) -> Result<()> {
         crate::instructions::browser_run::record(ctx, args)
     }
 

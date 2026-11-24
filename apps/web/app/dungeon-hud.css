@@ -1,0 +1,255 @@
+/* Combat HUD (2026-11-24): rounded dusk panels; smooth art, not pixel. */
+.dungeon-hud {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 140px;
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 20;
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  pointer-events: none;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.hud-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  color: #fff1cf;
+  background: #2f2b45f2;
+  border: 2px solid #5d5680;
+  border-radius: 14px;
+  box-shadow: 0 4px 0 #1e1626;
+}
+.hud-card > span,
+.hud-floor > p,
+.hud-cash small {
+  color: #b9b1cc;
+  font-size: 13px;
+}
+.hud-card strong {
+  font-variant-numeric: tabular-nums;
+}
+.hud-hero {
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+}
+.hud-hero img {
+  border-radius: 10px;
+  background: #3d3956;
+}
+.hud-hero-body {
+  display: grid;
+  gap: 5px;
+}
+.hud-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 15px;
+}
+.hud-health {
+  position: relative;
+  height: 18px;
+  overflow: hidden;
+  background: #4a2a3a;
+  border: 2px solid #1e1626;
+  border-radius: 9px;
+}
+.hud-health span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(#9cf08f, #4cb85a);
+  transform-origin: left;
+  transition: transform 150ms ease-out;
+}
+.hud-health strong {
+  position: relative;
+  display: block;
+  font:
+    700 11px / 14px var(--font-geist-mono),
+    monospace;
+  text-align: center;
+  text-shadow: 0 1px 0 #1e1626;
+}
+.hud-stats {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  font:
+    600 13px var(--font-geist-mono),
+    monospace;
+}
+.hud-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hud-stats span:first-child {
+  color: #ffc531;
+}
+.hud-stats span:last-child {
+  color: #8fc8ff;
+}
+.hud-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hud-traits li {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff1cf;
+  background: #4b4668;
+  border-radius: 999px;
+}
+.hud-floor {
+  justify-items: center;
+  min-width: 170px;
+}
+.hud-floor > p {
+  margin: 0;
+}
+.hud-floor strong {
+  color: #fff1cf;
+  font-size: 16px;
+}
+.hud-dots {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hud-dots li {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #8f88ad;
+  background: #3d3956;
+}
+.hud-dots li[data-state="done"] {
+  background: #ffc531;
+  border-color: #ffc531;
+}
+.hud-dots li[data-state="here"] {
+  border-color: #fff1cf;
+  box-shadow: 0 0 0 3px #fff1cf33;
+}
+.hud-dots li:last-child {
+  border-radius: 4px;
+}
+.hud-foes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: #b9b1cc;
+}
+.hud-foes span {
+  color: #ff9a9a;
+  font-weight: 600;
+}
+.hud-foes span[data-open] {
+  color: #9cf08f;
+}
+.hud-timer {
+  margin-left: auto;
+  min-width: 110px;
+}
+.hud-timer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hud-timer strong {
+  font:
+    700 22px var(--font-geist-mono),
+    monospace;
+}
+.hud-timer[data-urgent] {
+  border-color: #8fe36a;
+  background: #2d4430f2;
+}
+.hud-timer[data-urgent] strong {
+  color: #c8fc86;
+}
+.hud-cash strong {
+  font:
+    700 18px var(--font-geist-mono),
+    monospace;
+  color: #ffc531;
+  white-space: nowrap;
+}
+.hud-cash small {
+  font-family: var(--font-geist-mono), monospace;
+}
+.dungeon-traits {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.dungeon-traits li {
+  padding: 8px 12px;
+  color: #c6bfd7;
+  background: #3d3956;
+  border-radius: 10px;
+}
+.dungeon-traits strong {
+  color: #fff1cf;
+  margin-right: 6px;
+}
+.dungeon-attack {
+  min-width: 84px;
+}
+@media (max-width: 900px) {
+  .dungeon-hud {
+    left: 96px;
+    gap: 6px;
+  }
+  .hud-card {
+    padding: 6px 9px;
+    border-radius: 10px;
+  }
+  .hud-hero {
+    min-width: 0;
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+  .hud-hero img {
+    width: 36px;
+    height: 36px;
+  }
+  .hud-traits,
+  .hud-foes span {
+    display: none;
+  }
+  .hud-timer strong {
+    font-size: 18px;
+  }
+  .hud-cash strong {
+    font-size: 14px;
+  }
+  .hud-floor {
+    min-width: 0;
+  }
+}
+@media (max-width: 640px) {
+  .hud-cash,
+  .hud-stats {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-health span {
+    transition: none;
+  }
+}

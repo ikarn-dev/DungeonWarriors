@@ -3,6 +3,11 @@ import { z } from "zod";
 import { DEVNET } from "./addresses.ts";
 
 export const REQUIRED_PROGRAM_INSTRUCTIONS = [
+  "configure_dungeon",
+  "reserve_dungeon",
+  "fulfill_dungeon",
+  "settle_dungeon",
+  "refund_dungeon_randomness",
   "initialize_config",
   "publish_rules",
   "publish_catalog",

@@ -1,4 +1,8 @@
-import { BN, type IdlInstructionAccountItem } from "@anchor-lang/core";
+import { programInstruction } from "../solana/instruction";
+
+export { programInstruction } from "../solana/instruction";
+
+import { BN } from "@anchor-lang/core";
 import {
   DELEGATION_PROGRAM_ID,
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -17,131 +21,33 @@ import {
   TransactionMessage,
   type VersionedTransaction,
 } from "@solana/web3.js";
-import { z } from "zod";
 import {
   DEVNET,
   LEADERBOARD_SEED,
   MARKETS,
   oracleAddress,
-  publicKeySchema,
 } from "../solana/addresses.ts";
 import {
-  coder,
   crankAddress,
   hydraProgram,
-  idl,
   nonceBytes,
   pda,
   program,
-  u64Input,
 } from "../solana/program";
-import { playerActions, playerInstructions } from "./custody-client";
+import { playerInstructions } from "./custody-client";
+import { type GameIntent, initialDelegationEpoch } from "./run-intents";
 import { WebApiError } from "./web-api";
 
-const positive = u64Input.refine((n) => n !== "0");
-const version = z.number().int().min(1).max(0xffffffff);
-const marketSchema = z.enum(["BTC", "ETH", "SOL"]);
-// New reservations in the current program start at delegation epoch 1.
-export const initialDelegationEpoch = "1";
-const catSchema = z.enum(["collector", "acrobat", "guardian", "sprinter"]);
-const nonce = { nonce: u64Input };
-const identity = { ...nonce, delegationEpoch: positive };
-export const completionOfferSchema = z.strictObject({
-  sponsor: publicKeySchema,
-  lamports: positive,
-  floor: u64Input,
-  attempts: z.number().int().min(1).max(65_535),
-});
-export type CompletionOffer = z.infer<typeof completionOfferSchema>;
-export const playSponsorSchema = completionOfferSchema.pick({
-  sponsor: true,
-  floor: true,
-});
-export type PlaySponsor = z.infer<typeof playSponsorSchema>;
-export const sessionTokenSpace = 8 + 3 * 32 + 8;
-const action = z.discriminatedUnion("kind", [
-  ...playerActions,
-  z.strictObject({
-    kind: z.literal("authorizeSession"),
-    ...nonce,
-    inputKey: publicKeySchema,
-    expiresAtSeconds: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    allowance: u64Input,
-    rent: z
-      .strictObject({ token: u64Input, authorization: u64Input })
-      .optional(),
-  }),
-  z.strictObject({ kind: z.literal("revokeSession"), ...nonce }),
-  z.strictObject({
-    kind: z.literal("reserveRun"),
-    ...nonce,
-    sessionNonce: u64Input,
-    inputKey: publicKeySchema,
-    inventoryVersion: u64Input,
-    rulesVersion: version,
-    catalogVersion: version,
-    definingCatalogVersion: version,
-    cat: catSchema,
-    market: marketSchema,
-    stake: u64Input,
-    maxGross: u64Input.optional(),
-    completionFunding: completionOfferSchema.optional(),
-    expiresAtSeconds: z
-      .number()
-      .int()
-      .positive()
-      .max(Number.MAX_SAFE_INTEGER)
-      .optional(),
-  }),
-  z.strictObject({
-    kind: z.literal("delegateRun"),
-    ...identity,
-    completionSponsor: publicKeySchema.optional(),
-    inputKey: publicKeySchema.optional(),
-  }),
-  z.strictObject({
-    kind: z.literal("activateRun"),
-    ...identity,
-    inputKey: publicKeySchema,
-    market: marketSchema,
-  }),
-  z.strictObject({ kind: z.literal("expireDelegatedActivation"), ...nonce }),
-  z.strictObject({ kind: z.literal("revokeRunInputKey"), ...nonce }),
-  z.strictObject({ kind: z.literal("abortUndelegatedReservation"), ...nonce }),
-  z.strictObject({
-    kind: z.literal("suspendOrResumeRun"),
-    ...nonce,
-    market: marketSchema,
-  }),
-  z.strictObject({
-    kind: z.literal("resumeRun"),
-    ...nonce,
-    market: marketSchema,
-    inputKey: publicKeySchema,
-    suspendedAt: positive.refine(
-      (value) => BigInt(value) <= 0x7fffffffffffffffn,
-    ),
-  }),
-  z.strictObject({
-    kind: z.literal("requestCompletion"),
-    ...nonce,
-    market: marketSchema,
-    hasCrank: z.boolean().optional(),
-    expectedAttempt: z.number().int().min(0).max(65_535).optional(),
-  }),
-  z.strictObject({
-    kind: z.literal("settleReturnedRun"),
-    ...nonce,
-    market: marketSchema,
-  }),
-]);
-export const gameIntentSchema = z.strictObject({
-  operation: z.literal("game"),
-  sponsored: z.literal(false),
-  playSponsor: playSponsorSchema.optional(),
-  action,
-});
-export type GameIntent = z.infer<typeof gameIntentSchema>;
+export {
+  type CompletionOffer,
+  completionOfferSchema,
+  type GameIntent,
+  gameIntentSchema,
+  initialDelegationEpoch,
+  type PlaySponsor,
+  playSponsorSchema,
+  sessionTokenSpace,
+} from "./run-intents";
 
 export function runSponsor(action: GameIntent["action"]) {
   if (action.kind === "reserveRun") return action.completionFunding?.sponsor;
@@ -153,44 +59,6 @@ const sessionProgram = new PublicKey(
   "KeyspM2ssCJbqUhQ4k7sveSiY4WjnYsrXkC8oDbwde5",
 );
 const mint = new PublicKey(DEVNET.usdcMint);
-
-function accountMetas(
-  items: IdlInstructionAccountItem[],
-  values: Record<string, PublicKey>,
-): TransactionInstruction["keys"] {
-  return items.flatMap((meta) => {
-    if ("accounts" in meta) return accountMetas(meta.accounts, values);
-    const pubkey = Object.hasOwn(values, meta.name)
-      ? values[meta.name]
-      : undefined;
-    if (pubkey === undefined)
-      throw new WebApiError("UNSUPPORTED_ACCOUNT_LAYOUT");
-    return [
-      {
-        pubkey,
-        isSigner: "signer" in meta && meta.signer === true,
-        isWritable:
-          "writable" in meta &&
-          meta.writable === true &&
-          !("optional" in meta && meta.optional && pubkey.equals(program)),
-      },
-    ];
-  });
-}
-
-export function programInstruction(
-  name: string,
-  values: Record<string, PublicKey>,
-  args: object,
-) {
-  const definition = idl.instructions.find((ix) => ix.name === name);
-  if (definition === undefined) throw new WebApiError("INSTRUCTION_NOT_BUILT");
-  return new TransactionInstruction({
-    programId: program,
-    keys: accountMetas(definition.accounts, values),
-    data: coder.instruction.encode(name, args),
-  });
-}
 
 export function sessionToken(owner: PublicKey, inputKey: PublicKey) {
   if (owner.equals(inputKey) || !PublicKey.isOnCurve(inputKey.toBytes()))

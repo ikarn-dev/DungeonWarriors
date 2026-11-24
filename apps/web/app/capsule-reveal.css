@@ -216,6 +216,10 @@
   filter: drop-shadow(-3px 2px 0 var(--foil))
     drop-shadow(5px -2px 0 var(--foil-edge));
 }
+/* Warrior cats are smooth vector art. */
+.gacha-portrait img[src*="/game-assets/v3/"] {
+  image-rendering: auto;
+}
 .gacha-card::after {
   position: absolute;
   z-index: 1;

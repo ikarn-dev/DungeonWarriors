@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { lobbyMusic } from "../lib/audio/lobby-music";
+import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
 import { MEDIA_ROOT } from "../lib/game/assets";
 import { displayUsdc } from "../lib/game/custody-client";
 import {
@@ -96,7 +97,7 @@ export default function CapsuleReveal({
                     unoptimized
                     src={
                       reward.kind === "cat"
-                        ? `${MEDIA_ROOT}/portrait-${reward.id}.svg`
+                        ? warriorPortrait(reward.id)
                         : `${MEDIA_ROOT}/upgrade-item.svg`
                     }
                     alt=""
@@ -110,7 +111,7 @@ export default function CapsuleReveal({
                       ? "Cat unlocked"
                       : "Upgrade unlocked"}
                   </span>
-                  {cat && <span>Level {cat.level}</span>}
+                  {cat && <span>{WARRIORS[cat.id].title}</span>}
                 </footer>
               </div>
             </article>

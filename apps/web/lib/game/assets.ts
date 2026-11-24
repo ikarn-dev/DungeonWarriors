@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// Media used by the lobby. Runs load the exact version and hash published
-// by the on-chain catalog, so those assets must also be bundled.
+// Lobby and dungeon cat art is bundled and hash-checked locally.
+// Legacy runner recovery retains its published manifest bindings.
 export const MEDIA_ROOT = "/game-assets/v2";
 
 export const FIRST_SCENE_ASSETS = [

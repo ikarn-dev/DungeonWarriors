@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "version": 3,
+  "assets": [
+    {
+      "id": "body-acrobat",
+      "path": "/game-assets/v3/body-acrobat.svg",
+      "sha256": "c19d6a41dac6dd38b8a5001f39ad7204de8a0084dd331eb03fd0d37049aa3f39",
+      "bytes": 4896,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "body-collector",
+      "path": "/game-assets/v3/body-collector.svg",
+      "sha256": "0d8e8e48d4c47377bb514371b72a4704840240ff76fa5871e6b2b31455d06835",
+      "bytes": 4879,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "body-guardian",
+      "path": "/game-assets/v3/body-guardian.svg",
+      "sha256": "e9e2435a6f484980d6e49867c8fc2ca9f675731594d146f6e36fc0023e04c55f",
+      "bytes": 5341,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "body-sprinter",
+      "path": "/game-assets/v3/body-sprinter.svg",
+      "sha256": "2b1615fa1d3b83d471ee764bcda039a9598025be07abc0477d46eb1eb33b291b",
+      "bytes": 6437,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "enemy-bat",
+      "path": "/game-assets/v3/enemy-bat.svg",
+      "sha256": "8a474c8bbf2e86134649c1acd54d4a13aa55b70f3ad7acb61c0394bedec936d5",
+      "bytes": 1850,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 64,
+        "y": 90
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "enemy-skeleton",
+      "path": "/game-assets/v3/enemy-skeleton.svg",
+      "sha256": "e3847013707265172ec388a2537534aa553ba7bf6e56226f3e29e02c9b3024ad",
+      "bytes": 2953,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 64,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "enemy-slime",
+      "path": "/game-assets/v3/enemy-slime.svg",
+      "sha256": "57ad568777aff9b7a11d796289889ecd7bca3d4b4504583564de3c1911b824de",
+      "bytes": 1142,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 64,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "enemy-warden",
+      "path": "/game-assets/v3/enemy-warden.svg",
+      "sha256": "40d5e67f62eb47e77e05878e1b84269fa5c66939505098d0dce2837b0493c553",
+      "bytes": 4062,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 64,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "warrior-acrobat",
+      "path": "/game-assets/v3/warrior-acrobat.svg",
+      "sha256": "8b8b5ae834cda7912d9adce2ab911c057157e0d20804693a72e65e133a8d914c",
+      "bytes": 5901,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "warrior-collector",
+      "path": "/game-assets/v3/warrior-collector.svg",
+      "sha256": "22eee0ec54be44db7fe250255cdfa05d4296d9b5962a61b69fc9e6daaf9e4ebf",
+      "bytes": 5785,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "warrior-guardian",
+      "path": "/game-assets/v3/warrior-guardian.svg",
+      "sha256": "178174e202d5de3c55a9b0cbe8d77f2cfc29ef0dbd7014fd94dfbd1894d4e1cd",
+      "bytes": 6221,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "warrior-sprinter",
+      "path": "/game-assets/v3/warrior-sprinter.svg",
+      "sha256": "03b5d718d89c522b4870d14478e9c5b5d0815b3eca5ffbf2bbe023afd42a0e2b",
+      "bytes": 7270,
+      "width": 128,
+      "height": 128,
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "frames": 1,
+      "anchor": {
+        "x": 61,
+        "y": 120
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "weapon-axe",
+      "path": "/game-assets/v3/weapon-axe.svg",
+      "sha256": "d860fdce228208ec26bc515d9bc25ecfa63fcffcc5feee05aad72971812d61c1",
+      "bytes": 846,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 48,
+        "y": 74
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "weapon-longsword",
+      "path": "/game-assets/v3/weapon-longsword.svg",
+      "sha256": "7070983e7669163d17d8e8493d314ef0c558e0b3d2c47dacc4d49dd0e27055ff",
+      "bytes": 1018,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 48,
+        "y": 72
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "weapon-spear",
+      "path": "/game-assets/v3/weapon-spear.svg",
+      "sha256": "6e87188e3bdd577da196c9c774b91cd30f4fec41a45e3649a9c51d16191e466b",
+      "bytes": 919,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 48,
+        "y": 64
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "weapon-sword",
+      "path": "/game-assets/v3/weapon-sword.svg",
+      "sha256": "af27249f69a148bc557efed72811ff4e13a7c828966576ea95fd60204dd9fcd5",
+      "bytes": 893,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 48,
+        "y": 72
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    }
+  ]
+}

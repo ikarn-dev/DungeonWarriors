@@ -1,9 +1,8 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { MEDIA_ROOT } from "../lib/game/assets";
-import { type CatId, catStats } from "../lib/game/catalog";
+import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
+import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
-import { POWER_LABELS } from "./RunHud";
 
 export type LobbyTab =
   | "play"
@@ -51,7 +50,7 @@ export function LobbyMenu({
               {tab === id && cursor && (
                 <Image
                   unoptimized
-                  src={`${MEDIA_ROOT}/portrait-${cursor}.svg`}
+                  src={warriorPortrait(cursor)}
                   alt=""
                   width={32}
                   height={32}
@@ -82,12 +81,12 @@ export function LobbyHero({
 }: {
   readonly cat: LobbyState["cats"][number];
 }) {
-  const stats = catStats(cat.id, cat.level);
+  const warrior = WARRIORS[cat.id];
   return (
     <div className="bet-hero">
       <Image
         unoptimized
-        src={`${MEDIA_ROOT}/portrait-${cat.id}.svg`}
+        src={warriorPortrait(cat.id)}
         alt=""
         width={56}
         height={56}
@@ -98,12 +97,12 @@ export function LobbyHero({
           <span className="lobby-rarity" data-rarity={cat.rarity}>
             {cat.rarity}
           </span>
-          <span className="lobby-rarity">Lv {cat.level}</span>
         </p>
       </div>
       <p className="bet-power">
-        {POWER_LABELS[stats.power]}
-        <span>{stats.powerCooldownTicks / 60}s cooldown</span>
+        {warrior.title} · {warrior.hp} HP · {warrior.atk} ATK · {warrior.def}{" "}
+        DEF
+        <span>{warrior.traits.map((t) => t.name).join(" · ")}</span>
       </p>
     </div>
   );

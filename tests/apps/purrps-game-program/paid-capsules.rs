@@ -231,7 +231,14 @@ fn provider_rejection_rolls_back_draw_allocation_escrow_and_nonce() {
         let watched = [p.player, p.collection, p.house, p.vault];
         let before = watched.map(|key| account_bytes(&p, key));
         let request = purchase(&p, kind, 0, 100_000_000);
-        rejected(p.h.send(request, &p.owner), "DeclaredProgramIdMismatch");
+        rejected(
+            p.h.send(request, &p.owner),
+            if kind == CapsuleKind::Upgrade {
+                "AdmissionClosed"
+            } else {
+                "DeclaredProgramIdMismatch"
+            },
+        );
         assert!(p.h.svm.get_account(&draw).is_none());
         assert_eq!(watched.map(|key| account_bytes(&p, key)), before);
     }
@@ -243,7 +250,7 @@ fn provider_snapshot_accepts_paid_requests_and_locks_the_exact_credit() {
     let snapshot = |name| std::fs::read(std::env::var(name).unwrap()).unwrap();
     let provider = snapshot("PURRPS_VRF_PROGRAM_SNAPSHOT");
     let queue_data = snapshot("PURRPS_VRF_QUEUE_SNAPSHOT");
-    for kind in [CapsuleKind::PaidCat, CapsuleKind::Upgrade] {
+    for kind in [CapsuleKind::PaidCat] {
         let mut p = Play::new();
         let cfg = open_fixture(&mut p);
         install_vrf_fixture(&mut p, &cfg, &provider, &queue_data);
@@ -282,7 +289,7 @@ fn provider_snapshot_accepts_paid_requests_and_locks_the_exact_credit() {
 
 #[test]
 fn authenticated_callback_grants_once_and_reclassifies_escrow() {
-    for kind in [CapsuleKind::PaidCat, CapsuleKind::Upgrade] {
+    for kind in [CapsuleKind::PaidCat] {
         let mut p = Play::new();
         let (draw, price) = pending_fixture(&mut p, kind);
         let identity = p.h.read::<GameConfig>(p.h.config).vrf_callback_authority;

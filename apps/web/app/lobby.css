@@ -62,29 +62,29 @@
     #2a2640;
   image-rendering: pixelated;
 }
+/* Warrior art is 128 px with feet 8 px above the bottom; --ck scales it. */
 .lobby-cat {
   position: absolute;
   left: 0;
-  /* Feet sit 8 px above the frame bottom and 2 scenery px below the grass top. */
-  bottom: calc(var(--ground) - 2px * var(--k) - 8px * var(--ck));
-  width: calc(48px * var(--ck));
-  height: calc(48px * var(--ck));
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
+  bottom: calc(var(--ground) - 2px * var(--k) - 2.5px * var(--ck));
+  width: calc(40px * var(--ck));
+  height: calc(40px * var(--ck));
+  background: center / contain no-repeat;
+  transform-origin: 50% 94%;
   visibility: hidden;
   will-change: transform;
 }
 .lobby-cat[data-cat="acrobat"] {
-  background-image: url("/game-assets/v2/cat-acrobat.svg");
+  background-image: url("/game-assets/v3/warrior-acrobat.svg");
 }
 .lobby-cat[data-cat="collector"] {
-  background-image: url("/game-assets/v2/cat-collector.svg");
+  background-image: url("/game-assets/v3/warrior-collector.svg");
 }
 .lobby-cat[data-cat="guardian"] {
-  background-image: url("/game-assets/v2/cat-guardian.svg");
+  background-image: url("/game-assets/v3/warrior-guardian.svg");
 }
 .lobby-cat[data-cat="sprinter"] {
-  background-image: url("/game-assets/v2/cat-sprinter.svg");
+  background-image: url("/game-assets/v3/warrior-sprinter.svg");
 }
 .lobby-cat:first-of-type {
   z-index: 1;
@@ -180,7 +180,6 @@
   display: inline-grid;
   width: 32px;
   height: 32px;
-  image-rendering: pixelated;
 }
 .lobby-panel {
   min-width: 0;
@@ -254,7 +253,33 @@
   gap: 0.875rem;
 }
 .lobby-card img {
-  image-rendering: pixelated;
+  border-radius: 0.75rem;
+  background: var(--panel);
+}
+.lobby-card-title {
+  color: var(--soft);
+  font-size: 0.875rem;
+}
+.lobby-card-stats {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.lobby-traits {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 0 0 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+.lobby-traits li {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--cream);
+  font-size: 0.75rem;
 }
 .lobby-rarity {
   display: inline-block;
