@@ -41,6 +41,7 @@ export default function DungeonStage({
   const [ready, setReady] = useState(false),
     [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [renderAttempt, setRenderAttempt] = useState(0);
   const roomIndex = view.room?.index,
     seed = view.room?.seed,
     startedAt = view.room?.startedAt;
@@ -123,12 +124,21 @@ export default function DungeonStage({
     notified.current = true;
     void action({ kind: "exit", nonce: current.current.nonce, client });
   }, [action, client]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Play explicitly rebuilds the display without resetting the saved room.
   useEffect(() => {
     const parent = mount.current;
     if (!parent) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReady(false);
+    setError(null);
     const report = () => {
+      setReady(false);
+      if (current.current.phase !== "playing") {
+        setError(
+          "The display could not start. Press Play to reload it. Your room timer has not started.",
+        );
+        return;
+      }
       setError("The dungeon display stopped. Resolving automatically…");
       void send({ kind: "exit", nonce: current.current.nonce, client }).catch(
         () =>
@@ -152,12 +162,7 @@ export default function DungeonStage({
           now: () => performance.now() + offset.current,
           reduced: () => reduced.matches,
           onReady: () => setReady(true),
-          onError: () => {
-            setError(
-              "The dungeon display stopped. Resolving your saved expedition automatically.",
-            );
-            void action({ kind: "exit", nonce: current.current.nonce, client });
-          },
+          onError: report,
           onTimeout: timeout,
           preloaded: artwork.images,
         },
@@ -169,7 +174,7 @@ export default function DungeonStage({
       parent.removeEventListener("webglcontextlost", report, true);
       destroy?.();
     };
-  }, [artwork, action, client, timeout, send]);
+  }, [artwork, client, timeout, send, renderAttempt]);
   useEffect(() => {
     if (view.phase !== "playing") return;
     const timer = setInterval(() => {
@@ -321,17 +326,19 @@ export default function DungeonStage({
                   className="pixel-button"
                   data-tone="gold"
                   type="button"
-                  disabled={!ready || busy}
-                  onClick={() =>
-                    void action({
-                      kind: "start",
-                      nonce: view.nonce,
-                      client,
-                      room: 0,
-                    })
-                  }
+                  disabled={busy || (!ready && !error)}
+                  onClick={() => {
+                    if (!ready) setRenderAttempt((attempt) => attempt + 1);
+                    else
+                      void action({
+                        kind: "start",
+                        nonce: view.nonce,
+                        client,
+                        room: 0,
+                      });
+                  }}
                 >
-                  Start exploring
+                  Play
                 </button>
               </>
             )}
@@ -364,15 +371,17 @@ export default function DungeonStage({
                     className="pixel-button"
                     data-tone="green"
                     type="button"
-                    disabled={busy || !ready}
-                    onClick={() =>
-                      void action({
-                        kind: "start",
-                        nonce: view.nonce,
-                        client,
-                        room: view.cleared,
-                      })
-                    }
+                    disabled={busy || (!ready && !error)}
+                    onClick={() => {
+                      if (!ready) setRenderAttempt((attempt) => attempt + 1);
+                      else
+                        void action({
+                          kind: "start",
+                          nonce: view.nonce,
+                          client,
+                          room: view.cleared,
+                        });
+                    }}
                   >
                     Go deeper
                   </button>

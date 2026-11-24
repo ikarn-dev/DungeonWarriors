@@ -29,3 +29,10 @@ it("allows an explicit new approval at a cancelled nonce without accepting stale
   const won = { ...cancelled, phase: "won" as const };
   expect(mergeDungeonView(won, next, true)).toBe(won);
 });
+
+it("does not let an older empty status erase an in-flight approval", () => {
+  const pending = dungeonView({ ...record(), phase: "preparing" });
+  expect(mergeDungeonView(pending, null)).toBe(pending);
+  const cancelled = { ...pending, phase: "cancelled" as const, settled: true };
+  expect(mergeDungeonView(cancelled, null)).toBeNull();
+});

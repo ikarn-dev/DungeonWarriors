@@ -5,8 +5,9 @@ import {
   SYSVAR_SLOT_HASHES_PUBKEY,
   SystemProgram,
   TransactionMessage,
-  type VersionedTransaction,
+  VersionedTransaction,
 } from "@solana/web3.js";
+import { decodeBase64, encodeBase64 } from "../game/web-api";
 import { DEVNET } from "../solana/addresses";
 import { programInstruction } from "../solana/instruction";
 import { nonceBytes, pda } from "../solana/program";
@@ -94,4 +95,29 @@ export function validateDungeonReservation(
     bytes.some((value, index) => value !== actual[index])
   )
     throw new Error("UNEXPECTED_DUNGEON_TRANSACTION");
+}
+
+export type DungeonApproval = { source: string; transaction: string };
+export async function approveDungeonReservation(
+  owner: string,
+  quote: DungeonView,
+  sign: (tx: VersionedTransaction) => Promise<VersionedTransaction>,
+  previous: DungeonApproval | null,
+): Promise<DungeonApproval> {
+  if (!quote.preparation || quote.owner !== owner)
+    throw new Error("INVALID_DUNGEON_QUOTE");
+  const source = quote.preparation.transaction;
+  const tx = VersionedTransaction.deserialize(decodeBase64(source));
+  validateDungeonReservation(tx, owner, quote);
+  if (previous?.source === source) {
+    validateDungeonReservation(
+      VersionedTransaction.deserialize(decodeBase64(previous.transaction)),
+      owner,
+      quote,
+    );
+    return previous;
+  }
+  const signed = await sign(tx);
+  validateDungeonReservation(signed, owner, quote);
+  return { source, transaction: encodeBase64(signed.serialize()) };
 }

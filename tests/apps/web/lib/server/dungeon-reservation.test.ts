@@ -89,3 +89,47 @@ it("reuses the unchanged onchain nonce after cancellation, but never overwrites 
   await expect(quoteDungeon(owner, input)).rejects.toThrow("DUNGEON_ACTIVE");
   expect(mocks.stored?.reserve.transaction).toBe(original);
 });
+
+it("reuses a validated wallet approval for the same preparation, but signs again for a new blockhash", async () => {
+  const { VersionedTransaction } = await import("@solana/web3.js");
+  const { approveDungeonReservation } = await import(
+    "../../../../../apps/web/lib/dungeon/transactions"
+  );
+  const quote = await quoteDungeon(owner, {
+    kind: "quote",
+    stake: "1000000",
+    cat: "collector",
+    maxRooms: 5,
+    maxGross: "7214062",
+    rulesHash: "00".repeat(32),
+  });
+  const preparation = quote.preparation;
+  if (!preparation) throw new Error("Expected a prepared approval");
+  const signer = Keypair.fromSeed(new Uint8Array(32).fill(1));
+  const sign = vi.fn(async (tx: InstanceType<typeof VersionedTransaction>) => {
+    tx.sign([signer]);
+    return tx;
+  });
+  const first = await approveDungeonReservation(owner, quote, sign, null);
+  expect(await approveDungeonReservation(owner, quote, sign, first)).toBe(
+    first,
+  );
+  expect(sign).toHaveBeenCalledTimes(1);
+  await expect(
+    approveDungeonReservation(owner, { ...quote, maxGross: "1" }, sign, first),
+  ).rejects.toThrow("UNEXPECTED_DUNGEON_TRANSACTION");
+  expect(sign).toHaveBeenCalledTimes(1);
+  const tx = VersionedTransaction.deserialize(
+    Buffer.from(first.source, "base64"),
+  );
+  tx.message.recentBlockhash = Keypair.generate().publicKey.toBase58();
+  const changed = {
+    ...quote,
+    preparation: {
+      ...preparation,
+      transaction: Buffer.from(tx.serialize()).toString("base64"),
+    },
+  };
+  await approveDungeonReservation(owner, changed, sign, first);
+  expect(sign).toHaveBeenCalledTimes(2);
+});

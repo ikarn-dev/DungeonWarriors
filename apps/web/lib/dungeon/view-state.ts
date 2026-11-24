@@ -7,7 +7,8 @@ export function mergeDungeonView(
   next: DungeonView | null,
   newApproval = false,
 ): DungeonView | null {
-  if (!prior || !next) return next;
+  if (!next) return prior && !prior.settled ? prior : null;
+  if (!prior) return next;
   if (BigInt(prior.nonce) > BigInt(next.nonce)) return prior;
   if (prior.nonce !== next.nonce) return next;
   if (next.serverNow < prior.serverNow) return prior;

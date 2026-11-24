@@ -1,5 +1,5 @@
 "use client";
-import { VersionedTransaction } from "@solana/web3.js";
+import type { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type DungeonArtwork,
@@ -12,13 +12,17 @@ import {
   dungeonOfferSchema,
   dungeonViewSchema,
 } from "../lib/dungeon/protocol";
-import { validateDungeonReservation } from "../lib/dungeon/transactions";
+import { requestDungeon } from "../lib/dungeon/request";
+import {
+  approveDungeonReservation,
+  type DungeonApproval,
+} from "../lib/dungeon/transactions";
 import { mergeDungeonView } from "../lib/dungeon/view-state";
 import type { CatId } from "../lib/game/catalog";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
 import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
-import DungeonStage from "./DungeonStage";
+import DungeonScreen from "./DungeonScreen";
 
 export default function DungeonEntry({
   state,
@@ -41,6 +45,7 @@ export default function DungeonEntry({
     client = useRef(crypto.randomUUID());
   const latest = useRef<DungeonView | null>(null),
     finalized = useRef<string | null>(null);
+  const approved = useRef<DungeonApproval | null>(null);
   const [view, setView] = useState<DungeonView | null>(null);
   const [art, setArt] = useState<DungeonArtwork | null>(null);
   const [artError, setArtError] = useState(false);
@@ -81,11 +86,7 @@ export default function DungeonEntry({
   const send = useCallback(
     async (input: DungeonRequest) => {
       return accept(
-        dungeonViewSchema
-          .nullable()
-          .parse(
-            await webApi("/api/dungeon", input, AbortSignal.timeout(12000)),
-          ),
+        dungeonViewSchema.nullable().parse(await requestDungeon(input)),
         input.kind === "quote",
       );
     },
@@ -164,6 +165,7 @@ export default function DungeonEntry({
     nonce = view?.nonce;
   useEffect(() => {
     if (
+      busy ||
       !nonce ||
       settled ||
       phase === "playing" ||
@@ -195,7 +197,7 @@ export default function DungeonEntry({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [phase, settled, nonce, accept]);
+  }, [phase, settled, nonce, accept, busy]);
   useEffect(() => {
     const modal = dialog.current;
     if (open && !modal?.open) modal?.showModal();
@@ -216,39 +218,49 @@ export default function DungeonEntry({
     setOpen(false);
   }, [send]);
   async function begin() {
-    if (!sign || !offer || !rawStake || busy || blocked) return;
+    if (!sign || busy || blocked) return;
+    const current = latest.current;
+    const resuming = current?.phase === "preparing" && current.preparation;
+    let quote = resuming ? current : null;
+    if (!quote && (!offer || !rawStake)) return;
     setBusy(true);
     setNotice(null);
-    let quote: DungeonView | null = null;
     let loaded = false;
     try {
       setArtError(false);
-      const artwork = await loadDungeonArtwork(cat);
+      const artwork = await loadDungeonArtwork(quote?.cat ?? cat);
       setArt(artwork);
       loaded = true;
-      quote = await send({
-        kind: "quote",
-        stake: rawStake,
-        cat,
-        maxRooms: offer.maxRooms,
-        maxGross: offer.maxGross,
-        rulesHash: offer.rulesHash,
-      });
-      if (!quote?.preparation || quote.stake !== rawStake || quote.cat !== cat)
+      if (!quote) {
+        if (!offer || !rawStake) return;
+        quote = await send({
+          kind: "quote",
+          stake: rawStake,
+          cat,
+          maxRooms: offer.maxRooms,
+          maxGross: offer.maxGross,
+          rulesHash: offer.rulesHash,
+        });
+      }
+      if (
+        !quote?.preparation ||
+        quote.owner !== wallet ||
+        (!resuming && (quote.stake !== rawStake || quote.cat !== cat))
+      )
         throw new Error("INVALID_DUNGEON_QUOTE");
       setOpen(true);
-      const tx = VersionedTransaction.deserialize(
-        Uint8Array.from(atob(quote.preparation.transaction), (c) =>
-          c.charCodeAt(0),
-        ),
+      approved.current = await approveDungeonReservation(
+        wallet,
+        quote,
+        sign,
+        approved.current,
       );
-      validateDungeonReservation(tx, wallet, quote);
-      const signed = await sign(tx);
-      validateDungeonReservation(signed, wallet, quote);
-      const transaction = btoa(
-        Array.from(signed.serialize(), (b) => String.fromCharCode(b)).join(""),
-      );
-      await send({ kind: "submit", nonce: quote.nonce, transaction });
+      await send({
+        kind: "submit",
+        nonce: quote.nonce,
+        transaction: approved.current.transaction,
+      });
+      setNotice(null);
     } catch (error) {
       if (!loaded) setArtError(true);
       else
@@ -258,15 +270,11 @@ export default function DungeonEntry({
             : "The expedition could not start. Your saved request will be checked.",
         );
       if (quote)
-        void send({
-          kind: "exit",
+        await send({
+          kind: "status",
           nonce: quote.nonce,
           client: client.current,
-        }).catch(() =>
-          setNotice(
-            "Your saved expedition will be checked when your wallet returns.",
-          ),
-        );
+        }).catch(() => null);
       if (!quote && loaded) {
         void webApi("/api/dungeon", { kind: "offer", stake: rawStake, cat })
           .then((value) => setOffer(dungeonOfferSchema.parse(value)))
@@ -290,7 +298,7 @@ export default function DungeonEntry({
             type="button"
             onClick={() => setOpen(true)}
           >
-            Open expedition
+            Play
           </button>
         </div>
       ) : (
@@ -358,7 +366,9 @@ export default function DungeonEntry({
           </p>
         </div>
       )}
-      {notice && <output className="lobby-section-note">{notice}</output>}
+      {notice && !open && (
+        <output className="lobby-section-note">{notice}</output>
+      )}
       <dialog
         ref={dialog}
         className="run-dialog dungeon-dialog"
@@ -383,19 +393,16 @@ export default function DungeonEntry({
             >
               ← Lobby
             </button>
-            {art?.cat === view.cat ? (
-              <DungeonStage
-                view={view}
-                artwork={art}
-                client={client.current}
-                send={send}
-                onDone={close}
-              />
-            ) : (
-              <output className="dungeon-loading">
-                Loading the catacombs…
-              </output>
-            )}
+            <DungeonScreen
+              view={view}
+              artwork={art}
+              busy={busy}
+              notice={notice}
+              client={client.current}
+              send={send}
+              onPlay={() => void begin()}
+              onClose={close}
+            />
           </div>
         )}
       </dialog>

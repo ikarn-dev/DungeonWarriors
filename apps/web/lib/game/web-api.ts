@@ -15,7 +15,9 @@ const FRIENDLY: Readonly<Record<string, string>> = {
     "The available expedition changed. Review the new quote and try again.",
   DUNGEON_ACTIVE:
     "Your previous expedition is being resolved. Check it before placing another bet.",
-  DUNGEON_BUSY: "Your expedition is saving. Please try again in a moment.",
+  DUNGEON_BUSY: "Your expedition is saving. Press Play to continue.",
+  DUNGEON_STATE_CHANGED:
+    "Your expedition changed while the request was pending. Its saved status is being checked.",
   CAT_NOT_OWNED: "Choose a cat in your collection.",
   INSUFFICIENT_CREDIT: "Add USDC to your game balance or lower your bet.",
   AUTH_REQUIRED: "Please sign in again to continue.",
