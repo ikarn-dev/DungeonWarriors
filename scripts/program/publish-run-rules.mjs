@@ -94,18 +94,35 @@ if (mode === "--publish" && current.rules?.version !== target) {
     Uint8Array.from(JSON.parse(readFileSync(adminPath, "utf8"))),
   );
   check(admin.publicKey.equals(current.admin), "INVALID_ADMIN");
-  const readiness = await fetch(new URL("/api/run/browser", process.env.APP_ORIGIN),
-    {signal:AbortSignal.timeout(8000)}).then((response) => response.json());
-  check(readiness.ready === true && readiness.version === target, "CONFIGURE_THE_VERIFIER_AND_WORKER_FIRST");
-  const verifierBytes = Buffer.from(process.env.BROWSER_VERIFIER_SECRET_KEY ?? "", "base64");
+  const readiness = await fetch(
+    new URL("/api/run/browser", process.env.APP_ORIGIN),
+    { signal: AbortSignal.timeout(8000) },
+  ).then((response) => response.json());
+  check(
+    readiness.ready === true && readiness.version === target,
+    "CONFIGURE_THE_VERIFIER_FIRST",
+  );
+  const verifierBytes = Buffer.from(
+    process.env.BROWSER_VERIFIER_SECRET_KEY ?? "",
+    "base64",
+  );
   check(verifierBytes.length === 64, "VERIFIER_NOT_CONFIGURED");
   const authority = Keypair.fromSecretKey(verifierBytes).publicKey;
   check(!authority.equals(admin.publicKey), "VERIFIER_MUST_BE_DEDICATED");
+  check(
+    readiness.verifier === authority.toBase58(),
+    "HOSTED_VERIFIER_MISMATCH",
+  );
   const verifierAddress = pda("browser-verifier");
   const configured = await rpc.getAccountInfo(verifierAddress);
   if (configured) {
-    check(configured.owner.equals(program) &&
-      coder.accounts.decode("browserVerifier", configured.data).authority.equals(authority), "VERIFIER_MISMATCH");
+    check(
+      configured.owner.equals(program) &&
+        coder.accounts
+          .decode("browserVerifier", configured.data)
+          .authority.equals(authority),
+      "VERIFIER_MISMATCH",
+    );
   }
   // The final pointer is v4 only if every required version publishes successfully.
   const instructions = [RULES_V2, RULES_V3, RULES_V4]
@@ -136,16 +153,25 @@ if (mode === "--publish" && current.rules?.version !== target) {
           }),
         }),
     );
-  if (!configured) instructions.unshift(new TransactionInstruction({
-    programId:program,
-    keys:[
-      {pubkey:config,isSigner:false,isWritable:false},
-      {pubkey:admin.publicKey,isSigner:true,isWritable:true},
-      {pubkey:verifierAddress,isSigner:false,isWritable:true},
-      {pubkey:SystemProgram.programId,isSigner:false,isWritable:false},
-    ],
-    data:coder.instruction.encode("configureBrowserVerifier",{authority}),
-  }));
+  if (!configured)
+    instructions.unshift(
+      new TransactionInstruction({
+        programId: program,
+        keys: [
+          { pubkey: config, isSigner: false, isWritable: false },
+          { pubkey: admin.publicKey, isSigner: true, isWritable: true },
+          { pubkey: verifierAddress, isSigner: false, isWritable: true },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+        ],
+        data: coder.instruction.encode("configureBrowserVerifier", {
+          authority,
+        }),
+      }),
+    );
   const block = await rpc.getLatestBlockhash("confirmed");
   const transaction = new Transaction({
     feePayer: admin.publicKey,

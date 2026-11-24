@@ -1,5 +1,6 @@
 import { verifyManifestBinding } from "./assets";
 import type { CatId } from "./catalog";
+import { runImages } from "./render-assets";
 import { readWebJson } from "./web-api";
 
 type Binding = { version: number; contentHash: string };
@@ -9,17 +10,16 @@ export async function loadRunArtwork(
   signal: AbortSignal,
   cat?: CatId,
 ) {
-  const [manifest, { default: engine }, { renderRun, runImages }] =
-    await Promise.all([
-      fetch(`/game-assets/v${binding.version}/manifest.json`, { signal }).then(
-        async (response) => {
-          if (!response.ok) throw new Error("ASSETS_NOT_READY");
-          return verifyManifestBinding(await readWebJson(response), binding);
-        },
-      ),
-      import("phaser"),
-      import("./render-run"),
-    ]);
+  const [manifest, { default: engine }, { renderRun }] = await Promise.all([
+    fetch(`/game-assets/v${binding.version}/manifest.json`, { signal }).then(
+      async (response) => {
+        if (!response.ok) throw new Error("ASSETS_NOT_READY");
+        return verifyManifestBinding(await readWebJson(response), binding);
+      },
+    ),
+    import("phaser"),
+    import("./render-run"),
+  ]);
   const assets = cat
     ? new Map(
         await Promise.all(

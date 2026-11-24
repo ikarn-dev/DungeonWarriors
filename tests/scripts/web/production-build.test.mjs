@@ -38,7 +38,8 @@ test("the prerendered page references emitted local CSS", () => {
 test("the starter route renders the pixel lobby before wallet hydration", () => {
   const html = readFileSync(join(output, "server/app/starter.html"), "utf8");
   assert.match(html, /alt="PURRPS"/);
-  assert.match(html, /Loading wallet controls/);
+  assert.match(html, /<output class="pixel-loader">/);
+  assert.match(html, /class="sr-only">Loading/);
   assert.match(html, /data-cat="collector"/);
   assert.doesNotMatch(html, /capsule-(lid|base)\.svg/);
 });
@@ -54,7 +55,7 @@ test("server credential configuration is absent from browser chunks", () => {
   )) {
     const value = readFileSync(file, "utf8");
     assert.equal(
-      /HELIUS_DEVNET_RPC_URL|UPSTASH_REDIS_REST_TOKEN|SPONSOR_SECRET_KEY|SENTRY_DSN/.test(
+      /HELIUS_DEVNET_RPC_URL|UPSTASH_REDIS_REST_TOKEN|SPONSOR_SECRET_KEY|BROWSER_VERIFIER_SECRET_KEY|SENTRY_DSN/.test(
         value,
       ),
       false,

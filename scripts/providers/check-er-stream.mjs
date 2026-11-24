@@ -1,4 +1,4 @@
-import { decodeOracleQuote } from "../../apps/web/lib/providers/oracle.mts";
+import { decodeOracleQuote } from "../../apps/web/lib/providers/oracle.ts";
 import {
   accountBytes,
   accountSchema,

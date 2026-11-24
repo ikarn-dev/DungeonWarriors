@@ -8,14 +8,16 @@ import {
   type RunViewport,
   runViewport,
 } from "./presentation";
+import { auras, boosters, layers, runImages } from "./render-assets";
 import { Aura, BurstPool } from "./render-effects";
 import {
   type Surface,
   surfacePixels,
   surfaces,
   TerrainColumns,
+  type TerrainStyle,
 } from "./render-terrain";
-import { RULES_V1, RULES_V3 } from "./rules";
+import { RULES_V1, RULES_V3, RULES_V4 } from "./rules";
 import type { WorldEntity } from "./simulation-state";
 import type { WorldState } from "./world-state";
 
@@ -26,48 +28,6 @@ const correctionMs = 90;
 const ANCHOR_PERIOD = 19_200n;
 const RUN_STRIDE_PX = 16;
 const LAND_MS = 110;
-const layers = [
-  ["background-sky", 0.05],
-  ["background-forest-far", 0.2],
-  ["background-forest-near", 0.4],
-] as const;
-const stills = [
-  "background-sky",
-  "background-forest-far",
-  "background-forest-near",
-  "coin-shadow",
-  "hazard-obstacle",
-  "terrain-fill",
-  "terrain-grass",
-  "booster-magnet",
-  "booster-shield",
-  "booster-double-jump",
-  "booster-extra-dash",
-] as const;
-const sheets = [
-  "coin-spin",
-  "star",
-  "effects-actions",
-  "effects-powers",
-] as const;
-const boosters = {
-  magnet: "booster-magnet",
-  shield: "booster-shield",
-  doubleJump: "booster-double-jump",
-  extraDash: "booster-extra-dash",
-} as const;
-const auras = [
-  ["magnet", "magnet"],
-  ["doubleJump", "double-jump"],
-  ["extraDash", "extra-dash"],
-  ["shield", "shield-active"],
-] as const;
-
-export function runImages(manifest: AssetManifest, cat: CatId) {
-  const wanted = new Set<string>([`cat-${cat}`, ...sheets, ...stills]);
-  return manifest.assets.filter(({ id }) => wanted.has(id));
-}
-
 export type RunRenderOptions = {
   rulesVersion: number;
   world: () => WorldState;
@@ -98,6 +58,14 @@ export function renderRun(
   const starSheet = asset("star");
   const actions = asset("effects-actions");
   const powerSheet = asset("effects-powers");
+  const hazardArt = asset("hazard-obstacle");
+  const water = asset("water-surface");
+  const style: TerrainStyle =
+    options.rulesVersion >= RULES_V4.rulesVersion
+      ? "course"
+      : options.rulesVersion >= RULES_V3.rulesVersion
+        ? "platforms"
+        : "ground";
   const catClips = new Map(catSheet.clips.map((clip) => [clip.name, clip]));
   const measure = (): RunViewport => {
     const box = parent.getBoundingClientRect();
@@ -114,6 +82,7 @@ export function renderRun(
     private terrain?: TerrainColumns;
     private runner?: Phaser.GameObjects.Image;
     private pickups: Phaser.GameObjects.Image[] = [];
+    private hazards: Phaser.GameObjects.Image[] = [];
     private shadows: Phaser.GameObjects.Image[] = [];
     private dust?: BurstPool;
     private sparkle?: BurstPool;
@@ -177,13 +146,25 @@ export function renderRun(
       this.terrain = new TerrainColumns(
         this,
         RUN_VIEW.maxHeight,
-        options.rulesVersion >= RULES_V3.rulesVersion,
+        style,
+        water.clips.find((clip) => clip.name === "wave"),
       );
       this.shadows = Array.from({ length: 24 }, () =>
         this.add.image(0, 0, "coin-shadow").setDepth(4).setVisible(false),
       );
       this.pickups = Array.from({ length: 48 }, () =>
-        this.add.image(0, 0, "hazard-obstacle").setDepth(5).setVisible(false),
+        this.add.image(0, 0, "star").setDepth(5).setVisible(false),
+      );
+      // Behind the ground, so a spike's base is hidden below a sloped surface.
+      this.hazards = Array.from({ length: 16 }, () =>
+        this.add
+          .image(0, 0, hazardArt.id)
+          .setOrigin(
+            hazardArt.anchor.x / hazardArt.frameWidth,
+            hazardArt.anchor.y / hazardArt.frameHeight,
+          )
+          .setDepth(1.5)
+          .setVisible(false),
       );
       this.dust = new BurstPool(this, actions, 8, 6);
       this.sparkle = new BurstPool(this, actions, 8, 9);
@@ -229,7 +210,16 @@ export function renderRun(
       this.layers.forEach((layer, i) => {
         layer.tilePositionX = snap((left + anchor) * (layers[i]?.[1] ?? 0));
       });
-      this.terrain.draw(track, { left, anchor, width, height, yOffset, snap });
+      this.terrain.draw(track, {
+        left,
+        anchor,
+        width,
+        height,
+        yOffset,
+        snap,
+        time,
+        still,
+      });
       this.drawEntities(world.entities, track, {
         left,
         yOffset,
@@ -313,6 +303,7 @@ export function renderRun(
     ) {
       const { left, yOffset, snap, time, still } = at;
       let used = 0;
+      let blocked = 0;
       let shadowed = 0;
       const present = new Set<bigint>();
       for (const entity of entities) {
@@ -325,22 +316,21 @@ export function renderRun(
         const cx = px(entity.xSubpixels + entity.widthSubpixels / 2);
         const x = snap(cx - left);
         if (x < -40 || x > view.width + 40) continue;
-        const sprite = this.pickups[used++];
-        if (!sprite) break;
-        const cy = px(entity.ySubpixels + entity.heightSubpixels / 2) + yOffset;
-        if (entity.kind !== "hazard") {
-          present.add(entity.id);
-          this.seen.set(entity.id, { x, y: cy });
-        }
         if (entity.kind === "hazard") {
-          sprite
-            .setTexture("hazard-obstacle")
-            .setOrigin(0.5, 1)
-            .setPosition(
+          this.hazards[blocked++]
+            ?.setPosition(
               x,
               snap(px(entity.ySubpixels + entity.heightSubpixels) + yOffset),
-            );
-        } else if (entity.kind === "coin") {
+            )
+            .setVisible(true);
+          continue;
+        }
+        const sprite = this.pickups[used++];
+        if (!sprite) continue;
+        const cy = px(entity.ySubpixels + entity.heightSubpixels / 2) + yOffset;
+        present.add(entity.id);
+        this.seen.set(entity.id, { x, y: cy });
+        if (entity.kind === "coin") {
           const phase = Number(entity.id % 16n) * 62.5;
           sprite
             .setTexture("coin-spin", coinFrame(time + phase, still))
@@ -368,6 +358,8 @@ export function renderRun(
       }
       for (let i = used; i < this.pickups.length; i++)
         this.pickups[i]?.setVisible(false);
+      for (let i = blocked; i < this.hazards.length; i++)
+        this.hazards[i]?.setVisible(false);
       for (let i = shadowed; i < this.shadows.length; i++)
         this.shadows[i]?.setVisible(false);
       for (const [id, spot] of this.seen) {

@@ -19,20 +19,20 @@ import {
   type WorldEntity,
 } from "./simulation-state";
 import {
+  coordinate,
+  courseCoinLift,
+  entity,
+  extendCourse,
+  isCourse,
+  push,
+} from "./world-course";
+import {
   type PriceSample,
   priceSampleSchema,
   validateWorldState,
   type WorldState,
 } from "./world-state";
 
-function coordinate(value: number): number {
-  if (
-    !Number.isInteger(value) ||
-    Math.abs(value) > RULES_V1.physics.coordinateLimitSubpixels
-  )
-    throw new SimulationError("NUMERIC_OVERFLOW");
-  return value;
-}
 function coinDistance(speed: number, target: number, ticks: number): number {
   const ease = RULES_V1.physics.speedEasingSubpixelsPerTick;
   const accelerating = Math.min(ticks, Math.trunc((target - speed) / ease));
@@ -41,32 +41,6 @@ function coinDistance(speed: number, target: number, ticks: number): number {
     (ease * accelerating * (accelerating + 1)) / 2 +
     (ticks - accelerating) * target
   );
-}
-function push(state: WorldState, entity: WorldEntity): void {
-  if (state.entities.length >= RULES_V1.maxWorldEntities)
-    throw new SimulationError("INVALID_WORLD");
-  entity.id = state.nextEntityId;
-  state.nextEntityId = addCounter(state.nextEntityId, 1n);
-  state.entities.push(entity);
-}
-function entity(
-  kind: "coin" | "hazard" | "star",
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): WorldEntity {
-  return {
-    id: 0n,
-    kind,
-    xSubpixels: x,
-    ySubpixels: y,
-    widthSubpixels: width,
-    heightSubpixels: height,
-    designatedCoin: null,
-    designatedCheckpoint: 0n,
-    consumed: false,
-  };
 }
 function rebase(state: WorldState): void {
   if (
@@ -138,9 +112,11 @@ function prepare(
     state.generation.spawnedCoinMask = 0;
     state.generation.spawnedHazardMask = 0;
   }
+  const course = isCourse(gameRules);
+  if (course) extendCourse(state, sample, gameRules);
   const horizon =
     state.frame.runner.xSubpixels + width * rules.lookaheadSegments;
-  for (let i = 0; i <= rules.lookaheadSegments + 2; i++) {
+  for (let i = 0; !course && i <= rules.lookaheadSegments + 2; i++) {
     if (state.generation.nextXSubpixels >= horizon) break;
     const g = { ...state.generation };
     const gap = platformGap(gameRules, g.nextSegment)
@@ -229,6 +205,11 @@ function prepare(
         ? state.generation.spawnedHazardMask
         : state.generation.spawnedCoinMask;
       if ((mask & (1 << index)) !== 0) continue;
+      // The v4 course places its own spikes per segment.
+      if (course && hazard) {
+        state.generation.spawnedHazardMask |= 1 << index;
+        continue;
+      }
       let x = coordinate(
         state.generation.checkpointXSubpixels +
           coinDistance(
@@ -277,9 +258,12 @@ function prepare(
           ? Math.trunc(p.hitboxWidthSubpixels / 2) +
             (progressive ? Number(checkpoint > 8n ? 8n : checkpoint) * 256 : 0)
           : 8 * 256;
+        const lift = course ? courseCoinLift(state, x, gameRules) : null;
         const y = coordinate(
           surface -
-            (hazard ? size : Math.trunc((p.hitboxHeightSubpixels + size) / 2)),
+            (hazard
+              ? size
+              : (lift ?? Math.trunc((p.hitboxHeightSubpixels + size) / 2))),
         );
         const pickup = entity(
           hazard ? "hazard" : "coin",

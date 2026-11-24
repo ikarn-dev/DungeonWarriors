@@ -94,7 +94,8 @@ for (const power of ["double-jump", "extra-dash", "magnet", "shield"])
   still(`booster-${power}`, 24, 24, scene.booster(power), {
     anchor: { x: 12, y: 12 },
   });
-still("hazard-obstacle", 32, 32, scene.hazard(), { anchor: { x: 16, y: 32 } });
+// The anchor is the bottom centre of the 20 px spike collider.
+still("hazard-obstacle", 32, 32, scene.hazard(), { anchor: { x: 16, y: 30 } });
 still("hazard-pit-edge", 32, 32, scene.pitEdge());
 still("terrain-fill", 32, 32, scene.terrainFill(), { repeat: "xy" });
 still("terrain-grass", 32, 16, scene.terrainGrass(), { repeat: "x" });

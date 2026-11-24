@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
-import { BorshAccountsCoder, convertIdlToCamelCase } from "@anchor-lang/core";
+import {
+  BorshAccountsCoder,
+  convertIdlToCamelCase,
+  type IdlAccounts,
+} from "@anchor-lang/core";
 import {
   PublicKey,
   SystemProgram,
@@ -14,7 +18,10 @@ import {
   webErrorMessage,
 } from "../../../../../apps/web/lib/game/web-api";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
-import { PURRPS_GAME_IDL } from "../../../../../apps/web/lib/solana/purrps-game";
+import {
+  PURRPS_GAME_IDL,
+  type PurrpsGame,
+} from "../../../../../apps/web/lib/solana/purrps-game";
 import { config, wallet } from "../server/fixtures";
 
 vi.mock(
@@ -86,11 +93,11 @@ describe("finalized starter presentation", () => {
     expect(() => decodeLobbyState(f.response, wallet().address)).toThrow();
     const c = f.response.accounts[2];
     if (c === undefined) throw new Error("fixture");
-    const decoded = coder.decode<Record<string, unknown>>(
+    const decoded = coder.decode<IdlAccounts<PurrpsGame>["collection"]>(
       "collection",
       Buffer.from(c.account.data, "base64"),
     );
-    decoded["ownedMask"] = 1;
+    decoded.ownedMask = 1;
     c.account.data = (await coder.encode("collection", decoded)).toString(
       "base64",
     );
@@ -100,11 +107,11 @@ describe("finalized starter presentation", () => {
     const f = fixture("pending");
     const c = f.response.accounts[2];
     if (c === undefined) throw new Error("fixture");
-    const decoded = coder.decode<Record<string, unknown>>(
+    const decoded = coder.decode<IdlAccounts<PurrpsGame>["collection"]>(
       "collection",
       Buffer.from(c.account.data, "base64"),
     );
-    decoded["pendingDraw"] = PublicKey.default;
+    decoded.pendingDraw = PublicKey.default;
     c.account.data = (await coder.encode("collection", decoded)).toString(
       "base64",
     );
@@ -181,5 +188,5 @@ describe("wallet-side transaction checks", () => {
 it("gives non-retry guidance for deployment failures", () => {
   expect(webErrorMessage("ORIGIN_REJECTED")).not.toContain("refresh");
   expect(webErrorMessage("SERVICE_NOT_CONFIGURED")).not.toContain("refresh");
-  expect(webErrorMessage("TRANSACTION_FAILED")).toContain("transaction failed");
+  expect(webErrorMessage("TRANSACTION_FAILED")).toContain("didn't go through");
 });

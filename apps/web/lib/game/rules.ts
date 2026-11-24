@@ -90,6 +90,10 @@ export const RULES_V3 = {
   physics: { ...RULES_V2.physics, maxRequiredGapSubpixels: 48 * 256 },
 } as const;
 export const RULES_V4 = { ...RULES_V3, rulesVersion: 4 } as const;
+// Widest v4 pit. Course tuning is not part of the published rules struct: v4
+// runs are simulated in the browser and replayed by the server, which bounds
+// the result on chain. A jump spans 192 px at base speed.
+export const COURSE_MAX_GAP_SUBPIXELS = 96 * 256;
 export const supportedRules = [RULES_V1, RULES_V2, RULES_V3, RULES_V4] as const;
 export type GameplayRules = (typeof supportedRules)[number];
 export function rulesForVersion(version: number) {

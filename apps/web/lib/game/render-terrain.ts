@@ -1,4 +1,5 @@
 import type Phaser from "phaser";
+import type { ImageAsset } from "./assets";
 import { surfaceAt } from "./simulation-collision";
 import type { WorldEntity } from "./simulation-state";
 
@@ -15,9 +16,15 @@ const SHADE_HEIGHT = 6;
 const STONE_EDGE = 0x1d192e;
 const STONE_BEVEL = 0x433a5f;
 const SUBPIXELS = 256;
+// Pit water sits below the lowest course surface, so only gaps reveal it.
+const WATER_TOP = 24;
+type Clip = ImageAsset["clips"][number];
 const mod = (value: number, size: number) => ((value % size) + size) % size;
 
 export type Surface = Extract<WorldEntity, { kind: "ramp" | "terrain" }>;
+// ground: solid to the bottom (rules v1–v2); platforms: floating slabs over
+// pits (v3); course: solid ground with cliff edges and water in pits (v4).
+export type TerrainStyle = "ground" | "platforms" | "course";
 
 export function surfaces(entities: readonly WorldEntity[]): Surface[] {
   return entities
@@ -37,16 +44,37 @@ export function surfacePixels(track: readonly Surface[], xPixels: number) {
   return surface === null ? null : surface / 256;
 }
 
+type DrawView = {
+  left: number;
+  anchor: number;
+  width: number;
+  height: number;
+  yOffset: number;
+  snap: (value: number) => number;
+  time: number;
+  still: boolean;
+};
+
 export class TerrainColumns {
   private body: Phaser.GameObjects.Image[] = [];
   private grass: Phaser.GameObjects.Image[] = [];
-  private platformShade?: Phaser.GameObjects.Graphics;
+  private shade?: Phaser.GameObjects.Graphics;
+  private water?: {
+    sprite: Phaser.GameObjects.TileSprite;
+    clip: Clip | undefined;
+    frame: number;
+    width: number;
+    y: number;
+  };
+  private readonly floating: boolean;
 
   constructor(
     private readonly scene: Phaser.Scene,
     maxHeight: number,
-    private readonly floatingPlatforms: boolean,
+    style: TerrainStyle,
+    waterClip?: Clip,
   ) {
+    this.floating = style === "platforms";
     const source = scene.textures.get("terrain-fill").getSourceImage();
     const canvas = scene.textures.createCanvas(
       BODY_KEY,
@@ -67,8 +95,18 @@ export class TerrainColumns {
       for (let x = 0; x < BODY_WIDTH; x += TILE)
         context.drawImage(source, x, y, TILE, TILE);
     canvas.refresh();
-    if (floatingPlatforms)
-      this.platformShade = scene.add.graphics().setDepth(2.5);
+    if (style !== "ground") this.shade = scene.add.graphics().setDepth(2.5);
+    if (style === "course")
+      this.water = {
+        sprite: scene.add
+          .tileSprite(0, 0, 1, TILE, "water-surface", waterClip?.start ?? 0)
+          .setOrigin(0)
+          .setDepth(1),
+        clip: waterClip,
+        frame: -1,
+        width: 0,
+        y: Number.NaN,
+      };
   }
 
   private ensure(count: number) {
@@ -82,18 +120,9 @@ export class TerrainColumns {
     }
   }
 
-  draw(
-    track: readonly Surface[],
-    view: {
-      left: number;
-      anchor: number;
-      width: number;
-      height: number;
-      yOffset: number;
-      snap: (value: number) => number;
-    },
-  ) {
+  draw(track: readonly Surface[], view: DrawView) {
     const { left, anchor, width, height, yOffset, snap } = view;
+    if (this.water) this.drawWater(this.water, view);
     this.ensure(Math.ceil(width / COLUMN) + 2);
     let index = 0;
     let used = 0;
@@ -116,7 +145,7 @@ export class TerrainColumns {
       const absolute = Math.round(x + anchor);
       const bodyX = mod(absolute, BODY_WIDTH);
       const bodyY = mod(worldY, TILE);
-      const underside = this.floatingPlatforms
+      const underside = this.floating
         ? (tile.ySubpixels +
             tile.heightSubpixels +
             (tile.kind === "ramp" ? Math.max(0, tile.riseSubpixels) : 0)) /
@@ -138,18 +167,37 @@ export class TerrainColumns {
         .setPosition(screenX - grassX, y - GRASS_RISE)
         .setVisible(y - GRASS_RISE < height);
     }
-    if (this.platformShade)
-      this.drawPlatformShade(this.platformShade, track, view);
+    if (this.shade) this.drawShade(this.shade, track, view);
     for (let i = used; i < this.body.length; i++) {
       this.body[i]?.setVisible(false);
       this.grass[i]?.setVisible(false);
     }
   }
 
-  private drawPlatformShade(
+  private drawWater(
+    water: NonNullable<TerrainColumns["water"]>,
+    { left, anchor, width, height, snap, time, still }: DrawView,
+  ) {
+    const { clip, sprite } = water;
+    const frame =
+      (clip?.start ?? 0) +
+      (clip && !still ? Math.floor((time * clip.fps) / 1000) % clip.count : 0);
+    const y = height - WATER_TOP;
+    if (frame !== water.frame) sprite.setFrame(frame);
+    if (width !== water.width) sprite.setSize(width, TILE);
+    if (y !== water.y) sprite.setY(y);
+    water.frame = frame;
+    water.width = width;
+    water.y = y;
+    sprite.tilePositionX = snap(left + anchor);
+  }
+
+  // Platforms get a bevelled underside; both styles outline the cliff edges
+  // on either side of a pit.
+  private drawShade(
     shade: Phaser.GameObjects.Graphics,
     track: readonly Surface[],
-    { width, left, yOffset, snap }: Parameters<TerrainColumns["draw"]>[1],
+    { width, height, left, yOffset, snap }: DrawView,
   ) {
     shade.clear();
     for (const [index, tile] of track.entries()) {
@@ -160,16 +208,21 @@ export class TerrainColumns {
       const previous = track[index - 1];
       const next = track[index + 1];
       const endY = surfaceAt(tile, edge) ?? tile.ySubpixels;
-      const bottom =
-        (Math.max(tile.ySubpixels, endY) + tile.heightSubpixels) / SUBPIXELS +
-        yOffset;
-      shade.fillStyle(STONE_BEVEL);
-      shade.fillRect(x, snap(bottom - SHADE_HEIGHT), end - x, SHADE_HEIGHT);
+      const bottom = this.floating
+        ? (Math.max(tile.ySubpixels, endY) + tile.heightSubpixels) / SUBPIXELS +
+          yOffset
+        : height;
+      if (this.floating) {
+        shade.fillStyle(STONE_BEVEL);
+        shade.fillRect(x, snap(bottom - SHADE_HEIGHT), end - x, SHADE_HEIGHT);
+      }
       shade.fillStyle(STONE_EDGE);
-      shade.fillRect(x, snap(bottom - 2), end - x, 2);
+      if (this.floating) shade.fillRect(x, snap(bottom - 2), end - x, 2);
+      // Solid ground has no edge where the track begins behind the runner.
       if (
-        !previous ||
-        previous.xSubpixels + previous.widthSubpixels < tile.xSubpixels
+        previous
+          ? previous.xSubpixels + previous.widthSubpixels < tile.xSubpixels
+          : this.floating
       ) {
         const top = tile.ySubpixels / SUBPIXELS + yOffset;
         shade.fillRect(x, snap(top), EDGE_WIDTH, bottom - top);

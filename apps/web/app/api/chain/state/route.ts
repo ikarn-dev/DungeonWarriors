@@ -1,6 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
+import { after } from "next/server";
 import { z } from "zod";
 import { authenticate } from "../../../../lib/server/auth";
+import { recoverWallet } from "../../../../lib/server/browser-recovery";
 import { readState, stateInput, u64Input } from "../../../../lib/server/chain";
 import {
   assertOrigin,
@@ -32,6 +34,9 @@ export async function POST(request: Request) {
     const session = await authenticate(sessionToken(request));
     await rateLimit("state-wallet", clientIp(request), session.wallet);
     const requestState = await body(request, input);
+    // Opening the lobby settles any run this wallet left behind.
+    if (requestState.kind === "wallet")
+      after(() => recoverWallet(session.wallet));
     if (requestState.kind === "playSessionRent")
       return json(
         await playSessionRent(

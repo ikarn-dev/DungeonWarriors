@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+  COURSE_MAX_GAP_SUBPIXELS,
   type GameplayRules,
   minimumPlatformGap,
   platformGap,
   RULES_V1,
   RULES_V3,
+  RULES_V4,
   speedBps,
   U64_MAX,
 } from "./rules";
@@ -115,15 +117,19 @@ export function validateWorldState(
       const nextY = next?.ySubpixels ?? g.surfaceYSubpixels;
       const edge = r.xSubpixels + r.widthSubpixels;
       const gap = nextX - edge;
-      const hasGap = platformGap(rules, firstSegment + BigInt(index));
+      // v4 courses may open a pit in any segment, within the course bounds.
+      const course = rules.rulesVersion >= RULES_V4.rulesVersion;
+      const hasGap = course
+        ? gap > 0
+        : platformGap(rules, firstSegment + BigInt(index));
+      const maxGap = course
+        ? COURSE_MAX_GAP_SUBPIXELS
+        : rules.physics.maxRequiredGapSubpixels;
       return (
         surfaceAt(r, edge) !== nextY ||
         (rules.rulesVersion >= RULES_V3.rulesVersion &&
           nextX - r.xSubpixels !== width) ||
-        (hasGap
-          ? gap < minimumPlatformGap(rules) ||
-            gap > rules.physics.maxRequiredGapSubpixels
-          : gap !== 0)
+        (hasGap ? gap < minimumPlatformGap(rules) || gap > maxGap : gap !== 0)
       );
     })
   )

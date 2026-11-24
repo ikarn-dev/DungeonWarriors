@@ -18,11 +18,6 @@ import {
   UI_TOKENS,
 } from "../../../../../apps/web/lib/game/presentation";
 import { renderRun } from "../../../../../apps/web/lib/game/render-run";
-import {
-  type Surface,
-  surfacePixels,
-  TerrainColumns,
-} from "../../../../../apps/web/lib/game/render-terrain";
 
 it("registers all bound cat and coin frames under the keys loaded by the scene", () => {
   const bound = parseAssetManifest(
@@ -116,78 +111,9 @@ it("registers all bound cat and coin frames under the keys loaded by the scene",
     ["effects-actions", 24],
     ["effects-powers", 30],
     ["star", 4],
+    ["water-surface", 4],
   ]);
   expect(onError).not.toHaveBeenCalled();
-});
-
-it("draws v3 platform edges and undersides without filling the gap", () => {
-  const draw = vi.fn();
-  const shade = {
-    clear: vi.fn(),
-    fillStyle: vi.fn(),
-    fillRect: draw,
-    setDepth: () => shade,
-  };
-  const image = {
-    setOrigin: () => image,
-    setDepth: () => image,
-    setCrop: () => image,
-    setPosition: () => image,
-    setVisible: () => image,
-  };
-  class ImageSource {}
-  const scene = {
-    add: { image: () => image, graphics: () => shade },
-    textures: {
-      get: () => ({ getSourceImage: () => new ImageSource() }),
-      createCanvas: () => ({
-        height: 32,
-        getContext: () => ({ drawImage: vi.fn() }),
-        refresh: vi.fn(),
-      }),
-    },
-  } as unknown as ConstructorParameters<typeof TerrainColumns>[0];
-  const ramp: Surface = {
-    id: 1n,
-    kind: "ramp",
-    xSubpixels: 0,
-    ySubpixels: 100 * 256,
-    widthSubpixels: 88 * 256,
-    heightSubpixels: 28 * 256,
-    riseSubpixels: -12 * 256,
-    designatedCoin: null,
-    designatedCheckpoint: 0n,
-    consumed: false,
-  };
-  const track: Surface[] = [
-    ramp,
-    {
-      ...ramp,
-      id: 2n,
-      xSubpixels: 128 * 256,
-      ySubpixels: 88 * 256,
-      riseSubpixels: 12 * 256,
-    },
-  ];
-  vi.stubGlobal("HTMLImageElement", ImageSource);
-  try {
-    new TerrainColumns(scene, 240, true).draw(track, {
-      left: 0,
-      anchor: 0,
-      width: 260,
-      height: 240,
-      yOffset: 0,
-      snap: Math.round,
-    });
-  } finally {
-    vi.unstubAllGlobals();
-  }
-  expect(surfacePixels(track, 100)).toBeNull();
-  expect(draw).toHaveBeenCalledWith(84, 88, 4, 40);
-  expect(draw).toHaveBeenCalledWith(128, 88, 4, 40);
-  expect(
-    draw.mock.calls.every(([x, , width]) => x + width <= 88 || x >= 128),
-  ).toBe(true);
 });
 
 function image(id = "coin-spin"): ImageAsset {

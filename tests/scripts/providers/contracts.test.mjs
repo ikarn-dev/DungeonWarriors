@@ -6,7 +6,7 @@ import { providerConfigSchema } from "../../../apps/web/lib/providers/config.ts"
 import {
   decodeOracleQuote,
   validateOracleQuote,
-} from "../../../apps/web/lib/providers/oracle.mts";
+} from "../../../apps/web/lib/providers/oracle.ts";
 import {
   accountBytes,
   balanceSchema,
