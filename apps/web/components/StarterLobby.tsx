@@ -61,7 +61,8 @@ export default function StarterPanel() {
   const [state, setState] = useState<LobbyState | null>(null);
   const [accountRevision, setAccountRevision] = useState<number>();
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<LobbyTab>("play");
+  // null shows the main menu; a tab shows that section's card.
+  const [tab, setTab] = useState<LobbyTab | null>(null);
   const [pending, setPending] = useState<{
     signature: string;
     lastValidBlockHeight: number;

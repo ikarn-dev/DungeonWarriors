@@ -21,6 +21,17 @@
     #e7c06a 88%,
     #9b6c22
   );
+  /* Polished-gold fill for display text (background-clip: text). */
+  --metal-ink: linear-gradient(
+    180deg,
+    #fffbe6 0%,
+    #f8df95 28%,
+    #dba84c 47%,
+    #a06c1f 53%,
+    #cf9a42 66%,
+    #f3d58a 86%,
+    #fff1c2 100%
+  );
   --sky: #3e95e6;
   --icon: 24px;
   --edge-top: max(0.5rem, env(safe-area-inset-top));

@@ -49,16 +49,16 @@ export function LobbyClickSounds() {
       if (control.matches(START)) lobbySounds.start();
       else if (
         control.matches(
-          ".pixel-button, .title-start, .dpad-arm, .face-button, .console-pill",
+          ".pixel-button, .title-start, .lobby-option, .dpad-arm, .face-button, .console-pill",
         )
       )
         lobbySounds.blip();
     };
-    // Hover chirp for Start, mouse pointers only.
+    // Hover chirp for Start and the main-menu options, mouse pointers only.
     const over = (event: PointerEvent) => {
       if (event.pointerType !== "mouse" || !(event.target instanceof Element))
         return;
-      const start = event.target.closest(START);
+      const start = event.target.closest(`${START}, .lobby-option`);
       const from = event.relatedTarget;
       if (start && !(from instanceof Node && start.contains(from)))
         lobbySounds.hover();

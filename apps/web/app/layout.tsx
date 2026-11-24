@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
+import { Cinzel, Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
 import LobbyToaster from "../components/LobbyToaster";
 import WalletProviders from "../components/WalletProviders";
 import "./globals.css";
@@ -20,6 +20,12 @@ const pixel = Pixelify_Sans({
   subsets: ["latin"],
   weight: ["500", "700"],
 });
+
+// Display face for the main-menu options and section titles only.
+const display = Cinzel({
+  variable: "--font-display",
+  subsets: ["latin"],
+});
 export const metadata: Metadata = {
   title: "PURRPS",
   description:
@@ -30,7 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <WalletProviders>{children}</WalletProviders>

@@ -11,6 +11,7 @@ import DungeonEntry from "./DungeonEntry";
 import DungeonHistory from "./DungeonHistory";
 import LeaderboardPanel from "./LeaderboardPanel";
 import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
+import { LobbyShowcase } from "./LobbyShowcase";
 import WalletPanel from "./WalletPanel";
 
 type Work = (fn: (signal: AbortSignal) => Promise<void>) => Promise<void>;
@@ -40,8 +41,8 @@ export default function LobbySections({
     ComponentProps<typeof CapsuleShop>,
     "receipt" | "retryDraw" | "onViewDraw"
   >;
-  readonly tab: LobbyTab;
-  readonly setTab: (tab: LobbyTab) => void;
+  readonly tab: LobbyTab | null;
+  readonly setTab: (tab: LobbyTab | null) => void;
   readonly perform: Work;
   readonly transact: (
     intent: LobbyIntent | PlayerIntent,
@@ -62,7 +63,11 @@ export default function LobbySections({
     <LobbyMenu
       tab={tab}
       onTab={setTab}
-      cursor={selected?.id ?? state.selected}
+      showcase={
+        selected && (
+          <LobbyShowcase cat={selected} onViewCats={() => setTab("cats")} />
+        )
+      }
       panels={{
         play: (
           <>

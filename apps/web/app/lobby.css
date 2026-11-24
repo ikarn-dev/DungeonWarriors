@@ -85,35 +85,10 @@
   color: var(--soft);
 }
 
-/* Every section shares one panel size; long content scrolls inside it. */
-/* The panel takes exactly the menu column's height (contain: size gives it no
-   height of its own), so every section matches the menu and scrolls inside. */
-.lobby-menu-layout {
-  display: grid;
-  grid-template-columns: 13rem min(36rem, calc(100% - 14.5rem));
-  justify-content: center;
-  gap: 1.5rem;
-  width: 100%;
-}
-.lobby-menu {
-  display: grid;
-  align-content: start;
-  gap: 0.75rem;
-}
-.lobby-menu-item {
-  justify-content: flex-start;
-  min-height: 3.25rem;
-  padding-inline: 0.5rem 1rem;
-  font-size: 1.0625rem;
-}
-.lobby-cursor {
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
-}
+/* Section card; long content scrolls inside it. */
 .lobby-panel {
   min-width: 0;
-  contain: size;
+  min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 1.25rem 1.5rem;
@@ -135,8 +110,22 @@
   line-height: 1.2;
   text-wrap: balance;
 }
+/* Section titles share the menu's metallic display face. */
 :where(.lobby-panel) h2 {
-  font-size: 1.5rem;
+  background: var(--metal-ink);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #050908);
+  font-family: var(--font-display), serif;
+  font-size: 1.75rem;
+  letter-spacing: 0.04em;
+}
+@media (forced-colors: active) {
+  :where(.lobby-panel) h2 {
+    background: none;
+    color: CanvasText;
+  }
 }
 :where(.lobby-panel) h3 {
   font-size: 1.125rem;
@@ -260,59 +249,12 @@
 }
 
 @media (max-width: 48rem) {
-  .lobby-menu-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 1rem;
-    height: min(100%, 34rem);
-  }
-  .lobby-panel {
-    contain: none;
-    height: 100%;
-  }
-  .lobby-menu {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.625rem;
-  }
-  .lobby-menu-item {
-    justify-content: center;
-    min-height: 2.75rem;
-    padding-inline: 0.25rem;
-    font-size: 1rem;
-  }
-  .lobby-cursor {
-    display: none;
-  }
   .lobby-panel {
     padding: 1rem;
   }
 }
 @media (max-height: 30rem) {
-  /* Short landscape phones: the menu becomes one row above the panel. */
   .lobby {
     gap: 0.5rem;
-  }
-  .lobby-menu-layout {
-    grid-template-columns: minmax(0, 52rem);
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 0.75rem;
-    height: 100%;
-  }
-  .lobby-panel {
-    contain: none;
-    height: 100%;
-  }
-  .lobby-menu {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 0.5rem;
-  }
-  .lobby-menu-item {
-    justify-content: center;
-    min-height: 2.5rem;
-    padding-inline: 0.25rem;
-    font-size: 0.9375rem;
-  }
-  .lobby-cursor {
-    display: none;
   }
 }

@@ -5,6 +5,7 @@ const PATHS = {
   alert: "M12 4v10M12 19.5v.01",
   copy: "M9 9h10v10H9zM5 15V5h10",
   power: "M12 3v9M6.3 6.6a8 8 0 1 0 11.4 0",
+  back: "M15 5l-7 7 7 7",
 } as const;
 export type UiIconName = keyof typeof PATHS;
 

@@ -1,0 +1,445 @@
+/* Main menu (2026-11-24): a column of metal plaques on the misty left of the
+   castle backdrop. Choosing one swaps the column for that section's card. */
+.lobby-menu-layout {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+/* Display face with a polished-gold fill. drop-shadow, not text-shadow,
+   because a text-shadow would paint over the clipped gradient. */
+.metal-text {
+  background: var(--metal-ink);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #050908) drop-shadow(0 0 10px #000000b3);
+}
+@media (forced-colors: active) {
+  .metal-text {
+    background: none;
+    color: CanvasText;
+  }
+}
+
+.lobby-options {
+  align-self: center;
+  justify-self: start;
+  width: min(25rem, 100%);
+  margin-left: clamp(0rem, 7vw - 1.5rem, 6rem);
+}
+.lobby-options ul {
+  display: grid;
+  gap: clamp(0.5rem, 1.6dvh, 0.875rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lobby-menu-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  height: 100%;
+}
+.lobby-menu-view[hidden],
+.lobby-section-view[hidden] {
+  display: none;
+}
+
+/* The plaque is four nested layers clipped to the same elongated hexagon:
+   gold rim, dark gap, gold hairline and the steel-teal face. Each layer is
+   inset a little further and shortens its 45° tips by the same amount. */
+.lobby-option {
+  --h: clamp(3rem, 2rem + 3.6dvh, 4.25rem);
+  --tip: calc(var(--h) / 2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  height: var(--h);
+  padding: 0 var(--tip) 0 calc(var(--tip) * 0.75);
+  border: 0;
+  background: none;
+  color: var(--cream);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.lobby-option-plate,
+.lobby-option-plate::before,
+.lobby-option-plate::after,
+.lobby-option-face {
+  --t: var(--tip);
+  position: absolute;
+  clip-path: polygon(
+    var(--t) 0,
+    calc(100% - var(--t)) 0,
+    100% 50%,
+    calc(100% - var(--t)) 100%,
+    var(--t) 100%,
+    0 50%
+  );
+}
+.lobby-option-plate {
+  inset: 0;
+  background: var(--metal);
+}
+.lobby-option-plate::before {
+  --t: calc(var(--tip) - 3px);
+  inset: 3px;
+  z-index: 0;
+  content: "";
+  background: #050908;
+}
+.lobby-option-plate::after {
+  --t: calc(var(--tip) - 5px);
+  inset: 5px;
+  z-index: 0;
+  content: "";
+  background: #8a6a2a;
+}
+.lobby-option-face {
+  --t: calc(var(--tip) - 6px);
+  inset: 6px;
+  z-index: 1;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    #36524d 0%,
+    #1c302d 46%,
+    #12201e 54%,
+    #172a27 100%
+  );
+}
+/* Hover and focus: a teal glow from the left and one light sweep. */
+.lobby-option-face::before,
+.lobby-option-face::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+.lobby-option-face::before {
+  inset: 0;
+  background: radial-gradient(
+    ellipse 70% 120% at 18% 50%,
+    #2fb39a59,
+    #2fb39a00 70%
+  );
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.lobby-option-face::after {
+  inset: -10% auto -10% -40%;
+  width: 30%;
+  background: linear-gradient(
+    105deg,
+    #ffffff00,
+    #fff6d833 45%,
+    #ffffff4d 50%,
+    #fff6d833 55%,
+    #ffffff00
+  );
+  transform: translateX(0) skewX(-16deg);
+  opacity: 0;
+}
+.lobby-option-gem {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  filter: drop-shadow(0 1px 1px #000000b3);
+}
+.lobby-option-gem path:nth-child(1) {
+  fill: #e2b04e;
+  stroke: #5c4318;
+  stroke-width: 1.2;
+}
+.lobby-option-gem path:nth-child(2) {
+  fill: #1d6c5e;
+  transition: fill 200ms ease-out;
+}
+.lobby-option-gem path:nth-child(3) {
+  fill: #c8fff1;
+  opacity: 0.55;
+}
+.lobby-option-label {
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.25rem, 0.75rem + 2.4dvh, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .lobby-option:hover {
+    transform: translateX(0.5rem);
+  }
+  .lobby-option:hover .lobby-option-face::before {
+    opacity: 1;
+  }
+  .lobby-option:hover .lobby-option-gem path:nth-child(2) {
+    fill: #5fe0c8;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lobby-option:hover .lobby-option-face::after {
+    animation: option-sheen 650ms ease-out;
+  }
+}
+.lobby-option:focus-visible {
+  outline: none;
+  transform: translateX(0.5rem);
+  filter: drop-shadow(0 0 6px #ffd27acc);
+}
+.lobby-option:focus-visible .lobby-option-plate {
+  background: linear-gradient(#fff7df, #f3d58a);
+}
+.lobby-option:focus-visible .lobby-option-face::before {
+  opacity: 1;
+}
+.lobby-option:active {
+  transform: translateX(0.5rem) translateY(1px);
+}
+@keyframes option-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-16deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(520%) skewX(-16deg);
+  }
+}
+
+/* A chosen section: Back above one card that scrolls inside itself. */
+.lobby-section-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  justify-self: center;
+  width: min(42rem, 100%);
+  height: min(100%, 44rem);
+}
+.pixel-button.lobby-back {
+  justify-self: start;
+  padding-inline: 0.625rem 1rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lobby-showcase {
+    animation: section-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
+  }
+  .lobby-options li {
+    animation: option-in 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .lobby-options li:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .lobby-options li:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .lobby-options li:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .lobby-options li:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .lobby-options li:nth-child(6) {
+    animation-delay: 250ms;
+  }
+  .lobby-section-view {
+    animation: section-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+@keyframes option-in {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
+}
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+}
+
+/* Backdrop: shade the left behind the menu so the castle stays clear on the
+   right; dim the whole scene behind an open card. */
+.lobby-backdrop-shade::before,
+.lobby-backdrop-shade::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  opacity: 0;
+  transition: opacity 400ms ease-in-out;
+}
+.lobby-backdrop-shade::before {
+  background: linear-gradient(
+    90deg,
+    #030706e6 0%,
+    #030706a6 32%,
+    #03070600 62%
+  );
+}
+.lobby-backdrop-shade::after {
+  background: #030706a6;
+}
+.lobby:has(.lobby-options:not([hidden])) .lobby-backdrop-shade::before,
+.lobby:has(.lobby-section-view:not([hidden])) .lobby-backdrop-shade::after {
+  opacity: 1;
+}
+
+/* Desktop: the selected warrior on a pedestal fills the right side. */
+.lobby-showcase {
+  display: none;
+}
+@media (min-width: 64rem) and (min-height: 32rem) {
+  .lobby-menu-view {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+  .lobby-showcase {
+    display: grid;
+    justify-items: center;
+    justify-self: end;
+    width: 22rem;
+    margin-right: clamp(0rem, 8vw - 4rem, 7rem);
+  }
+}
+.lobby-showcase-stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin-bottom: -0.75rem;
+}
+/* Glowing stone disc under the cat's feet (y 120 of 128). */
+.lobby-showcase-pedestal {
+  position: absolute;
+  bottom: 0.25rem;
+  width: 78%;
+  aspect-ratio: 4 / 1;
+  border: 2px solid #c9a04e99;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, #5fe0c84d, #2fb39a1f 60%, #2fb39a00),
+    radial-gradient(closest-side, #13221fe6, #0a1413f2);
+  box-shadow:
+    0 0 0 4px #050908b3,
+    0 0 40px #2fb39a40,
+    0 10px 30px #000000cc;
+}
+/* Mirrored so the warrior faces the menu. */
+.lobby-showcase-cat {
+  position: relative;
+  width: clamp(9rem, 30dvh, 17rem);
+  height: auto;
+  transform: scaleX(-1);
+  filter: drop-shadow(0 6px 12px #000000b3);
+}
+.lobby-showcase-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 1.125rem 1.25rem 1.25rem;
+  text-align: center;
+}
+.lobby-showcase-name {
+  margin: 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.lobby-showcase-role {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.875rem;
+}
+.lobby-showcase-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  margin: 0;
+  border-block: 1px solid var(--panel-hi);
+}
+.lobby-showcase-stats div {
+  display: grid;
+  gap: 0.125rem;
+  padding-block: 0.5rem;
+}
+.lobby-showcase-stats div + div {
+  border-left: 1px solid var(--panel-hi);
+}
+.lobby-showcase-stats dt {
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.lobby-showcase-stats dd {
+  margin: 0;
+  color: var(--gold-hi);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.lobby-showcase .lobby-traits {
+  margin: 0;
+}
+.lobby-showcase .pixel-button {
+  width: 100%;
+}
+
+@media (max-width: 48rem) {
+  .lobby-options {
+    justify-self: center;
+    margin-left: 0;
+  }
+  .lobby-backdrop-shade::before {
+    background: #030706a6;
+  }
+}
+@media (max-height: 30rem) {
+  /* Short landscape phones: two columns of smaller plaques. */
+  .lobby-options {
+    width: min(34rem, 100%);
+  }
+  .lobby-options ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 0.75rem;
+  }
+  .lobby-option {
+    --h: 2.75rem;
+  }
+  .lobby-option-gem {
+    width: 1rem;
+    height: 1rem;
+  }
+  .lobby-option-label {
+    font-size: 1.125rem;
+  }
+  .lobby-section-view {
+    width: min(52rem, 100%);
+    height: 100%;
+    gap: 0.5rem;
+  }
+}
