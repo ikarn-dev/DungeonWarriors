@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
+import LobbyToaster from "../components/LobbyToaster";
 import WalletProviders from "../components/WalletProviders";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <WalletProviders>{children}</WalletProviders>
+        <LobbyToaster />
       </body>
     </html>
   );

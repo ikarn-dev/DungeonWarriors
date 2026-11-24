@@ -30,25 +30,27 @@ export default function WalletDialog({
     <dialog
       ref={dialog}
       className="wallet-dialog pixel-panel"
-      aria-labelledby="wallet-dialog-title"
+      aria-labelledby={open ? "wallet-dialog-title" : undefined}
       onClose={onClose}
     >
-      <div className="wallet-dialog-body">
-        <button
-          type="button"
-          className="wallet-dialog-close"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-        >
-          <UiIcon name="cross" size={16} />
-        </button>
-        <WalletPicker
-          wallet={wallet}
-          busy={busy}
-          onConnect={onConnect}
-          titleId="wallet-dialog-title"
-        />
-      </div>
+      {open && (
+        <div className="wallet-dialog-body">
+          <button
+            type="button"
+            className="wallet-dialog-close"
+            aria-label="Close"
+            onClick={() => dialog.current?.close()}
+          >
+            <UiIcon name="cross" size={16} />
+          </button>
+          <WalletPicker
+            wallet={wallet}
+            busy={busy}
+            onConnect={onConnect}
+            titleId="wallet-dialog-title"
+          />
+        </div>
+      )}
     </dialog>
   );
 }

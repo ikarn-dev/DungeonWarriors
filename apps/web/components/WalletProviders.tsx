@@ -1,6 +1,8 @@
 "use client";
 import {
   ConnectionProvider,
+  useWallet,
+  type WalletContextState,
   WalletProvider,
   type WalletProviderProps,
 } from "@solana/wallet-adapter-react";
@@ -15,6 +17,31 @@ const noSubscription = () => () => {};
 // endpoint only tells Mobile Wallet Adapter which cluster to use.
 const proxyEndpoint = () => `${window.location.origin}/api/rpc/devnet`;
 const serverEndpoint = () => "https://api.devnet.solana.com";
+
+const hydrationWallet = {
+  wallets: [],
+  wallet: null,
+  publicKey: null,
+  connecting: false,
+  connected: false,
+  disconnecting: false,
+  signTransaction: undefined,
+  signAllTransactions: undefined,
+  signMessage: undefined,
+  signIn: undefined,
+} satisfies Partial<WalletContextState>;
+
+// Extensions and a remembered adapter can be available on the browser's
+// first render. Reveal those fields after the server snapshot has hydrated.
+export function useHydratedWallet(): WalletContextState {
+  const wallet = useWallet();
+  const hydrated = useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+  return hydrated ? wallet : { ...wallet, ...hydrationWallet };
+}
 
 // Shared by every page, so a wallet connected on the title screen stays
 // connected in the lobby.

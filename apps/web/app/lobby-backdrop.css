@@ -89,9 +89,9 @@
 
 /* Title screen: one ornate metallic frame, centred. */
 .lobby[data-screen="title"] {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  grid-template: minmax(min-content, 1fr) / minmax(0, 1fr);
   place-items: center;
+  overflow-y: auto;
 }
 .title-defs {
   position: absolute;
@@ -110,6 +110,7 @@
     #9b6c22
   );
   position: relative;
+  grid-area: 1 / 1;
   display: grid;
   justify-items: center;
   gap: clamp(1rem, 3dvh, 1.75rem);
@@ -201,9 +202,13 @@
     transform: translateX(420%) skewX(-12deg);
   }
 }
+.title-frame .lobby-head {
+  width: 100%;
+  min-width: 0;
+}
 .title-frame .lobby-title {
-  /* Fills the frame width; the wide wordmark sets the frame's scale. */
   --logo-w: clamp(13rem, 40dvh, 21rem);
+  width: min(100%, var(--logo-w));
   filter: drop-shadow(0 6px 14px #000000b3);
 }
 .title-frame .lobby-brand {

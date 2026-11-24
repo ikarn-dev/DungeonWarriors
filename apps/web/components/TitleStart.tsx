@@ -1,10 +1,10 @@
 "use client";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
 import WalletDialog from "./WalletDialog";
+import { useHydratedWallet } from "./WalletProviders";
 import { signInWallet } from "./wallet-sign-in";
 
 type Step = "idle" | "connecting" | "signing" | "entering";
@@ -19,7 +19,7 @@ const LABELS: Record<Step, string> = {
 // sign the domain-bound challenge in the wallet if there is no session, then
 // enter the lobby. No separate wallet or sign-in page.
 export default function TitleStart() {
-  const wallet = useWallet();
+  const wallet = useHydratedWallet();
   const router = useRouter();
   const address = wallet.publicKey?.toBase58() ?? null;
   const [wanted, setWanted] = useState(false);

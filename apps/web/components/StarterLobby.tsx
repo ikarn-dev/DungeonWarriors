@@ -1,5 +1,4 @@
 "use client";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,10 +35,10 @@ import LobbyBackdrop from "./LobbyBackdrop";
 import type { LobbyTab } from "./LobbyMenu";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
-import LobbyToaster from "./LobbyToaster";
 import { WalletChip } from "./LobbyWallet";
 import { useWalletEntry } from "./useWalletEntry";
 import WalletDialog from "./WalletDialog";
+import { useHydratedWallet } from "./WalletProviders";
 import { signInWallet } from "./wallet-sign-in";
 
 const drawPollMs = 6_000;
@@ -50,7 +49,7 @@ const notifyError = (code: string) =>
 type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 
 export default function StarterPanel() {
-  const wallet = useWallet();
+  const wallet = useHydratedWallet();
   const router = useRouter();
   const address = wallet.publicKey?.toBase58() ?? null;
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
@@ -386,7 +385,6 @@ export default function StarterPanel() {
   return (
     <>
       <LobbyBackdrop />
-      <LobbyToaster />
       {wallet.connected && address !== null && (
         <WalletChip
           address={address}

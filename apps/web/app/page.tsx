@@ -1,7 +1,6 @@
 import LobbyBackdrop from "../components/LobbyBackdrop";
 import { LobbyClickSounds } from "../components/LobbySound";
 import LobbyTitle from "../components/LobbyTitle";
-import LobbyToaster from "../components/LobbyToaster";
 import TitleStart from "../components/TitleStart";
 
 // Filigree corner for the metallic frame; mirrored for the other corners.
@@ -33,7 +32,6 @@ export default function Home() {
     <main className="lobby" data-screen="title">
       <LobbyBackdrop />
       <LobbyClickSounds />
-      <LobbyToaster />
       <svg className="title-defs" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="title-metal" x1="0" y1="0" x2="1" y2="1">
