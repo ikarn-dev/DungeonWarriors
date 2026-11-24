@@ -404,3 +404,63 @@
     display: none;
   }
 }
+
+/* Wallet pop-up over the title or lobby (2026-11-24). */
+.wallet-dialog {
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  color: var(--cream);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.wallet-dialog::backdrop {
+  background: #020504b3;
+  backdrop-filter: blur(3px);
+}
+.wallet-dialog-body {
+  position: relative;
+  padding: 1.5rem;
+}
+.wallet-dialog-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid #c9a04e66;
+  border-radius: 999px;
+  background: #0a1413;
+  color: var(--soft);
+  cursor: pointer;
+}
+.wallet-dialog-close:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .wallet-dialog-close:hover {
+    color: var(--cream);
+  }
+}
+.wallet-dialog .wallet-picker h2 {
+  padding-right: 2.5rem;
+}
+.wallet-dialog .wallet-picker p {
+  margin: 0;
+  color: var(--soft);
+  line-height: 1.45;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wallet-dialog[open] {
+    animation: wallet-dialog-in 180ms ease-out;
+  }
+}
+@keyframes wallet-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}

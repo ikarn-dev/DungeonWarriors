@@ -13,7 +13,7 @@ import {
   type LobbyState,
 } from "../lib/game/lobby-state";
 import { LobbySoundToggle } from "./LobbySound";
-import PixelLoader from "./PixelLoader";
+import DotsLoader from "./DotsLoader";
 
 export default function CapsuleReveal({
   kind,
@@ -167,7 +167,7 @@ export default function CapsuleReveal({
             ) : retry ? (
               <p>We couldn't check your capsule yet.</p>
             ) : (
-              <PixelLoader label="Opening your capsule" />
+              <DotsLoader label="Opening your capsule" />
             )}
             {!refunded && retry && (
               <button type="button" className="pixel-button" onClick={retry}>

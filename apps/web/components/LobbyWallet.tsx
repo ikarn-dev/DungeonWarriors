@@ -12,10 +12,12 @@ export function WalletPicker({
   wallet,
   busy,
   onConnect,
+  titleId,
 }: {
   readonly wallet: Wallet;
   readonly busy: boolean;
   readonly onConnect: () => void;
+  readonly titleId?: string;
 }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const selected = wallet.wallet?.adapter.name ?? null;
@@ -31,7 +33,7 @@ export function WalletPicker({
   const detected = wallet.wallets;
   return (
     <div className="wallet-picker">
-      <h2>Connect a wallet</h2>
+      <h2 id={titleId}>Connect a wallet</h2>
       {detected.length === 0 ? (
         <p>
           No Solana wallet found in this browser. Install one, such as Phantom

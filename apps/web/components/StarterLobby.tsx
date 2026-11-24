@@ -1,6 +1,7 @@
 "use client";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { verifyManifestBinding } from "../lib/game/assets";
@@ -37,6 +38,8 @@ import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
 import LobbyToaster from "./LobbyToaster";
 import { WalletChip } from "./LobbyWallet";
+import { useWalletEntry } from "./useWalletEntry";
+import WalletDialog from "./WalletDialog";
 import { signInWallet } from "./wallet-sign-in";
 
 const drawPollMs = 6_000;
@@ -48,6 +51,7 @@ type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 
 export default function StarterPanel() {
   const wallet = useWallet();
+  const router = useRouter();
   const address = wallet.publicKey?.toBase58() ?? null;
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
@@ -357,6 +361,11 @@ export default function StarterPanel() {
     };
   }, [authenticated, address, paidDraw, state?.pendingDraw]);
   const blocked = busy || pending !== null;
+  const { picking, setPicking } = useWalletEntry(
+    wallet,
+    { address, restoring, authenticated, restoreFailed },
+    () => void perform(signIn),
+  );
   const copy = () =>
     void perform(async () => {
       if (address === null) return;
@@ -367,6 +376,7 @@ export default function StarterPanel() {
     void perform(async (signal) => {
       if (authenticated) await webApi("/api/auth/logout", {}, signal);
       await wallet.disconnect();
+      router.replace("/");
     });
   const ready =
     authenticated &&
@@ -415,11 +425,7 @@ export default function StarterPanel() {
             restoreFailed={restoreFailed}
             state={state}
             gettingCat={pending?.starter === true}
-            onConnect={() =>
-              void perform(async () => {
-                await wallet.connect();
-              })
-            }
+            onPickWallet={() => setPicking(true)}
             onSignIn={() => {
               if (restoreFailed) setRestoreAttempt((attempt) => attempt + 1);
               else void perform(signIn);
@@ -456,6 +462,17 @@ export default function StarterPanel() {
           />
         )}
       </div>
+      <WalletDialog
+        open={picking}
+        wallet={wallet}
+        busy={busy || wallet.connecting}
+        onConnect={() =>
+          void perform(async () => {
+            await wallet.connect();
+          })
+        }
+        onClose={() => setPicking(false)}
+      />
       {visibleDraw && (
         <CapsuleReveal
           key={visibleDraw.nonce.toString()}

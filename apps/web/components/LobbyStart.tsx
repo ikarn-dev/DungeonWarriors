@@ -1,11 +1,11 @@
 import type { useWallet } from "@solana/wallet-adapter-react";
 import type { ReactNode } from "react";
 import type { LobbyState } from "../lib/game/lobby-state";
-import { WalletPicker } from "./LobbyWallet";
-import PixelLoader from "./PixelLoader";
+import DotsLoader from "./DotsLoader";
 
-// The single next step before the lobby menu opens: connect, sign in,
-// create the player account, then claim the free starter cat.
+// The single next step before the lobby menu opens: connect (in the wallet
+// pop-up), sign in (prompted automatically), create the player account, then
+// claim the free starter cat.
 export default function LobbyStart({
   wallet,
   busy,
@@ -15,7 +15,7 @@ export default function LobbyStart({
   restoreFailed,
   state,
   gettingCat,
-  onConnect,
+  onPickWallet,
   onSignIn,
   onCreatePlayer,
   onClaimStarter,
@@ -28,28 +28,59 @@ export default function LobbyStart({
   readonly restoreFailed: boolean;
   readonly state: LobbyState | null;
   readonly gettingCat: boolean;
-  readonly onConnect: () => void;
+  readonly onPickWallet: () => void;
   readonly onSignIn: () => void;
   readonly onCreatePlayer: () => void;
   readonly onClaimStarter: () => void;
 }) {
   let body: ReactNode;
+  // Waiting states show only the loader, without the panel around it.
+  let waiting = false;
   if (!wallet.connected)
-    body = <WalletPicker wallet={wallet} busy={busy} onConnect={onConnect} />;
-  else if (restoring) body = <PixelLoader label="Connecting" />;
-  else if (!authenticated)
-    body = (
-      <button
-        type="button"
-        className="pixel-button"
-        data-tone="gold"
-        disabled={busy || (!restoreFailed && wallet.signMessage === undefined)}
-        onClick={onSignIn}
-      >
-        {restoreFailed ? "Retry session" : "Sign in to PURRPS"}
-      </button>
+    body = wallet.connecting ? (
+      ((waiting = true), <DotsLoader label="Connecting your wallet" />)
+    ) : (
+      <>
+        <p>Connect a Solana wallet to enter the catacombs.</p>
+        <button
+          type="button"
+          className="pixel-button"
+          data-tone="gold"
+          onClick={onPickWallet}
+        >
+          Connect wallet
+        </button>
+      </>
     );
-  else if (state === null) body = <PixelLoader label="Loading your cats" />;
+  else if (restoring) body = <DotsLoader label="Connecting" />;
+  else if (!authenticated)
+    body =
+      busy && !restoreFailed ? (
+        <>
+          <DotsLoader label="Waiting for your wallet" />
+          <p>Approve the sign-in message in your wallet.</p>
+        </>
+      ) : (
+        <>
+          <p>
+            {restoreFailed
+              ? "PURRPS couldn't reach your session."
+              : "Your wallet didn't sign in."}
+          </p>
+          <button
+            type="button"
+            className="pixel-button"
+            data-tone="gold"
+            disabled={
+              busy || (!restoreFailed && wallet.signMessage === undefined)
+            }
+            onClick={onSignIn}
+          >
+            Try again
+          </button>
+        </>
+      );
+  else if (state === null) body = <DotsLoader label="Loading your cats" />;
   else if (!state.configured)
     body = <p>Devnet configuration has not been published yet.</p>;
   else if (!state.hasPlayer)

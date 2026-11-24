@@ -250,10 +250,16 @@
     filter 150ms ease-out;
 }
 @media (hover: hover) {
-  .title-start:hover {
+  .title-start:not(:disabled):hover {
     filter: brightness(1.12);
     transform: translateY(-1px);
   }
+}
+.title-start:not(:disabled) {
+  cursor: pointer;
+}
+.title-start:disabled {
+  filter: saturate(0.6) brightness(0.85);
 }
 .title-start:active {
   transform: translateY(1px);
