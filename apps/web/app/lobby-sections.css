@@ -98,26 +98,6 @@
   width: 100%;
 }
 
-.lobby-filters {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.lobby-segment {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.625rem;
-  min-width: 0;
-  margin: 0;
-  padding: var(--px);
-}
-.lobby-segment .pixel-button {
-  min-height: 2.5rem;
-  padding-inline: 0.75rem;
-  font-size: 0.875rem;
-}
-
 .lobby-table {
   width: 100%;
   border-collapse: collapse;
@@ -142,6 +122,9 @@
 .lobby-table [data-number] {
   text-align: right;
 }
+.lobby-history .lobby-table :is(td:first-child, th[data-number]) {
+  white-space: normal;
+}
 .lobby-table tr[data-mine] td {
   background: #e2b04e1f;
   color: var(--gold-hi);
@@ -150,11 +133,10 @@
   min-height: 2.25rem;
   font-size: 0.8125rem;
 }
-.lobby-badge,
 .lobby-rank {
   display: inline-grid;
   place-items: center;
-  min-width: 4.25rem;
+  min-width: 2rem;
   padding: 0.125rem 0.5rem;
   border: 1px solid #c9a04e66;
   border-radius: 999px;
@@ -162,22 +144,6 @@
   color: var(--cream);
   font-size: 0.75rem;
   font-weight: 600;
-}
-.lobby-badge[data-result="win"] {
-  background: #1f6b4a;
-}
-.lobby-badge[data-result="loss"] {
-  background: #a82c3a;
-}
-.lobby-badge[data-result="technicalRefund"] {
-  background: #1f6e9e;
-}
-.lobby-badge[data-result="live"] {
-  background: var(--gold);
-  color: #2a1a05;
-}
-.lobby-rank {
-  min-width: 2rem;
 }
 .lobby-rank[data-rank="1"] {
   background: linear-gradient(#fff0b8, #e0ac45);
@@ -190,10 +156,6 @@
 .lobby-rank[data-rank="3"] {
   background: linear-gradient(#f2b98a, #b06a32);
   color: #2a1405;
-}
-.lobby-more {
-  justify-self: center;
-  min-width: 10rem;
 }
 
 .lobby-banner {

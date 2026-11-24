@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { z } from "zod";
 import { catSchema } from "../lib/dungeon/protocol";
 import { displayUsdc } from "../lib/game/custody-client";
@@ -21,108 +20,69 @@ const pageSchema = z.object({
           "lost",
           "refunded",
         ]),
-        cleared: z.number().int().min(0).max(5),
         stake: u64Input,
         payout: u64Input,
       }),
     )
     .max(8),
-  next: u64Input.nullable(),
 });
-type Page = z.infer<typeof pageSchema>;
-const read = async (signal: AbortSignal, fromNonce?: string) =>
-  pageSchema.parse(
-    await webApi("/api/dungeon", { kind: "history", fromNonce }, signal),
-  );
+const read = async (signal: AbortSignal) =>
+  pageSchema.parse(await webApi("/api/dungeon", { kind: "history" }, signal));
 const labels = {
-  awaitingRandomness: "Preparing",
-  ready: "In progress",
-  won: "Treasure banked",
+  awaitingRandomness: null,
+  ready: null,
+  won: "Won",
   lost: "Lost",
   refunded: "Refunded",
 };
+
 export default function DungeonHistory({
   revision,
 }: {
   readonly revision: number | undefined;
 }) {
-  const latest = useFinalized(revision, read);
-  const [older, setOlder] = useState<Page | null>(null),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(false);
-  const seen = new Set(latest.value?.entries.map((e) => e.nonce));
-  const entries = [
-    ...(latest.value?.entries ?? []),
-    ...(older?.entries.filter((e) => !seen.has(e.nonce)) ?? []),
-  ];
-  const next = older ? older.next : latest.value?.next;
-  async function more() {
-    if (!next) return;
-    setBusy(true);
-    setError(false);
-    try {
-      const p = await read(AbortSignal.timeout(10000), next);
-      setOlder((old) => ({
-        entries: [...(old?.entries ?? []), ...p.entries],
-        next: p.next,
-      }));
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { value, failed, retry } = useFinalized(revision, read);
+  const entries = value?.entries.filter(({ state }) => labels[state] !== null);
+
   return (
-    <section className="lobby-section">
-      <h2>Expeditions</h2>
-      {latest.failed && (
-        <>
-          <p>Could not read finalized expeditions.</p>
-          <button className="pixel-button" type="button" onClick={latest.retry}>
+    <section className="lobby-section lobby-history">
+      <h2>History</h2>
+      {failed ? (
+        <div className="lobby-empty">
+          <p role="alert">History unavailable.</p>
+          <button className="pixel-button" type="button" onClick={retry}>
             Retry
           </button>
-        </>
-      )}
-      {latest.value === null ? (
-        <p>Loading expeditions…</p>
+        </div>
+      ) : entries === undefined ? (
+        <p aria-live="polite">Loading…</p>
       ) : entries.length === 0 ? (
-        <p>No dungeon expeditions on this page.</p>
+        <p>No completed expeditions.</p>
       ) : (
         <table className="lobby-table">
           <thead>
             <tr>
-              <th>Expedition</th>
-              <th>Cat</th>
-              <th>Result</th>
-              <th>Rooms</th>
-              <th>Bet USDC</th>
-              <th>Return USDC</th>
+              <th scope="col">Cat</th>
+              <th scope="col">Result</th>
+              <th scope="col" data-number>
+                Bet (USDC)
+              </th>
+              <th scope="col" data-number>
+                Payout (USDC)
+              </th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((e) => (
-              <tr key={e.nonce}>
-                <td>#{e.nonce}</td>
-                <td>{CAT_NAMES[e.cat]}</td>
-                <td>{labels[e.state]}</td>
-                <td>{e.cleared}</td>
-                <td>{displayUsdc(e.stake)}</td>
-                <td>{displayUsdc(e.payout)}</td>
+            {entries.map((entry) => (
+              <tr key={entry.nonce}>
+                <td>{CAT_NAMES[entry.cat]}</td>
+                <td>{labels[entry.state]}</td>
+                <td data-number>{displayUsdc(entry.stake)}</td>
+                <td data-number>{displayUsdc(entry.payout)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
-      {error && <output>Could not load older expeditions. Try again.</output>}
-      {next && (
-        <button
-          className="pixel-button"
-          type="button"
-          disabled={busy}
-          onClick={() => void more()}
-        >
-          Older expeditions
-        </button>
       )}
     </section>
   );

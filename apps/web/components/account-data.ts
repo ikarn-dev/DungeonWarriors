@@ -20,23 +20,6 @@ const creditsSchema = finalized.extend({
 const fundsSchema = finalized.extend({
   walletFunds: z.strictObject({ solLamports: decimal, usdcBaseUnits: decimal }),
 });
-const pendingEntry = z.object({ nonce: decimal, status: z.literal("pending") });
-const finishedEntry = z.object({
-  nonce: decimal,
-  status: z.enum(["settled", "refunded"]),
-  outcome: z.enum(["win", "loss", "technicalRefund"]),
-  market: z.enum(["BTC", "ETH", "SOL"]),
-  score: decimal,
-  stakeBaseUnits: decimal,
-  grossPayoutBaseUnits: decimal,
-  refundBaseUnits: decimal,
-});
-const historySchema = finalized.extend({
-  history: z.object({
-    nextFromNonce: decimal.nullable(),
-    entries: z.array(z.union([pendingEntry, finishedEntry])).max(8),
-  }),
-});
 const boardSchema = finalized.extend({
   leaderboard: z
     .array(
@@ -48,11 +31,6 @@ const boardSchema = finalized.extend({
     )
     .max(20),
 });
-
-export type HistoryEntry = z.infer<
-  typeof historySchema
->["history"]["entries"][number];
-export type HistoryPage = z.infer<typeof historySchema>["history"];
 
 const read = (body: unknown, signal: AbortSignal) =>
   webApi<unknown>("/api/chain/state", body, signal);
@@ -67,19 +45,6 @@ export async function readWallet(signal: AbortSignal) {
     ),
   ]);
   return { credits, funds };
-}
-export async function readHistory(
-  signal: AbortSignal,
-  fromNonce?: string,
-): Promise<HistoryPage> {
-  return historySchema.parse(
-    await read(
-      fromNonce === undefined
-        ? { kind: "history" }
-        : { kind: "history", fromNonce },
-      signal,
-    ),
-  ).history;
 }
 export async function readLeaderboard(signal: AbortSignal) {
   return boardSchema.parse(await read({ kind: "leaderboard" }, signal))

@@ -9,7 +9,6 @@ import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
 import DungeonEntry from "./DungeonEntry";
 import DungeonHistory from "./DungeonHistory";
-import HistoryPanel from "./HistoryPanel";
 import LeaderboardPanel from "./LeaderboardPanel";
 import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
 import WalletPanel from "./WalletPanel";
@@ -55,7 +54,6 @@ export default function LobbySections({
     state.cats.find(({ id }) => id === (preferred ?? state.selected)) ??
     state.cats[0] ??
     null;
-  const reloadSoon = () => void perform((signal) => reload(signal));
   const game = (action: PlayerIntent["action"]) =>
     void perform((signal) =>
       transact({ operation: "game", sponsored: false, action }, signal),
@@ -121,21 +119,10 @@ export default function LobbySections({
           />
         ),
         history: (
-          <>
-            <DungeonHistory
-              revision={tab === "history" ? accountRevision : undefined}
-            />
-            <details>
-              <summary>Earlier runner records</summary>
-              <HistoryPanel
-                key={`history:${address}`}
-                wallet={address}
-                revision={tab === "history" ? accountRevision : undefined}
-                media={state.assetBinding}
-                onSettled={reloadSoon}
-              />
-            </details>
-          </>
+          <DungeonHistory
+            key={`history:${address}`}
+            revision={tab === "history" ? accountRevision : undefined}
+          />
         ),
         leaderboard: (
           <LeaderboardPanel
