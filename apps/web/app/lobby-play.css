@@ -1,19 +1,20 @@
-/* Play card, wallet pill and pixel toasts. */
+/* Play card, wallet pill and toasts (metal theme, 2026-11-24). */
 .bet-hero {
   display: flex;
   align-items: center;
   gap: 0.875rem;
   margin-bottom: 1rem;
   padding: 0.5rem 1rem 0.5rem 0.5rem;
-  border-radius: 0.875rem;
-  background: var(--panel-lo);
-  box-shadow: 0 0 0 2px var(--ink);
+  border: 1px solid var(--panel-hi);
+  border-radius: 10px;
+  background: linear-gradient(#152825, var(--panel-lo));
+  box-shadow: inset 0 1px 0 #ffffff12;
 }
 .bet-hero img {
   flex: none;
-  border-radius: 0.625rem;
+  border: 1px solid #c9a04e80;
+  border-radius: 0.5rem;
   background: var(--panel);
-  box-shadow: inset 0 -4px 0 0 var(--panel-hi);
 }
 .bet-hero-copy {
   display: grid;
@@ -76,21 +77,17 @@
 .bet-amount {
   display: flex;
   align-items: center;
-  margin: 2px;
-  border-radius: 0.75rem;
+  border: 1px solid #6e542099;
+  border-radius: 8px;
   background: var(--panel-lo);
-  box-shadow:
-    0 0 0 2px var(--ink),
-    inset 0 3px 0 0 #0b0a14;
+  box-shadow: inset 0 2px 8px #000000b3;
 }
 .bet-amount:focus-within {
-  outline: var(--px) solid var(--gold-hi);
+  outline: 2px solid var(--gold-hi);
   outline-offset: 3px;
 }
 .bet-amount[data-invalid] {
-  box-shadow:
-    0 0 0 2px #ff6b6b,
-    inset 0 3px 0 0 #0b0a14;
+  border-color: #ff6b6b;
 }
 .bet-amount input {
   flex: 1;
@@ -109,13 +106,14 @@
   outline: none;
 }
 .bet-amount input::placeholder {
-  color: #6b6590;
+  color: #5d7570;
 }
 .bet-amount > span {
   padding-right: 0.875rem;
-  color: var(--soft);
-  font-family: var(--font-pixel), sans-serif;
-  font-size: 0.875rem;
+  color: var(--gold-hi);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 .bet-note {
   display: flex;
@@ -144,7 +142,7 @@
 }
 .wallet-picker h2 {
   margin: 0;
-  font-family: var(--font-pixel), sans-serif;
+  color: var(--gold-hi);
   font-size: 1.375rem;
   line-height: 1.2;
 }
@@ -189,9 +187,12 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.1875rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: #0b0a14b3;
-  box-shadow: inset 0 0 0 2px #ffffff1f;
+  background:
+    linear-gradient(#0f1c1af2, #081110f2) padding-box,
+    var(--metal) border-box;
+  box-shadow: 0 6px 18px #00000099;
 }
 .lobby-address {
   display: inline-flex;
@@ -216,21 +217,19 @@
   place-items: center;
   width: 2.75rem;
   height: 2.75rem;
-  border: 0;
+  border: 1px solid #c9a04e80;
   border-radius: 999px;
-  background: var(--panel);
-  box-shadow:
-    inset 0 0 0 2px var(--ink),
-    inset 0 -3px 0 0 var(--panel-lo);
-  color: var(--soft);
+  background: linear-gradient(#36524d, #1c302d 55%, #12201e);
+  box-shadow: inset 0 1px 0 #ffffff26;
+  color: var(--cream);
   cursor: pointer;
 }
 .lobby-disconnect svg {
-  transition: transform 80ms steps(2);
+  transition: transform 120ms ease-out;
 }
 .lobby-address:focus-visible,
 .lobby-disconnect:focus-visible {
-  outline: var(--px) solid var(--gold-hi);
+  outline: 2px solid var(--gold-hi);
   outline-offset: 2px;
 }
 .lobby-disconnect:not(:disabled):active {
@@ -252,25 +251,6 @@
     color: #ff6b6b;
   }
 }
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .lobby-disconnect:not(:disabled):hover svg {
-    animation: pixel-wiggle 360ms steps(1) infinite;
-  }
-}
-@keyframes pixel-wiggle {
-  0% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-2px);
-  }
-  50% {
-    transform: translateX(0);
-  }
-  75% {
-    transform: translateX(2px);
-  }
-}
 
 /* Sonner toasts, unstyled and themed here. */
 /* Sonner positions each toast absolutely inside its centred stack; both
@@ -284,19 +264,37 @@
   max-width: 100%;
   margin-inline: auto;
   padding: 0.625rem 1.125rem 0.625rem 0.875rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--panel);
-  box-shadow:
-    0 0 0 var(--px) var(--ink),
-    inset 0 2px 0 0 var(--panel-hi),
-    0 6px 0 0 #0b0a1466;
+  background:
+    linear-gradient(#13221ff7, #0a1413f7) padding-box,
+    var(--metal) border-box;
+  box-shadow: 0 10px 28px #000000b3;
   color: var(--cream);
-  font-family: var(--font-pixel), sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.9375rem;
+  font-weight: 500;
 }
 .pixel-toast-icon {
   display: grid;
   place-items: center;
+}
+.pixel-toast-mark {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 999px;
+  background: #ffffff14;
+}
+.pixel-toast-mark[data-kind="success"] {
+  color: #7fe0b0;
+}
+.pixel-toast-mark[data-kind="error"] {
+  color: #ff8a8a;
+}
+.pixel-toast-mark[data-kind="info"] {
+  color: var(--gold-hi);
 }
 .pixel-toast-title {
   white-space: nowrap;
@@ -307,19 +305,20 @@
   padding: 0.25rem 0.75rem;
   border: 0;
   border-radius: 999px;
-  background: var(--gold);
-  color: var(--ink);
+  background: linear-gradient(#fff0b8, #e0ac45 55%, #a8741f);
+  color: #2a1a05;
   font: inherit;
+  font-weight: 600;
   font-size: 0.8125rem;
   cursor: pointer;
 }
 .pixel-spinner {
   display: block;
-  width: 12px;
-  height: 12px;
-  background:
-    linear-gradient(var(--gold) 0 0) 0 0 / 6px 6px no-repeat,
-    linear-gradient(#ffc53166 0 0) 6px 6px / 6px 6px no-repeat;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e2b04e40;
+  border-top-color: var(--gold-hi);
+  border-radius: 50%;
 }
 
 /* Loader: Pip Spearpaw marching on the spot (smooth vector art). */
@@ -341,10 +340,11 @@
   gap: 6px;
 }
 .pixel-loader-dots span {
-  width: 8px;
-  height: 8px;
-  background: var(--cream);
-  box-shadow: 0 0 0 2px var(--ink);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold-hi);
+  box-shadow: 0 0 8px #e2b04e99;
   opacity: 0.3;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -352,7 +352,7 @@
     animation: loader-march 520ms ease-in-out infinite alternate;
   }
   .pixel-loader-dots span {
-    animation: loader-dot 900ms steps(1) infinite;
+    animation: loader-dot 900ms ease-in-out infinite;
   }
   .pixel-loader-dots span:nth-child(2) {
     animation-delay: 300ms;
@@ -361,7 +361,7 @@
     animation-delay: 600ms;
   }
   .pixel-spinner {
-    animation: spinner-turn 480ms steps(4) infinite;
+    animation: spinner-turn 800ms linear infinite;
   }
 }
 @keyframes loader-march {

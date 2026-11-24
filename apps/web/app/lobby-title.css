@@ -1,5 +1,5 @@
 /* Title screen: brand badges and the Start button. */
-/* "Built on" badges: rounded pills, pixel marks, brand-coloured names. */
+/* "Built on" badges: rounded pills, brand marks and brand-coloured names. */
 .lobby-brands {
   display: flex;
   flex-wrap: wrap;
@@ -21,7 +21,7 @@
     inset 0 0 0 2px #ffffff26,
     0 2px 0 0 #0b0a1459;
   color: var(--soft);
-  font-family: var(--font-pixel), sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.8125rem;
   white-space: nowrap;
 }
@@ -49,7 +49,7 @@
   filter: invert(1);
 }
 .lobby-brand strong {
-  font-family: var(--font-pixel), sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
   font-size: 1rem;
   font-weight: 700;
 }
@@ -64,58 +64,36 @@
   color: #ffffff;
 }
 
+/* Primary action in a panel (Bet & explore): full-width gold metal. */
 .pixel-button.lobby-play {
-  gap: 0.75rem;
-  margin-top: clamp(1rem, 8dvh, 4rem);
-  min-width: clamp(14rem, 28vw, 18rem);
-  min-height: 4.5rem;
-  padding-inline: 2.5rem 2rem;
-  border-radius: 999px;
-  font-size: 2rem;
+  width: 100%;
+  min-height: 3.25rem;
+  margin-top: 0.5rem;
+  border-radius: 8px;
+  font-size: 1.1875rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-decoration: none;
   box-shadow:
-    0 0 0 var(--px) var(--ink),
-    inset 0 var(--px) 0 0 var(--gold-hi),
-    inset 0 calc(var(--px) * -2) 0 0 var(--gold-lo),
-    0 calc(var(--px) * 3) 0 0 #0b0a1466;
+    inset 0 1px 0 #fff8d880,
+    inset 0 -2px 0 #6d461066,
+    0 4px 14px #000000a6,
+    0 0 22px #e2b04e26;
 }
 @media (hover: hover) {
-  .pixel-button.lobby-play:hover {
-    transform: translateY(-3px);
+  .pixel-button.lobby-play:not(:disabled):hover {
+    transform: translateY(-1px);
   }
 }
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .pixel-button.lobby-play:hover .pixel-icon {
-    animation: start-nudge 480ms steps(1) infinite;
-  }
-}
-@keyframes start-nudge {
-  0% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(4px);
-  }
-}
-.pixel-button.lobby-play:active {
-  transform: translateY(var(--px));
-  box-shadow:
-    0 0 0 var(--px) var(--ink),
-    inset 0 var(--px) 0 0 var(--gold-lo);
-}
-.lobby-play .pixel-icon {
-  --icon: 32px;
-}
-
-/* Sound toggle sits on the ground strip, clear of the menu and status bar. */
+/* Sound toggle: a round metal button in the bottom-right corner. */
 .pixel-button.lobby-sound {
   position: absolute;
   z-index: 3;
-  right: calc(var(--edge-right) + var(--px));
-  bottom: calc(var(--edge-bottom) + var(--px));
+  right: var(--edge-right);
+  bottom: var(--edge-bottom);
   width: 2.75rem;
   padding: 0;
+  border-radius: 999px;
 }
 
 @media (max-height: 30rem) {

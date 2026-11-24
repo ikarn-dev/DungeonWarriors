@@ -52,8 +52,8 @@
   margin: 6px 0 12px;
   color: #fff1cf;
   font:
-    700 clamp(24px, 4vw, 38px) var(--font-pixel),
-    monospace;
+    700 clamp(24px, 4vw, 38px) var(--font-geist-sans),
+    sans-serif;
 }
 .dungeon-result p {
   color: #c6bfd7;
@@ -119,7 +119,7 @@
   color: #d4ff9a;
   background: #203125;
   border: 2px solid #76935b;
-  font-family: var(--font-pixel), monospace;
+  font-family: var(--font-geist-sans), sans-serif;
 }
 .dungeon-notice {
   position: absolute;
@@ -132,9 +132,9 @@
 }
 .dungeon-bet h2 {
   font:
-    700 30px var(--font-pixel),
-    monospace;
-  color: var(--cream);
+    700 1.625rem var(--font-geist-sans),
+    sans-serif;
+  color: var(--gold-hi);
   margin: 0;
 }
 .dungeon-bet > p {
@@ -168,7 +168,7 @@
   height: 100%;
   place-items: center;
   color: #fff1cf;
-  font-family: var(--font-pixel), monospace;
+  font-family: var(--font-geist-sans), sans-serif;
 }
 .dungeon-history {
   display: grid;

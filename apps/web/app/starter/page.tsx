@@ -6,7 +6,7 @@ export default function StarterPage() {
   return (
     <main className="lobby">
       <LobbyTitle bar />
-      <LobbySound track="lobby" />
+      <LobbySound />
       <WalletShell />
     </main>
   );

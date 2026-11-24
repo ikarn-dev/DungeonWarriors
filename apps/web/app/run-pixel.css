@@ -1,15 +1,26 @@
-/* Pixel UI primitives shared by the lobby, the in-game HUD and controls. */
+/* Shared UI primitives (2026-11-24 metal theme): dark teal glass panels with
+   a polished gold rim, and metal buttons, used by the lobby and the dungeon.
+   Class names keep their original pixel- prefix. */
 :root {
   --px: 3px;
-  --ink: #1e1626;
-  --panel: #2a2745;
-  --panel-hi: #45407a;
-  --panel-lo: #19172d;
-  --cream: #fff4d6;
-  --soft: #cfc8ee;
-  --gold: #ffc531;
-  --gold-hi: #ffe58a;
-  --gold-lo: #c9851a;
+  --ink: #050908;
+  --panel: #13221f;
+  --panel-hi: #2a4440;
+  --panel-lo: #0a1413;
+  --cream: #f4ead2;
+  --soft: #a9bcb5;
+  --gold: #e2b04e;
+  --gold-hi: #fbe7a6;
+  --gold-lo: #9c6c1e;
+  --metal: linear-gradient(
+    135deg,
+    #fbeab0,
+    #b9852f 22%,
+    #fff3c4 45%,
+    #7d561a 68%,
+    #e7c06a 88%,
+    #9b6c22
+  );
   --sky: #3e95e6;
   --icon: 24px;
   --edge-top: max(0.5rem, env(safe-area-inset-top));
@@ -18,25 +29,25 @@
   --edge-left: max(0.75rem, env(safe-area-inset-left));
 }
 
-/* Notched pixel frame: orthogonal outer shadows leave the corners open. */
-.pixel-panel,
-.pixel-button,
-:where(.lobby-panel) button {
-  --face: var(--panel);
-  --face-hi: var(--panel-hi);
-  --face-lo: var(--panel-lo);
-  background: var(--face);
+.pixel-panel {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(170deg, #13221ff0, #0b1716f2 55%, #081110f5) padding-box,
+    var(--metal) border-box;
   box-shadow:
-    0 calc(var(--px) * -1) 0 0 var(--ink),
-    0 var(--px) 0 0 var(--ink),
-    calc(var(--px) * -1) 0 0 0 var(--ink),
-    var(--px) 0 0 0 var(--ink),
-    inset 0 var(--px) 0 0 var(--face-hi),
-    inset 0 calc(var(--px) * -1) 0 0 var(--face-lo);
+    inset 0 0 0 4px #08100f,
+    inset 0 0 0 5px #6e542080,
+    0 18px 50px #000000a6;
 }
 
+/* Metal button: a three-stop face under a thin gold rim. Tones change the
+   face colours only. */
 .pixel-button,
 :where(.lobby-panel) button {
+  --face: #1c302d;
+  --face-hi: #36524d;
+  --face-lo: #12201e;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -45,76 +56,71 @@
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0.25rem 0.875rem;
-  border: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--face-hi), var(--face) 55%, var(--face-lo)) padding-box,
+    linear-gradient(#e7c374, #7d5a20 50%, #c9a04e) border-box;
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    inset 0 -2px 0 #00000059,
+    0 2px 8px #00000080;
   color: var(--cream);
-  font-family: var(--font-pixel), sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.9375rem;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   line-height: 1.1;
   white-space: nowrap;
-  text-shadow: 0 2px 0 var(--ink);
+  text-shadow: 0 1px 0 #000000b3;
   touch-action: manipulation;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    filter 150ms ease-out,
+    transform 150ms ease-out;
 }
 .pixel-button:not(:disabled):active,
 :where(.lobby-panel) button:not(:disabled):active {
-  transform: translateY(var(--px));
-  box-shadow:
-    0 calc(var(--px) * -1) 0 0 var(--ink),
-    0 var(--px) 0 0 var(--ink),
-    calc(var(--px) * -1) 0 0 0 var(--ink),
-    var(--px) 0 0 0 var(--ink),
-    inset 0 var(--px) 0 0 var(--face-lo);
+  transform: translateY(1px);
+  filter: brightness(0.92);
 }
 .pixel-button:not(:disabled) {
   cursor: pointer;
 }
 .pixel-button:disabled,
 :where(.lobby-panel) button:disabled {
-  filter: grayscale(0.7) brightness(0.8);
-  opacity: 0.75;
+  filter: grayscale(0.6) brightness(0.75);
+  opacity: 0.7;
 }
 .pixel-button:focus-visible,
 :where(.lobby-panel) button:focus-visible,
 .run-canvas:focus-visible {
-  outline: var(--px) solid var(--gold-hi);
-  outline-offset: calc(var(--px) * 2);
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 3px;
 }
 @media (hover: hover) {
   .pixel-button:not(:disabled):hover,
   :where(.lobby-panel) button:not(:disabled):hover {
-    filter: brightness(1.12);
+    filter: brightness(1.15);
   }
 }
-
-/* Rounded variant: same tones, a soft ink ring instead of notched corners. */
 .pixel-button[data-shape="round"] {
-  border-radius: 0.75rem;
-  box-shadow:
-    0 0 0 2px var(--ink),
-    inset 0 2px 0 0 var(--face-hi),
-    inset 0 -3px 0 0 var(--face-lo);
-}
-.pixel-button[data-shape="round"]:not(:disabled):active {
-  transform: translateY(2px);
-  box-shadow:
-    0 0 0 2px var(--ink),
-    inset 0 2px 0 0 var(--face-lo);
+  border-radius: 999px;
 }
 
 .pixel-button[data-tone="gold"],
 :where(.lobby-panel) button[data-primary] {
-  --face: var(--gold);
-  --face-hi: var(--gold-hi);
-  --face-lo: var(--gold-lo);
-  color: var(--ink);
-  text-shadow: 0 1px 0 var(--gold-hi);
+  --face: #e0ac45;
+  --face-hi: #fff0b8;
+  --face-lo: #a8741f;
+  color: #2a1a05;
+  text-shadow: 0 1px 0 #fff3c480;
 }
 .pixel-button[data-tone="green"] {
-  --face: #4fb848;
-  --face-hi: #8ee05c;
-  --face-lo: #2f8f3a;
+  --face: #24806f;
+  --face-hi: #5fc4ad;
+  --face-lo: #165045;
 }
 .pixel-button[data-tone="blue"] {
   --face: #3a7bff;

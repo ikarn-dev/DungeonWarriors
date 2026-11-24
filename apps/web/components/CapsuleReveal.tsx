@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
-import { lobbyMusic } from "../lib/audio/lobby-music";
+import { lobbySounds } from "../lib/audio/lobby-sounds";
 import { WARRIORS, warriorPortrait } from "../lib/dungeon/warriors";
 import { MEDIA_ROOT } from "../lib/game/assets";
 import { displayUsdc } from "../lib/game/custody-client";
@@ -44,19 +44,15 @@ export default function CapsuleReveal({
   useEffect(() => {
     const surface = dialog.current;
     if (surface && !surface.open) surface.showModal();
-    lobbyMusic.setSummoning(true);
     const timer = setTimeout(
       () => setShowResult(true),
       matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1500,
     );
-    return () => {
-      clearTimeout(timer);
-      lobbyMusic.setSummoning(false);
-    };
+    return () => clearTimeout(timer);
   }, []);
   const revealed = reward != null;
   useEffect(() => {
-    if (revealed) lobbyMusic.reveal();
+    if (revealed) lobbySounds.reveal();
   }, [revealed]);
 
   return (

@@ -2,34 +2,13 @@
 
 import type { CSSProperties } from "react";
 import { Toaster } from "sonner";
-import { type Fill, PixelMark } from "./PixelMark";
+import { UiIcon } from "./UiIcon";
 
-const CHECK = [
-  "......o",
-  ".....oo",
-  "o...oo.",
-  "oo.oo..",
-  ".ooo...",
-  "..o....",
-] as const;
-const CROSS = [
-  "o....o",
-  "oo..oo",
-  ".oooo.",
-  "..oo..",
-  ".oooo.",
-  "oo..oo",
-  "o....o",
-] as const;
-const BANG = ["oo", "oo", "oo", "oo", "..", "oo"] as const;
-const green: Fill = (key) => (key === "o" ? "#8ee05c" : null);
-const red: Fill = (key) => (key === "o" ? "#ff6b6b" : null);
-const gold: Fill = (key) => (key === "o" ? "#ffc531" : null);
 const toasterStyle: CSSProperties & { "--width": string } = {
   "--width": "20rem",
 };
 
-// Sonner with its own styling switched off; the pixel theme lives in CSS.
+// Sonner with its own styling switched off; the metal theme lives in CSS.
 export default function LobbyToaster() {
   return (
     <Toaster
@@ -40,9 +19,21 @@ export default function LobbyToaster() {
       visibleToasts={3}
       style={toasterStyle}
       icons={{
-        success: <PixelMark rows={CHECK} fill={green} />,
-        error: <PixelMark rows={CROSS} fill={red} />,
-        info: <PixelMark rows={BANG} fill={gold} />,
+        success: (
+          <span className="pixel-toast-mark" data-kind="success">
+            <UiIcon name="check" />
+          </span>
+        ),
+        error: (
+          <span className="pixel-toast-mark" data-kind="error">
+            <UiIcon name="cross" />
+          </span>
+        ),
+        info: (
+          <span className="pixel-toast-mark" data-kind="info">
+            <UiIcon name="alert" />
+          </span>
+        ),
         loading: <span className="pixel-spinner" />,
       }}
       toastOptions={{

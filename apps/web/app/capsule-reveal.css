@@ -11,7 +11,7 @@
   overscroll-behavior: contain;
   color: var(--cream);
   background: #151126;
-  font-family: var(--font-pixel), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
 }
 .gacha-dialog::backdrop {
   background: #151126;

@@ -1,30 +1,10 @@
 import type { useWallet } from "@solana/wallet-adapter-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { lobbyMusic } from "../lib/audio/lobby-music";
-import { type Fill, PixelMark } from "./PixelMark";
+import { lobbySounds } from "../lib/audio/lobby-sounds";
+import { UiIcon } from "./UiIcon";
 
 type Wallet = ReturnType<typeof useWallet>;
-const ink: Fill = (key) => (key === "o" ? "currentColor" : null);
-const POWER = [
-  "....o....",
-  "..o.o.o..",
-  ".o..o..o.",
-  "o...o...o",
-  "o.......o",
-  "o.......o",
-  ".o.....o.",
-  "..ooooo..",
-] as const;
-const COPY = [
-  "..ooooo",
-  "..o...o",
-  "ooooo.o",
-  "o...o.o",
-  "o...ooo",
-  "o...o..",
-  "ooooo..",
-] as const;
 
 // Lists the wallets the browser exposes (Wallet Standard detection). One
 // press selects the wallet and opens its connect prompt.
@@ -116,13 +96,13 @@ export function WalletChip({
         className="lobby-address"
         title="Copy wallet address"
         onClick={() => {
-          lobbyMusic.blip();
+          lobbySounds.blip();
           onCopy();
         }}
       >
         <span className="sr-only">Copy wallet address </span>
         {address.slice(0, 4)}…{address.slice(-4)}
-        <PixelMark rows={COPY} fill={ink} />
+        <UiIcon name="copy" size={14} />
       </button>
       <button
         type="button"
@@ -131,11 +111,11 @@ export function WalletChip({
         title="Disconnect"
         disabled={busy}
         onClick={() => {
-          lobbyMusic.powerDown();
+          lobbySounds.powerDown();
           onDisconnect();
         }}
       >
-        <PixelMark rows={POWER} fill={ink} />
+        <UiIcon name="power" size={18} />
       </button>
     </div>
   );

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import { lobbyMusic } from "../lib/audio/lobby-music";
-import type { LobbyTrack } from "../lib/audio/lobby-tracks";
+import { lobbySounds } from "../lib/audio/lobby-sounds";
 
 // Sound defaults to on and starts with the first tap or key press, as
-// browsers require. The choice is remembered on this device.
+// browsers require. The choice is remembered on this device. There is no
+// music; only clicks and short feedback sounds play.
 const KEY = "purrps:sound";
 const listeners = new Set<() => void>();
 function readEnabled() {
@@ -32,37 +32,36 @@ function subscribe(listener: () => void) {
     window.removeEventListener("storage", listener);
   };
 }
+const START = ".lobby-play, .title-start";
 
-export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
+// Click sounds for buttons and links on this screen; renders nothing.
+export function LobbyClickSounds() {
   const enabled = useSyncExternalStore(subscribe, readEnabled, () => true);
-
+  useEffect(() => lobbySounds.setEnabled(enabled), [enabled]);
   useEffect(() => {
-    lobbyMusic.setTrack(track);
-    return () => lobbyMusic.setTrack(null);
-  }, [track]);
-  useEffect(() => lobbyMusic.setEnabled(enabled), [enabled]);
-  useEffect(() => {
-    // Capture phase: unlock audio inside the gesture, then add a soft blip
-    // for pixel buttons and a short meow for Start.
+    // Capture phase: unlock audio inside the gesture, then a soft click for
+    // buttons and the start jingle for Start.
     const press = (event: Event) => {
-      lobbyMusic.unlock();
+      lobbySounds.unlock();
       if (!(event.target instanceof Element)) return;
       const control = event.target.closest(".lobby a, .lobby button");
       if (!control || control.matches(":disabled, .lobby-sound")) return;
-      if (control.matches(".lobby-play")) lobbyMusic.start();
+      if (control.matches(START)) lobbySounds.start();
       else if (
-        control.matches(".pixel-button, .dpad-arm, .face-button, .console-pill")
+        control.matches(
+          ".pixel-button, .title-start, .dpad-arm, .face-button, .console-pill",
+        )
       )
-        lobbyMusic.blip();
+        lobbySounds.blip();
     };
     // Hover chirp for Start, mouse pointers only.
     const over = (event: PointerEvent) => {
       if (event.pointerType !== "mouse" || !(event.target instanceof Element))
         return;
-      const start = event.target.closest(".lobby-play");
+      const start = event.target.closest(START);
       const from = event.relatedTarget;
       if (start && !(from instanceof Node && start.contains(from)))
-        lobbyMusic.hover();
+        lobbySounds.hover();
     };
     window.addEventListener("pointerdown", press, true);
     window.addEventListener("keydown", press, true);
@@ -73,8 +72,17 @@ export default function LobbySound({ track }: { readonly track: LobbyTrack }) {
       window.removeEventListener("pointerover", over, true);
     };
   }, []);
+  return null;
+}
 
-  return <LobbySoundToggle />;
+// Click sounds plus the on/off toggle.
+export default function LobbySound() {
+  return (
+    <>
+      <LobbyClickSounds />
+      <LobbySoundToggle />
+    </>
+  );
 }
 
 export function LobbySoundToggle() {
@@ -88,16 +96,29 @@ export function LobbySoundToggle() {
       aria-pressed={enabled}
       title={label}
       onClick={() => {
-        lobbyMusic.unlock();
-        lobbyMusic.cue(!enabled);
+        lobbySounds.unlock();
+        lobbySounds.cue(!enabled);
         writeEnabled(!enabled);
       }}
     >
-      <span
-        className="pixel-icon"
-        data-icon={enabled ? "sound" : "mute"}
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
         aria-hidden="true"
-      />
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+        {enabled ? (
+          <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+        ) : (
+          <path d="M16 9l5 6M21 9l-5 6" />
+        )}
+      </svg>
     </button>
   );
 }

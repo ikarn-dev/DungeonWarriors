@@ -26,12 +26,10 @@
 .lobby-stats,
 .lobby-banner,
 .lobby-offer {
-  background: var(--panel-lo);
-  box-shadow:
-    0 -2px 0 0 var(--ink),
-    0 2px 0 0 var(--ink),
-    -2px 0 0 0 var(--ink),
-    2px 0 0 0 var(--ink);
+  border: 1px solid var(--panel-hi);
+  border-radius: 8px;
+  background: linear-gradient(#152825, var(--panel-lo));
+  box-shadow: inset 0 1px 0 #ffffff12;
 }
 .lobby-stats {
   display: grid;
@@ -92,6 +90,7 @@
   width: 5rem;
   height: 0.875rem;
   vertical-align: middle;
+  border-radius: 4px;
   background: var(--panel-hi);
   opacity: 0.6;
 }
@@ -126,11 +125,10 @@
 }
 .lobby-table th {
   padding: 0 0.5rem 0.5rem;
-  color: var(--soft);
-  font-family: var(--font-pixel), sans-serif;
+  color: var(--gold-hi);
   font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
@@ -138,14 +136,14 @@
 .lobby-table td {
   height: 3rem;
   padding: 0.25rem 0.5rem;
-  border-top: 2px solid var(--panel-hi);
+  border-top: 1px solid var(--panel-hi);
   white-space: nowrap;
 }
 .lobby-table [data-number] {
   text-align: right;
 }
 .lobby-table tr[data-mine] td {
-  background: #ffc53126;
+  background: #e2b04e1f;
   color: var(--gold-hi);
 }
 .lobby-table .pixel-button {
@@ -158,14 +156,15 @@
   place-items: center;
   min-width: 4.25rem;
   padding: 0.125rem 0.5rem;
-  background: #5d5873;
-  box-shadow: 0 0 0 2px var(--ink);
+  border: 1px solid #c9a04e66;
+  border-radius: 999px;
+  background: #2a3b38;
   color: var(--cream);
-  font-family: var(--font-pixel), sans-serif;
   font-size: 0.75rem;
+  font-weight: 600;
 }
 .lobby-badge[data-result="win"] {
-  background: #2f8f3a;
+  background: #1f6b4a;
 }
 .lobby-badge[data-result="loss"] {
   background: #a82c3a;
@@ -175,22 +174,22 @@
 }
 .lobby-badge[data-result="live"] {
   background: var(--gold);
-  color: var(--ink);
+  color: #2a1a05;
 }
 .lobby-rank {
   min-width: 2rem;
 }
 .lobby-rank[data-rank="1"] {
-  background: var(--gold);
-  color: var(--ink);
+  background: linear-gradient(#fff0b8, #e0ac45);
+  color: #2a1a05;
 }
 .lobby-rank[data-rank="2"] {
-  background: #c9cbd6;
-  color: var(--ink);
+  background: linear-gradient(#ffffff, #b9c0cc);
+  color: #1a1d22;
 }
 .lobby-rank[data-rank="3"] {
-  background: #c9853f;
-  color: var(--ink);
+  background: linear-gradient(#f2b98a, #b06a32);
+  color: #2a1405;
 }
 .lobby-more {
   justify-self: center;
@@ -204,7 +203,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-left: calc(var(--px) * 2) solid var(--gold);
+  border-left: 3px solid var(--gold);
 }
 .lobby-banner p {
   margin: 0;
@@ -286,7 +285,7 @@
   align-items: center;
   gap: 0.75rem;
   min-height: 3.25rem;
-  border-top: 2px solid var(--panel-hi);
+  border-top: 1px solid var(--panel-hi);
 }
 .lobby-row-main {
   font-family: var(--font-geist-mono), monospace;
