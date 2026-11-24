@@ -92,7 +92,7 @@ export default function DungeonEntry({
       signal?.throwIfAborted();
       return accept(
         dungeonViewSchema.nullable().parse(result),
-        input.kind === "prepare",
+        input.kind === "prepare" || input.kind === "quote",
       );
     },
     [accept],
@@ -183,25 +183,39 @@ export default function DungeonEntry({
       signal.throwIfAborted();
       setArt(artwork);
       loaded = true;
+      let request:
+        | DungeonPrepare
+        | Extract<DungeonRequest, { kind: "quote" }>
+        | null = null;
       if (expedition?.phase === "preparing" && expedition.preparation) {
+        const previous = expedition;
         expedition = await send(
-          { kind: "status", nonce: expedition.nonce, client: client.current },
+          { kind: "status", nonce: previous.nonce, client: client.current },
           signal,
         );
-        if (!expedition || expedition.settled) {
-          setNotice("The previous wager expired. Press Play to start again.");
-          return;
+        if (expedition?.phase === "cancelled" && expedition.settled) {
+          request = {
+            kind: "quote",
+            stake: previous.stake,
+            cat: previous.cat,
+            maxRooms: previous.maxRooms,
+            maxGross: previous.maxGross,
+            rulesHash: previous.rulesHash,
+          };
         }
+      } else if (!expedition && rawStake) {
+        request = { kind: "prepare", stake: rawStake, cat };
       }
-      if (!expedition && rawStake) {
-        expedition = await send(
-          { kind: "prepare", stake: rawStake, cat },
-          signal,
-        );
+      if (request) {
+        expedition = await send(request, signal);
         if (
           !expedition?.preparation ||
-          expedition.stake !== rawStake ||
-          expedition.cat !== cat
+          expedition.stake !== request.stake ||
+          expedition.cat !== request.cat ||
+          (request.kind === "quote" &&
+            (expedition.maxRooms !== request.maxRooms ||
+              expedition.maxGross !== request.maxGross ||
+              expedition.rulesHash !== request.rulesHash))
         )
           throw new Error("INVALID_DUNGEON_QUOTE");
       }

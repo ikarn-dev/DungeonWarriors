@@ -12,9 +12,12 @@ export const u64Input = z
   .regex(/^(0|[1-9][0-9]{0,19})$/)
   .pipe(z.string().refine((n) => BigInt(n) <= 0xffffffffffffffffn));
 export function nonceBytes(value: string | bigint) {
-  const b = Buffer.alloc(8);
-  b.writeBigUInt64LE(BigInt(value));
-  return b;
+  const nonce = BigInt(value);
+  if (nonce < 0n || nonce > 0xffffffffffffffffn)
+    throw new RangeError("Nonce must be an unsigned 64-bit integer");
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setBigUint64(0, nonce, true);
+  return bytes;
 }
 export function pda(seed: string, ...parts: Uint8Array[]) {
   return PublicKey.findProgramAddressSync(

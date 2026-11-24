@@ -3,11 +3,13 @@ import { Keypair } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dungeonPrepareSchema } from "../../../../../apps/web/lib/dungeon/request";
 import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
+import { approveDungeonReservation } from "../../../../../apps/web/lib/dungeon/transactions";
 import {
   quoteDungeon,
   submitDungeon,
 } from "../../../../../apps/web/lib/server/dungeon-reservation";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
+import { nonceBytes } from "../../../../../apps/web/lib/solana/program";
 import { owner, record, verifier } from "../dungeon/fixtures";
 
 const mocks = vi.hoisted(() => ({
@@ -124,11 +126,39 @@ it("calculates and freezes the exact funded terms from one Play request", async 
   expect(quote.preparation?.transaction).toBeTruthy();
 });
 
+it("reaches the wallet without the unsupported browser Buffer bigint writer", async () => {
+  const quote = await quoteDungeon(owner, {
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  });
+  const sign = vi.fn(
+    async (tx: import("@solana/web3.js").VersionedTransaction) => {
+      tx.sign([Keypair.fromSeed(new Uint8Array(32).fill(1))]);
+      return tx;
+    },
+  );
+  const write = vi
+    .spyOn(Buffer.prototype, "writeBigUInt64LE")
+    .mockImplementation(() => {
+      throw new TypeError("writeBigUInt64LE is unavailable in the browser");
+    });
+  try {
+    expect(Array.from(nonceBytes("81985529216486895"))).toEqual([
+      0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01,
+    ]);
+    expect(() => nonceBytes(2n ** 64n)).toThrow(RangeError);
+    expect(() => nonceBytes(-1n)).toThrow(RangeError);
+    const approval = await approveDungeonReservation(owner, quote, sign, null);
+    expect(approval.source).toBe(quote.preparation?.transaction);
+    expect(sign).toHaveBeenCalledTimes(1);
+  } finally {
+    write.mockRestore();
+  }
+});
+
 it("reuses a validated wallet approval for the same preparation, but signs again for a new blockhash", async () => {
   const { VersionedTransaction } = await import("@solana/web3.js");
-  const { approveDungeonReservation } = await import(
-    "../../../../../apps/web/lib/dungeon/transactions"
-  );
   const quote = await quoteDungeon(owner, {
     kind: "quote",
     stake: "1000000",
@@ -180,9 +210,6 @@ it("reuses a validated wallet approval for the same preparation, but signs again
 });
 
 it("persists the single wallet approval and reuses its signature after a repeated submit", async () => {
-  const { approveDungeonReservation } = await import(
-    "../../../../../apps/web/lib/dungeon/transactions"
-  );
   const quote = await quoteDungeon(owner, {
     kind: "prepare",
     stake: "1000000",
