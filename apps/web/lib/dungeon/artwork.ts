@@ -21,9 +21,10 @@ export type DungeonArtwork = {
 async function readBounded(
   url: string,
   bytes: number,
+  signal: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(10000),
+    signal,
     cache: "force-cache",
   });
   if (!response.ok || !response.body) throw new Error("ASSETS_NOT_READY");
@@ -55,11 +56,19 @@ async function readBounded(
 export function loadDungeonArtwork(cat: CatId): Promise<DungeonArtwork> {
   const cached = pending.get(cat);
   if (cached) return cached;
-  const task = (async () => {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("ASSETS_NOT_READY"));
+    }, 15000);
+  });
+  const loading = (async () => {
     const [response, { default: engine }, { renderDungeon }] =
       await Promise.all([
         fetch(`${WARRIOR_ART}/manifest.json`, {
-          signal: AbortSignal.timeout(10000),
+          signal: controller.signal,
         }),
         import("phaser"),
         import("./render-dungeon"),
@@ -76,7 +85,11 @@ export function loadDungeonArtwork(cat: CatId): Promise<DungeonArtwork> {
       wanted.map(async (id) => {
         const asset = manifest.assets.find((a) => a.id === id);
         if (!asset) throw new Error("ASSETS_NOT_READY");
-        const bytes = await readBounded(asset.path, asset.bytes);
+        const bytes = await readBounded(
+          asset.path,
+          asset.bytes,
+          controller.signal,
+        );
         const hash = Array.from(
           new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
           (b) => b.toString(16).padStart(2, "0"),
@@ -88,7 +101,14 @@ export function loadDungeonArtwork(cat: CatId): Promise<DungeonArtwork> {
     );
     return { cat, engine, manifest, render: renderDungeon, images };
   })();
+  // Bound imports as well as downloads, so a stalled preload can be retried.
+  const task = Promise.race([loading, deadline]).finally(() =>
+    clearTimeout(timer),
+  );
   pending.set(cat, task);
-  void task.catch(() => pending.delete(cat));
+  void task.catch(() => {
+    controller.abort();
+    if (pending.get(cat) === task) pending.delete(cat);
+  });
   return task;
 }

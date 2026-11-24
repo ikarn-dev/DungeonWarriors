@@ -43,6 +43,7 @@ export default function DungeonEntry({
     finalized = useRef<string | null>(null);
   const [view, setView] = useState<DungeonView | null>(null);
   const [art, setArt] = useState<DungeonArtwork | null>(null);
+  const [artError, setArtError] = useState(false);
   const [amount, setAmount] = useState(""),
     [offer, setOffer] = useState<DungeonOffer | null>(null);
   const [busy, setBusy] = useState(false),
@@ -95,13 +96,13 @@ export default function DungeonEntry({
     let live = true;
     void loadDungeonArtwork(artworkCat).then(
       (value) => {
-        if (live) setArt(value);
+        if (live) {
+          setArt(value);
+          setArtError(false);
+        }
       },
       () => {
-        if (live)
-          setNotice(
-            "Dungeon artwork could not load. Retry before placing a wager.",
-          );
+        if (live) setArtError(true);
       },
     );
     return () => {
@@ -219,8 +220,12 @@ export default function DungeonEntry({
     setBusy(true);
     setNotice(null);
     let quote: DungeonView | null = null;
+    let loaded = false;
     try {
-      await loadDungeonArtwork(cat);
+      setArtError(false);
+      const artwork = await loadDungeonArtwork(cat);
+      setArt(artwork);
+      loaded = true;
       quote = await send({
         kind: "quote",
         stake: rawStake,
@@ -245,11 +250,13 @@ export default function DungeonEntry({
       );
       await send({ kind: "submit", nonce: quote.nonce, transaction });
     } catch (error) {
-      setNotice(
-        error instanceof WebApiError
-          ? webErrorMessage(error.code)
-          : "The expedition could not start. Your saved request will be checked.",
-      );
+      if (!loaded) setArtError(true);
+      else
+        setNotice(
+          error instanceof WebApiError
+            ? webErrorMessage(error.code)
+            : "The expedition could not start. Your saved request will be checked.",
+        );
       if (quote)
         void send({
           kind: "exit",
@@ -260,7 +267,7 @@ export default function DungeonEntry({
             "Your saved expedition will be checked when your wallet returns.",
           ),
         );
-      if (!quote) {
+      if (!quote && loaded) {
         void webApi("/api/dungeon", { kind: "offer", stake: rawStake, cat })
           .then((value) => setOffer(dungeonOfferSchema.parse(value)))
           .catch(() => setOffer(null));
@@ -322,15 +329,34 @@ export default function DungeonEntry({
               busy ||
               !sign ||
               !offer ||
-              !art ||
-              art.cat !== cat ||
               !stake ||
               stake > BigInt(state.available)
             }
             onClick={() => void begin()}
           >
-            {busy ? "Preparing…" : "Bet & explore"}
+            {busy
+              ? art?.cat === cat
+                ? "Preparing…"
+                : "Loading dungeon…"
+              : artError
+                ? "Retry & explore"
+                : "Bet & explore"}
           </button>
+          {artError && (
+            <output className="lobby-section-note">
+              The game could not load. Your wager has not been taken. Try again.
+            </output>
+          )}
+          {!sign && (
+            <output className="lobby-section-note">
+              Reconnect your wallet to approve this wager.
+            </output>
+          )}
+          {blocked && (
+            <output className="lobby-section-note">
+              Finish the pending wallet request before starting an expedition.
+            </output>
+          )}
           <p className="dungeon-odds-note">
             Each gate: 2 in 3 treasure. Reach it before time runs out. PURRPS
             covers Devnet fees.

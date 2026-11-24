@@ -35,12 +35,12 @@ test("the prerendered page references emitted local CSS", () => {
       readFileSync(join(output, sheet[1].slice("/_next/".length))).length > 0,
     );
 });
-test("the starter route renders the pixel lobby before wallet hydration", () => {
+test("the starter route renders the game lobby before wallet hydration", () => {
   const html = readFileSync(join(output, "server/app/starter.html"), "utf8");
-  assert.match(html, /alt="PURRPS"/);
+  assert.match(html, /alt="Dungeon Warriors"/);
   assert.match(html, /<output class="pixel-loader">/);
   assert.match(html, /class="sr-only">Loading/);
-  assert.match(html, /data-cat="collector"/);
+  assert.match(html, /class="lobby-backdrop-image"/);
   assert.doesNotMatch(html, /capsule-(lid|base)\.svg/);
 });
 test("server credential configuration is absent from browser chunks", () => {
