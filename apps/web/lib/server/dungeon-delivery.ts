@@ -75,14 +75,15 @@ export async function refreshDungeon(record: DungeonRecord) {
   }
   if (e.randomness) {
     record.randomness = Buffer.from(e.randomness).toString("hex");
-    if (record.outcome !== null)
+    if (record.outcome !== null) {
+      record.dueAt = Date.now();
       record.phase =
         record.outcome === 0
           ? "won"
           : record.outcome === 1
             ? "lost"
             : "refunded";
-    else if (record.phase === "preparing") {
+    } else if (record.phase === "preparing") {
       record.phase = "ready";
       record.dueAt = Date.now() + 60000;
     }

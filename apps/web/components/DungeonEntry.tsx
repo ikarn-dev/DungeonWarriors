@@ -1,11 +1,13 @@
 "use client";
 import type { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   type DungeonArtwork,
   loadDungeonArtwork,
 } from "../lib/dungeon/artwork";
 import { logDungeon } from "../lib/dungeon/debug";
+import { clearDeparture, savedDeparture } from "../lib/dungeon/departure";
 import {
   type DungeonRequest,
   type DungeonView,
@@ -22,7 +24,16 @@ import type { CatId } from "../lib/game/catalog";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
 import { WebApiError, webErrorMessage } from "../lib/game/web-api";
-import DungeonScreen from "./DungeonScreen";
+import DungeonScreen, { DungeonDialog } from "./DungeonScreen";
+import { useDungeonExit } from "./useDungeonExit";
+
+// One toast follows a quest from Play until the game opens: it updates in
+// place and is dismissed when the dungeon appears. In-game messages use the
+// dungeon's own notice, because the modal dialog covers the toaster.
+const QUEST_TOAST = "quest";
+const progress = (title: string) => toast.loading(title, { id: QUEST_TOAST });
+const problem = (title: string) =>
+  toast.error(title, { id: QUEST_TOAST, duration: 6000 });
 
 export default function DungeonEntry({
   state,
@@ -31,6 +42,7 @@ export default function DungeonEntry({
   blocked,
   sign,
   refresh,
+  showMenu,
 }: {
   readonly state: LobbyState;
   readonly cat: CatId;
@@ -40,9 +52,9 @@ export default function DungeonEntry({
     | ((tx: VersionedTransaction) => Promise<VersionedTransaction>)
     | undefined;
   readonly refresh: (signal: AbortSignal) => Promise<void>;
+  readonly showMenu: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null),
-    client = useRef(crypto.randomUUID());
+  const client = useRef(crypto.randomUUID());
   const latest = useRef<DungeonView | null>(null),
     finalized = useRef<string | null>(null);
   const approved = useRef<DungeonApproval | null>(null);
@@ -53,8 +65,8 @@ export default function DungeonEntry({
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [launch, setLaunch] = useState(false);
+  const [uncertain, setUncertain] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
   let stake: bigint | null = null;
   try {
     stake = parseUsdc(amount);
@@ -66,8 +78,10 @@ export default function DungeonEntry({
   const pendingWager = view?.preparation ? view : null;
   const open =
     launch && view !== null && !["preparing", "cancelled"].includes(view.phase);
-  const confirming = view?.phase === "preparing" && !view.preparation;
-  const waiting = launch && confirming;
+  const confirming =
+    (view?.phase === "preparing" && !view.preparation) ||
+    (uncertain !== null && uncertain === view?.nonce);
+  const funded = active && pendingWager === null;
   const accept = useCallback(
     (incoming: DungeonView | null, newApproval = false) => {
       const next = mergeDungeonView(latest.current, incoming, newApproval);
@@ -76,6 +90,7 @@ export default function DungeonEntry({
       if (newApproval && next?.phase === "preparing") finalized.current = null;
       latest.current = next;
       setView(next);
+      if (next?.settled) clearDeparture(wallet, next.nonce);
       if (
         next?.settled &&
         next.phase !== "cancelled" &&
@@ -101,40 +116,68 @@ export default function DungeonEntry({
     },
     [accept],
   );
+  const returnToMenu = useCallback(() => {
+    setLaunch(false);
+    setNotice(null);
+    showMenu();
+  }, [showMenu]);
+  const { exit, pending, requested } = useDungeonExit({
+    open,
+    phase: view?.phase,
+    latest,
+    wallet,
+    client: client.current,
+    send,
+    onMenu: returnToMenu,
+    toastId: QUEST_TOAST,
+  });
   useEffect(() => {
     const controller = new AbortController();
-    void send({ kind: "status", client: client.current }, controller.signal)
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setNotice("Could not check your previous expedition.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setChecking(false);
-      });
+    const departure = savedDeparture(wallet);
+    if (departure) {
+      exit(departure);
+      setChecking(false);
+    } else
+      void send({ kind: "status" }, controller.signal)
+        .catch(() => {
+          if (!controller.signal.aborted)
+            problem("Couldn't check your last quest.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setChecking(false);
+        });
     return () => {
       controller.abort();
       starting.current?.abort();
     };
-  }, [send]);
+  }, [exit, send, wallet]);
   const nonce = view?.nonce;
+  const watching = (funded || confirming) && !launch;
   const pendingSettlement =
     active && view !== null && ["won", "lost", "refunded"].includes(view.phase);
   useEffect(() => {
-    if (busy || !nonce || (!waiting && !pendingSettlement)) return;
+    if (busy || pending || !nonce || (!watching && !pendingSettlement)) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const next = await send(
-          { kind: "status", nonce, client: client.current },
-          controller.signal,
-        );
+        const next = await send({ kind: "status", nonce }, controller.signal);
+        if (uncertain !== null && next?.nonce === uncertain) {
+          setUncertain(null);
+          if (next.preparation) problem("Your wager wasn't confirmed.");
+        }
         if (next?.phase === "cancelled") {
           setLaunch(false);
           setNotice(null);
-          setFailure("Devnet did not confirm this wager.");
+          problem("Your wager wasn't confirmed. Try again.");
         } else if (next && next.phase !== "preparing") setNotice(null);
-        if (next?.settled || (waiting && next?.phase === "ready")) return;
+        if (next?.settled) {
+          if (watching && next.phase === "refunded") {
+            returnToMenu();
+            toast("Your wager was refunded.", { id: QUEST_TOAST });
+          }
+          return;
+        }
       } catch {
         if (!controller.signal.aborted)
           setNotice("Checking your saved expedition…");
@@ -147,28 +190,75 @@ export default function DungeonEntry({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [nonce, waiting, pendingSettlement, busy, send]);
+  }, [
+    nonce,
+    watching,
+    pending,
+    pendingSettlement,
+    busy,
+    send,
+    returnToMenu,
+    uncertain,
+  ]);
   useEffect(() => {
-    const modal = dialog.current;
-    if (open && !modal?.open) modal?.showModal();
-    else if (!open && modal?.open) modal.close();
+    if (
+      busy ||
+      checking ||
+      pending ||
+      launch ||
+      view?.phase !== "ready" ||
+      view.settled ||
+      requested.current === view.nonce
+    )
+      return;
+    if (art?.cat === view.cat) {
+      setLaunch(true);
+      return;
+    }
+    const { nonce, cat } = view;
+    let cancelled = false;
+    progress("Opening the catacombs…");
+    void loadDungeonArtwork(cat).then(
+      (artwork) => {
+        if (!cancelled) setArt(artwork);
+      },
+      () => {
+        if (!cancelled) exit({ kind: "exit", nonce, client: client.current });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [art, busy, checking, exit, launch, pending, requested, view]);
+  useEffect(() => {
+    if (open) toast.dismiss(QUEST_TOAST);
   }, [open]);
-  const close = useCallback(() => {
+  const interrupt = useCallback(() => {
     const current = latest.current;
     if (current && !current.settled)
-      void send({
-        kind: "exit",
-        nonce: current.nonce,
-        client: client.current,
-      }).catch(() =>
-        setNotice(
-          "Your saved expedition will resolve when your wallet next checks it.",
-        ),
-      );
-    setLaunch(false);
-  }, [send]);
+      exit({ kind: "exit", nonce: current.nonce, client: client.current });
+    else returnToMenu();
+  }, [exit, returnToMenu]);
+  const close = useCallback(() => {
+    if (
+      latest.current?.phase === "playing" &&
+      !window.confirm(
+        "Leaving this room forfeits your wager. Return to the menu?",
+      )
+    )
+      return;
+    interrupt();
+  }, [interrupt]);
   async function begin() {
-    if (starting.current || checking || waiting || blocked) return;
+    if (
+      starting.current ||
+      checking ||
+      confirming ||
+      funded ||
+      pending ||
+      blocked
+    )
+      return;
     const current = latest.current;
     let expedition = current && !current.settled ? current : null;
     if (
@@ -181,8 +271,8 @@ export default function DungeonEntry({
     const { signal } = controller;
     starting.current = controller;
     setBusy(true);
-    setFailure(null);
-    setNotice("Preparing your expedition…");
+    setNotice(null);
+    progress("Getting your quest ready…");
     logDungeon("play.start", { network: "devnet", saved: expedition !== null });
     let step = "artwork";
     try {
@@ -236,7 +326,7 @@ export default function DungeonEntry({
         if (!sign) throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
         step = "wallet";
         if (approved.current?.source !== expedition.preparation.transaction)
-          setNotice("Approve the wager in your wallet.");
+          progress("Approve the wager in your wallet");
         approved.current = await approveDungeonReservation(
           wallet,
           expedition,
@@ -245,7 +335,7 @@ export default function DungeonEntry({
         );
         signal.throwIfAborted();
         step = "submit";
-        setNotice("Confirming your wager…");
+        progress("Confirming your wager…");
         expedition = await send(
           {
             kind: "submit",
@@ -258,8 +348,6 @@ export default function DungeonEntry({
       if (expedition?.phase === "cancelled")
         throw new WebApiError("TRANSACTION_FAILED");
       logDungeon("play.accepted", { phase: expedition?.phase ?? "unknown" });
-      setLaunch(true);
-      setNotice(null);
     } catch (error) {
       if (signal.aborted) return;
       const code =
@@ -271,23 +359,19 @@ export default function DungeonEntry({
               ? "DUNGEON_SUBMIT_UNCONFIRMED"
               : "DUNGEON_PREPARE_FAILED";
       logDungeon("play.failed", { step, code });
-      setNotice(null);
-      setFailure(webErrorMessage(code));
+      problem(webErrorMessage(code));
+      if (step === "artwork") returnToMenu();
       if (step !== "submit" && step !== "prepare") return;
       const saved = await send(
         { kind: "status", nonce: expedition?.nonce, client: client.current },
         signal,
       ).catch(() => null);
-      if (
-        saved &&
-        !saved.settled &&
-        !saved.preparation &&
-        saved.cat === artCat
-      ) {
-        setLaunch(true);
-        setNotice(null);
-        setFailure(null);
-      }
+      if (signal.aborted) return;
+      if (step === "submit" && !saved && latest.current?.preparation) {
+        setUncertain(latest.current.nonce);
+        progress("Confirming your wager…");
+      } else if (saved && !saved.settled && !saved.preparation)
+        progress("Confirming your quest…");
     } finally {
       if (starting.current === controller) {
         starting.current = null;
@@ -297,22 +381,17 @@ export default function DungeonEntry({
   }
   return (
     <>
-      {active && !pendingWager ? (
-        <div className="lobby-banner">
-          <p>Expedition #{view.nonce}</p>
-          <button
-            className="pixel-button"
-            data-tone="gold"
-            type="button"
-            aria-busy={busy || waiting}
-            disabled={
-              blocked || busy || waiting || (view.preparation !== null && !sign)
-            }
-            onClick={() => void begin()}
-          >
-            Play
-          </button>
-        </div>
+      {funded || confirming || pending ? (
+        <output className="lobby-section-note">
+          {pending || pendingSettlement
+            ? "Resolving your quest…"
+            : confirming
+              ? "Confirming your wager…"
+              : watching &&
+                  (view?.phase === "playing" || view?.phase === "intermission")
+                ? "Quest in progress."
+                : "Opening the catacombs…"}
+        </output>
       ) : (
         <div className="bet-card dungeon-bet">
           <div className="bet-field">
@@ -332,10 +411,7 @@ export default function DungeonEntry({
                 inputMode="decimal"
                 autoComplete="off"
                 value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
-                onChange={(event) => {
-                  setAmount(event.target.value);
-                  setFailure(null);
-                }}
+                onChange={(event) => setAmount(event.target.value)}
                 disabled={busy || pendingWager !== null}
                 aria-invalid={
                   !pendingWager &&
@@ -354,7 +430,7 @@ export default function DungeonEntry({
           )}
           <button
             className="pixel-button lobby-play"
-            aria-busy={busy}
+            aria-busy={busy || checking}
             data-tone="gold"
             type="button"
             disabled={
@@ -382,54 +458,38 @@ export default function DungeonEntry({
             Each gate: 2 in 3 treasure. Reach it before time runs out. PURRPS
             covers Devnet fees.
           </p>
+          <p className="lobby-section-note">
+            Leaving or refreshing during a room forfeits your wager.
+          </p>
         </div>
       )}
-      {!open && failure && (
-        <p role="alert" className="lobby-problem">
-          {failure}
-        </p>
+      {open && view && (
+        <DungeonDialog onClose={close} onFailure={interrupt}>
+          <button
+            className="pixel-button dungeon-lobby"
+            aria-keyshortcuts="Escape"
+            type="button"
+            disabled={busy}
+            onClick={close}
+            title={
+              view.phase === "playing"
+                ? "Leaving or refreshing an active room forfeits your wager"
+                : "Back to lobby"
+            }
+          >
+            ← Lobby
+          </button>
+          <DungeonScreen
+            view={view}
+            artwork={art}
+            notice={notice}
+            client={client.current}
+            send={send}
+            onClose={close}
+            onFailure={interrupt}
+          />
+        </DungeonDialog>
       )}
-      {!open && !failure && (notice || waiting || checking) && (
-        <output className="lobby-section-note">
-          {notice ??
-            (waiting ? "Confirming your wager…" : "Checking your expedition…")}
-        </output>
-      )}
-      <dialog
-        ref={dialog}
-        className="run-dialog dungeon-dialog"
-        aria-label="Catacomb Quest"
-        onCancel={(event) => {
-          event.preventDefault();
-          if (!busy) close();
-        }}
-      >
-        {open && view && (
-          <div className="dungeon-dialog-content">
-            <button
-              className="pixel-button dungeon-lobby"
-              type="button"
-              disabled={busy}
-              onClick={close}
-              title={
-                view.phase === "playing"
-                  ? "Leaving an active room ends the expedition"
-                  : "Back to lobby"
-              }
-            >
-              ← Lobby
-            </button>
-            <DungeonScreen
-              view={view}
-              artwork={art}
-              notice={notice}
-              client={client.current}
-              send={send}
-              onClose={close}
-            />
-          </div>
-        )}
-      </dialog>
     </>
   );
 }

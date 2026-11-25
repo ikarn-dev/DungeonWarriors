@@ -5,7 +5,10 @@ import { dungeonPrepareSchema } from "../../../lib/dungeon/request";
 import { DUNGEON_V2, ENGINE } from "../../../lib/dungeon/rules";
 import { authenticate } from "../../../lib/server/auth";
 import { browserVerifierAddress } from "../../../lib/server/browser-config";
-import { recoverDungeonWallet } from "../../../lib/server/dungeon-recovery";
+import {
+  exitDungeon,
+  recoverDungeonWallet,
+} from "../../../lib/server/dungeon-recovery";
 import { quoteDungeon } from "../../../lib/server/dungeon-reservation";
 import { updateDungeon } from "../../../lib/server/dungeon-run";
 import {
@@ -45,7 +48,12 @@ export async function POST(request: Request) {
     const input = await body(request, requestSchema, 196608);
     const view = await (input.kind === "prepare"
       ? quoteDungeon(wallet, input)
-      : updateDungeon(wallet, input)
+      : input.kind === "exit"
+        ? exitDungeon(wallet, input)
+        : // Viewing a wallet in another tab must not forfeit its active room.
+          input.kind === "status"
+          ? updateDungeon(wallet, { kind: "status", nonce: input.nonce })
+          : updateDungeon(wallet, input)
     ).catch((error: unknown) => {
       if (["prepare", "quote", "submit"].includes(input.kind)) {
         const code =

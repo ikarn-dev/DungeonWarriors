@@ -1,10 +1,34 @@
 import "server-only";
+import type { DungeonRequest } from "../dungeon/protocol";
 import { deliverDungeon, refreshDungeon } from "./dungeon-delivery";
 import { broadcastReservation } from "./dungeon-reservation";
 import { finishDungeon } from "./dungeon-run";
 import { dungeonPendingKey, withDungeon } from "./dungeon-store";
-import { runtime } from "./runtime";
+import { dungeonView } from "./dungeon-view";
+import { ApiError, runtime } from "./runtime";
 import { observeDuration } from "./telemetry";
+
+// Departure is a lifecycle action outside the published room engine.
+export async function exitDungeon(
+  owner: string,
+  input: Extract<DungeonRequest, { kind: "exit" }>,
+) {
+  return withDungeon(owner, input.nonce, async (record) => {
+    if (!record) throw new ApiError("DUNGEON_NOT_FOUND", 409);
+    if (!record.settled && record.outcome === null) {
+      if (record.client !== null && record.client !== input.client)
+        throw new ApiError("DUNGEON_OTHER_CLIENT", 409);
+      if (record.phase === "playing") finishDungeon(record, 1, "abandoned");
+      else if (record.phase === "preparing" && !record.reserve.signature) {
+        record.phase = "cancelled";
+        record.settled = true;
+        record.reason = "cancelled";
+      } else if (record.cleared > 0) finishDungeon(record, 0, "banked");
+      else finishDungeon(record, 2, "unstarted");
+    }
+    return { record, value: dungeonView(record) };
+  });
+}
 
 export async function recoverDungeonWallet(owner: string): Promise<void> {
   const r = runtime();

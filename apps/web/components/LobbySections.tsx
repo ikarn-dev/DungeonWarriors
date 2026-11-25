@@ -1,6 +1,6 @@
 import type { VersionedTransaction } from "@solana/web3.js";
 import type { ComponentProps } from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { CatId } from "../lib/game/catalog";
 import type { PlayerIntent } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
@@ -49,6 +49,7 @@ export default function LobbySections({
   ) => Promise<void>;
   readonly reload: (signal: AbortSignal) => Promise<void>;
 }) {
+  const showMenu = useCallback(() => setTab(null), [setTab]);
   const [preferred, setPreferred] = useState<CatId | null>(null);
   const selected =
     state.cats.find(({ id }) => id === (preferred ?? state.selected)) ??
@@ -78,6 +79,7 @@ export default function LobbySections({
                 blocked={blocked}
                 sign={sign}
                 refresh={reload}
+                showMenu={showMenu}
               />
             )}
           </>

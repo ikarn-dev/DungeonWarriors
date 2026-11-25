@@ -8,6 +8,7 @@ import {
   dungeonTrap,
   secretCommitment,
 } from "../../../../../apps/web/lib/server/dungeon-randomness";
+import { exitDungeon } from "../../../../../apps/web/lib/server/dungeon-recovery";
 import { updateDungeon } from "../../../../../apps/web/lib/server/dungeon-run";
 import {
   type DungeonRecord,
@@ -77,21 +78,45 @@ it("persists a room start, never resets its clock on retry and never reads chain
     updateDungeon(owner, { kind: "start", nonce: "0", client, room: 1 }),
   ).rejects.toThrow("DUNGEON_STATE_CHANGED");
 });
-it("ends an active room on reload and never lets exit relabel it as an unstarted refund", async () => {
+it("leaves status reads harmless and rejects an exit from another client", async () => {
   await updateDungeon(owner, { kind: "start", nonce: "0", client, room: 0 });
-  await updateDungeon(owner, {
-    kind: "status",
-    nonce: "0",
-    client: "00000000-0000-4000-8000-000000000002",
-  });
+  await updateDungeon(owner, { kind: "status", nonce: "0" });
+  const other = "00000000-0000-4000-8000-000000000002";
+  await expect(
+    exitDungeon(owner, { kind: "exit", nonce: "0", client: other }),
+  ).rejects.toThrow("DUNGEON_OTHER_CLIENT");
+  expect(mocks.stored).toMatchObject({ phase: "playing", outcome: null });
+  await exitDungeon(owner, { kind: "exit", nonce: "0", client });
+  await exitDungeon(owner, { kind: "exit", nonce: "0", client });
   expect(mocks.stored).toMatchObject({
     phase: "lost",
     outcome: 1,
     payout: "0",
     reason: "abandoned",
   });
-  await updateDungeon(owner, { kind: "exit", nonce: "0", client });
-  expect(mocks.stored?.outcome).toBe(1);
+});
+it("schedules a refund for an interrupted funded startup and banks cleared rooms", async () => {
+  await exitDungeon(owner, { kind: "exit", nonce: "0", client });
+  expect(mocks.stored).toMatchObject({
+    phase: "refunded",
+    outcome: 2,
+    payout: "1000000",
+    dueAt: 100000,
+  });
+  mocks.stored = {
+    ...record(),
+    client,
+    phase: "intermission",
+    cleared: 1,
+    gates: [0],
+  };
+  await exitDungeon(owner, { kind: "exit", nonce: "0", client });
+  expect(mocks.stored).toMatchObject({
+    phase: "won",
+    outcome: 0,
+    payout: "1425000",
+    dueAt: 100000,
+  });
 });
 it("rejects teleporting to gates and future simulation before committing a choice", async () => {
   await updateDungeon(owner, { kind: "start", nonce: "0", client, room: 0 });

@@ -27,6 +27,7 @@ function screen(overrides: Partial<Parameters<typeof DungeonScreen>[0]>) {
     notice: null,
     send: async () => null,
     onClose: vi.fn(),
+    onFailure: vi.fn(),
     ...overrides,
   };
   return renderToStaticMarkup(createElement(DungeonScreen, props));

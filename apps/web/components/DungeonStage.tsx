@@ -22,12 +22,14 @@ export default function DungeonStage({
   client,
   send,
   onDone,
+  onFailure,
 }: {
   readonly view: DungeonView;
   readonly artwork: DungeonArtwork;
   readonly client: string;
   readonly send: (input: DungeonRequest) => Promise<DungeonView | null>;
   readonly onDone: () => void;
+  readonly onFailure: () => void;
 }) {
   const mount = useRef<HTMLDivElement>(null),
     runner = useRef<DungeonRunner | null>(null);
@@ -40,7 +42,6 @@ export default function DungeonStage({
   const [ready, setReady] = useState(false),
     [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [renderAttempt, setRenderAttempt] = useState(0);
   const roomIndex = view.room?.index,
     seed = view.room?.seed,
     startedAt = view.room?.startedAt;
@@ -88,13 +89,24 @@ export default function DungeonStage({
       try {
         return await send(input);
       } catch {
+        if (input.kind === "start") {
+          // Retry the same room start after a lost response. Its saved clock
+          // and owner are checked by the server.
+          try {
+            return await send(input);
+          } catch {
+            onFailure();
+            return null;
+          }
+        }
         setError("Checking your saved expedition…");
         try {
-          return await send({
+          const saved = await send({
             kind: "status",
             nonce: current.current.nonce,
-            client,
           });
+          if (saved) setError(null);
+          return saved;
         } catch {
           return null;
         }
@@ -103,76 +115,43 @@ export default function DungeonStage({
         setBusy(false);
       }
     },
-    [send, client],
+    [send, onFailure],
   );
-  const startFirstRoom = useCallback(() => {
-    if (!ready) {
-      setRenderAttempt((attempt) => attempt + 1);
-      return;
-    }
-    void action({
-      kind: "start",
-      nonce: current.current.nonce,
-      client,
-      room: 0,
-    }).then((next) => {
-      if (!next || next.phase === "ready")
-        setError("The room could not open. Press Play to continue.");
-    });
-  }, [action, client, ready]);
   useEffect(() => {
     if (!ready || view.phase !== "ready" || autoStarted.current) return;
     const startWhenVisible = () => {
       if (document.hidden || autoStarted.current) return;
       autoStarted.current = true;
-      startFirstRoom();
+      void action({
+        kind: "start",
+        nonce: current.current.nonce,
+        client,
+        room: 0,
+      });
     };
     startWhenVisible();
     document.addEventListener("visibilitychange", startWhenVisible);
     return () =>
       document.removeEventListener("visibilitychange", startWhenVisible);
-  }, [ready, startFirstRoom, view.phase]);
-  const leave = useCallback(() => {
-    const state = current.current;
-    if (state.settled) return;
-    void fetch("/api/dungeon", {
-      method: "POST",
-      credentials: "same-origin",
-      keepalive: true,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "exit", nonce: state.nonce, client }),
-    }).catch(() =>
-      setError("Your saved deadline will resolve this expedition."),
-    );
-  }, [client]);
+  }, [action, client, ready, view.phase]);
   const timeout = useCallback(() => {
     if (notified.current) return;
     notified.current = true;
     void action({ kind: "exit", nonce: current.current.nonce, client });
   }, [action, client]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Play explicitly rebuilds the display without resetting the saved room.
   useEffect(() => {
     const parent = mount.current;
     if (!parent) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReady(false);
     setError(null);
+    let failed = false;
     const report = () => {
-      setReady(false);
-      if (current.current.phase !== "playing") {
-        setError(
-          "The display could not start. Press Play to reload it. Your room timer has not started.",
-        );
-        return;
-      }
-      setError("The dungeon display stopped. Resolving automatically…");
-      void send({ kind: "exit", nonce: current.current.nonce, client }).catch(
-        () =>
-          setError(
-            "Your saved deadline will resolve this expedition when you return.",
-          ),
-      );
+      if (failed) return;
+      failed = true;
+      onFailure();
     };
+    const startupDeadline = setTimeout(report, 15000);
     parent.addEventListener("webglcontextlost", report, true);
     let destroy: (() => void) | undefined;
     try {
@@ -187,7 +166,10 @@ export default function DungeonStage({
             current.current.phase === "playing" && !sending.current,
           now: () => performance.now() + offset.current,
           reduced: () => reduced.matches,
-          onReady: () => setReady(true),
+          onReady: () => {
+            clearTimeout(startupDeadline);
+            if (!failed) setReady(true);
+          },
           onError: report,
           onTimeout: timeout,
           preloaded: artwork.images,
@@ -197,21 +179,19 @@ export default function DungeonStage({
       report();
     }
     return () => {
+      failed = true;
+      clearTimeout(startupDeadline);
       parent.removeEventListener("webglcontextlost", report, true);
       destroy?.();
     };
-  }, [artwork, client, timeout, send, renderAttempt]);
+  }, [artwork, timeout, onFailure]);
   useEffect(() => {
     if (view.phase !== "playing") return;
     const timer = setInterval(() => {
       if (runner.current) setFrame({ ...runner.current.frame });
     }, 100);
-    window.addEventListener("pagehide", leave);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("pagehide", leave);
-    };
-  }, [view.phase, leave]);
+    return () => clearInterval(timer);
+  }, [view.phase]);
   const input = useCallback((control: Control) => {
     if (current.current.phase === "playing" && !sending.current)
       runner.current?.input(control);
@@ -318,17 +298,6 @@ export default function DungeonStage({
             </span>
             <h2>{title}</h2>
             {error && <output>{error}</output>}
-            {view.phase === "ready" && error && (
-              <button
-                className="pixel-button"
-                data-tone="gold"
-                type="button"
-                disabled={busy}
-                onClick={startFirstRoom}
-              >
-                Play
-              </button>
-            )}
             {view.phase === "intermission" && (
               <>
                 <p className="dungeon-treasure">
@@ -358,17 +327,15 @@ export default function DungeonStage({
                     className="pixel-button"
                     data-tone="green"
                     type="button"
-                    disabled={busy || (!ready && !error)}
-                    onClick={() => {
-                      if (!ready) setRenderAttempt((attempt) => attempt + 1);
-                      else
-                        void action({
-                          kind: "start",
-                          nonce: view.nonce,
-                          client,
-                          room: view.cleared,
-                        });
-                    }}
+                    disabled={busy || !ready}
+                    onClick={() =>
+                      void action({
+                        kind: "start",
+                        nonce: view.nonce,
+                        client,
+                        room: view.cleared,
+                      })
+                    }
                   >
                     Go deeper
                   </button>
