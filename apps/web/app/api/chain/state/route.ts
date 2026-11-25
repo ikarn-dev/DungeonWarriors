@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { after } from "next/server";
 import { z } from "zod";
+import { transactionCursor } from "../../../../lib/game/transaction-history";
 import { authenticate } from "../../../../lib/server/auth";
 import { recoverWallet } from "../../../../lib/server/browser-recovery";
 import { readState, stateInput, u64Input } from "../../../../lib/server/chain";
@@ -16,11 +17,16 @@ import {
 import { readLiveRun } from "../../../../lib/server/live-run";
 import { rateLimit } from "../../../../lib/server/runtime";
 import { playSessionRent } from "../../../../lib/server/sponsorship";
+import { readTransactionHistory } from "../../../../lib/server/transaction-history";
 import { checkedConnection } from "../../../../lib/server/transaction-network";
 import { publicKeySchema } from "../../../../lib/solana/addresses";
 
 const input = z.union([
   stateInput,
+  z.strictObject({
+    kind: z.literal("transactions"),
+    before: transactionCursor.optional(),
+  }),
   z.strictObject({ kind: z.literal("liveRun"), nonce: u64Input }),
   z.strictObject({
     kind: z.literal("playSessionRent"),
@@ -43,6 +49,10 @@ export async function POST(request: Request) {
           recoverDungeonWallet(session.wallet),
         ]);
       });
+    if (requestState.kind === "transactions")
+      return json(
+        await readTransactionHistory(session.wallet, requestState.before),
+      );
     if (requestState.kind === "playSessionRent")
       return json(
         await playSessionRent(

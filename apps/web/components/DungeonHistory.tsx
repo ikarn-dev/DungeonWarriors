@@ -46,7 +46,6 @@ export default function DungeonHistory({
 
   return (
     <section className="lobby-section lobby-history">
-      <h2>History</h2>
       {failed ? (
         <div className="lobby-empty">
           <p role="alert">History unavailable.</p>

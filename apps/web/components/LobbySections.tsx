@@ -8,7 +8,7 @@ import type { LobbyIntent } from "../lib/game/transaction-intents";
 import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
 import DungeonEntry from "./DungeonEntry";
-import DungeonHistory from "./DungeonHistory";
+import HistoryTabs from "./HistoryTabs";
 import LeaderboardPanel from "./LeaderboardPanel";
 import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
 import WalletPanel from "./WalletPanel";
@@ -123,7 +123,7 @@ export default function LobbySections({
           />
         ),
         history: (
-          <DungeonHistory
+          <HistoryTabs
             key={`history:${address}`}
             revision={tab === "history" ? accountRevision : undefined}
           />
