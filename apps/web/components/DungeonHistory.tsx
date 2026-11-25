@@ -1,11 +1,15 @@
 "use client";
+import Image from "next/image";
 import { z } from "zod";
 import { catSchema } from "../lib/dungeon/protocol";
 import { displayUsdc } from "../lib/game/custody-client";
 import { CAT_NAMES } from "../lib/game/lobby-state";
+import { warriorAvatar } from "../lib/game/warrior-avatars";
 import { webApi } from "../lib/game/web-api";
 import { u64Input } from "../lib/solana/program";
 import { useFinalized } from "./account-data";
+import DotsLoader from "./DotsLoader";
+import { UiIcon } from "./UiIcon";
 
 const pageSchema = z.object({
   entries: z
@@ -54,15 +58,19 @@ export default function DungeonHistory({
           </button>
         </div>
       ) : entries === undefined ? (
-        <p aria-live="polite">Loading…</p>
+        <div className="lobby-loading">
+          <DotsLoader label="Loading history" />
+        </div>
       ) : entries.length === 0 ? (
         <p>No completed expeditions.</p>
       ) : (
         <table className="lobby-table">
           <thead>
             <tr>
-              <th scope="col">Cat</th>
-              <th scope="col">Result</th>
+              <th scope="col">Avatar</th>
+              <th scope="col" data-center>
+                Result
+              </th>
               <th scope="col" data-number>
                 Bet (USDC)
               </th>
@@ -73,9 +81,30 @@ export default function DungeonHistory({
           </thead>
           <tbody>
             {entries.map((entry) => (
-              <tr key={entry.nonce}>
-                <td>{CAT_NAMES[entry.cat]}</td>
-                <td>{labels[entry.state]}</td>
+              <tr key={entry.nonce} data-result={entry.state}>
+                <td>
+                  <span className="history-cat">
+                    <span className="history-art">
+                      <Image
+                        src={warriorAvatar(entry.cat)}
+                        alt=""
+                        width={1254}
+                        height={1254}
+                        sizes="2.25rem"
+                      />
+                    </span>
+                    {CAT_NAMES[entry.cat]}
+                  </span>
+                </td>
+                <td data-center>
+                  <span className="history-result">
+                    {entry.state === "won" && <UiIcon name="check" size={12} />}
+                    {entry.state === "lost" && (
+                      <UiIcon name="cross" size={12} />
+                    )}
+                    {labels[entry.state]}
+                  </span>
+                </td>
                 <td data-number>{displayUsdc(entry.stake)}</td>
                 <td data-number>{displayUsdc(entry.payout)}</td>
               </tr>

@@ -2,17 +2,17 @@ import type Phaser from "phaser";
 import type { AssetManifest } from "../game/assets";
 import type { CatId } from "../game/catalog";
 import { type Enemy, enemyStats } from "./enemies";
-import { AMBUSH_WARNING_TICKS } from "./generate";
+import { EnemyRig } from "./render-enemy";
+import { CombatFeedback, uiFont } from "./render-feedback";
+import { GasSmog } from "./render-gas";
+import { drawHourglass, drawMovers, drawWarnings } from "./render-props";
 import { DUSK, drawScenery } from "./render-scenery";
+import { GateTrap, TRAP_HIT_MS } from "./render-trap";
+import { WarriorRig } from "./render-warrior";
 import type { DungeonRunner } from "./replay";
-import { type DungeonRoom, type EnemyKind, moverSurface } from "./rooms";
+import type { DungeonRoom, EnemyKind } from "./rooms";
 import { PHYSICS } from "./rules";
-import {
-  type DungeonFrame,
-  roomBudgetMs,
-  SWING_TICKS,
-  wardensLeft,
-} from "./simulation";
+import { type DungeonFrame, SWING_TICKS, wardensLeft } from "./simulation";
 import { WARRIORS } from "./warriors";
 
 type Options = {
@@ -23,12 +23,10 @@ type Options = {
   onReady: () => void;
   onError: () => void;
   onTimeout: () => void;
+  // The gate the server reported as the trap, once it has.
+  trap: () => number | null;
   preloaded: ReadonlyMap<string, Blob>;
 };
-// Body art is 128 px with feet at y = 120; the cat stands about 66 px tall.
-const BODY_SCALE = 0.56;
-const WEAPON_SCALE = BODY_SCALE * 0.85;
-const HAND = { x: 93 - 61, y: 86 - 120 };
 // Top of each foe's body on its canvas (scripts/assets/enemy-art.mjs).
 const ENEMY_TOP: Readonly<Record<EnemyKind, number>> = {
   slime: 66,
@@ -43,8 +41,9 @@ const ENEMY_FEET: Readonly<Record<EnemyKind, number>> = {
   warden: 120,
 };
 const POOL = 24;
+const FLASH_MS = 90;
 type Ghost = { sprite: Phaser.GameObjects.Image; started: number };
-const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+type Track = { px: number; py: number; x: number; y: number; hp: number };
 
 export function renderDungeon(
   engine: typeof Phaser,
@@ -54,25 +53,33 @@ export function renderDungeon(
   options: Options,
 ) {
   const warrior = WARRIORS[cat];
-  const weaponId = `weapon-${warrior.weapon}`;
-  const weaponArt = manifest.assets.find((a) => a.id === weaponId);
-  if (!weaponArt) throw new Error("ASSETS_NOT_READY");
-  const grip = weaponArt.anchor;
+  const font = uiFont();
   class DungeonScene extends engine.Scene {
     private scenery?: Phaser.GameObjects.Graphics;
+    private props?: Phaser.GameObjects.Graphics;
+    private shadows?: Phaser.GameObjects.Graphics;
     private live?: Phaser.GameObjects.Graphics;
-    private body?: Phaser.GameObjects.Image;
-    private weapon?: Phaser.GameObjects.Image;
-    private mist?: Phaser.GameObjects.Rectangle;
-    private foes: Phaser.GameObjects.Image[] = [];
+    private rig?: WarriorRig;
+    private feedback?: CombatFeedback;
+    private gas?: GasSmog;
+    private trap?: GateTrap;
+    private trapHurt = false;
+    private foes: EnemyRig[] = [];
     private ghosts: Ghost[] = [];
     private seen = new Map<
       number,
       { kind: EnemyKind; x: number; y: number; scale: number; flip: boolean }
     >();
+    private tracks = new Map<number, Track>();
+    private flashed = new Map<number, number>();
     private labels: Phaser.GameObjects.Text[] = [];
     private sealed?: Phaser.GameObjects.Text;
     private lastRunner?: DungeonRunner | null;
+    private lastTick = -1;
+    private lastHp: number = warrior.hp;
+    private lastResets = 0;
+    private lastDefeated = 0;
+    private ground: number | null = null;
     private notified = false;
     preload() {
       this.load.on("loaderror", () => options.onError());
@@ -91,9 +98,13 @@ export function renderDungeon(
     }
     create() {
       this.scenery = this.add.graphics().setDepth(0);
-      this.live = this.add.graphics().setDepth(6);
-      this.foes = Array.from({ length: POOL }, () =>
-        this.add.image(0, 0, "enemy-skeleton").setDepth(8).setVisible(false),
+      // Lifts sit under shadows and characters, like the static floors.
+      this.props = this.add.graphics().setDepth(3);
+      this.shadows = this.add.graphics().setDepth(4);
+      this.live = this.add.graphics().setDepth(12);
+      this.foes = Array.from(
+        { length: POOL },
+        () => new EnemyRig(this, engine, manifest, 8),
       );
       this.ghosts = Array.from({ length: 8 }, () => ({
         // A white silhouette that swells and fades where a foe was beaten.
@@ -105,34 +116,22 @@ export function renderDungeon(
           .setVisible(false),
         started: -Infinity,
       }));
-      // The weapon is held in front of the body, as in the portraits.
-      this.weapon = this.add
-        .image(0, 0, weaponId)
-        .setOrigin(grip.x / 96, grip.y / 96)
-        .setDisplaySize(96 * WEAPON_SCALE, 96 * WEAPON_SCALE)
-        .setDepth(11);
-      this.body = this.add
-        .image(0, 0, `body-${cat}`)
-        .setOrigin(61 / 128, 120 / 128)
-        .setDisplaySize(128 * BODY_SCALE, 128 * BODY_SCALE)
-        .setDepth(10);
+      this.rig = new WarriorRig(this, manifest, cat, 10);
+      this.feedback = new CombatFeedback(this, 14, font);
       this.sealed = this.add
         .text(0, 0, "Defeat the warden to open the gates", {
-          fontFamily: "Geist, Arial, sans-serif",
+          fontFamily: font,
           fontSize: "15px",
           fontStyle: "600",
           color: "#fff1cf",
-          backgroundColor: "#2f2b45",
+          backgroundColor: "#0b1716",
           padding: { x: 10, y: 6 },
         })
         .setOrigin(0.5, 1)
-        .setDepth(12)
+        .setDepth(13)
         .setVisible(false);
-      this.mist = this.add
-        .rectangle(0, 0, 1, 600, DUSK.gas, 0.25)
-        .setOrigin(0)
-        .setDepth(15)
-        .setScrollFactor(0);
+      this.gas = new GasSmog(this, engine, 15);
+      this.trap = new GateTrap(this, engine, 13);
       this.fit();
       options.onReady();
     }
@@ -148,17 +147,27 @@ export function renderDungeon(
       this.labels = room.gates.map((gate) =>
         this.add
           .text(gate.x, gate.y - 118, String(gate.id + 1), {
-            fontFamily: "Geist, Arial, sans-serif",
+            fontFamily: font,
             fontSize: "18px",
             fontStyle: "700",
-            color: "#fff1cf",
-            backgroundColor: "#2f2b45",
-            padding: { x: 7, y: 2 },
+            color: "#fbe7a6",
+            backgroundColor: "#0b1716",
+            padding: { x: 8, y: 3 },
           })
           .setOrigin(0.5)
           .setDepth(5),
       );
       this.seen.clear();
+      this.tracks.clear();
+      this.flashed.clear();
+      this.lastTick = -1;
+      this.lastHp = warrior.hp;
+      this.lastResets = 0;
+      this.lastDefeated = 0;
+      this.ground = null;
+      this.gas?.reset();
+      this.trap?.reset();
+      this.trapHurt = false;
       this.cameras.main.setBounds(0, 0, room.width, room.height);
     }
     override update(time: number) {
@@ -176,25 +185,61 @@ export function renderDungeon(
         this.notified = false;
         this.build(runner.room);
       }
-      if (!runner || !this.live) return;
-      const frame = options.playing()
-        ? runner.advance(options.now())
-        : runner.frame;
+      if (
+        !runner ||
+        !this.live ||
+        !this.props ||
+        !this.shadows ||
+        !this.feedback
+      )
+        return;
+      const now = options.now();
+      const frame = options.playing() ? runner.advance(now) : runner.frame;
+      // Progress through the current tick, for smooth motion between ticks.
+      const fraction = Math.max(
+        0,
+        Math.min(
+          1,
+          ((now - runner.startedAt) * PHYSICS.ticksPerSecond) / 1000 -
+            frame.tick,
+        ),
+      );
       const still = options.reduced();
       const room = runner.room;
       const g = this.live;
       g.clear();
-      this.drawMovers(g, room, frame);
-      this.drawHourglass(g, room, frame, time, still);
-      this.drawFoes(g, room, frame, time, still);
-      this.drawWarnings(g, room, frame, time, still);
-      this.drawCat(g, runner, frame, time, still);
+      this.props.clear();
+      this.shadows.clear();
+      this.feedback.begin();
+      drawMovers(this.props, room, frame);
+      drawHourglass(g, room, frame, time, still);
+      const cat = runner.position(now);
+      this.trap?.spring(time, room, options.trap(), cat, still);
+      this.drawFoes(g, room, frame, fraction, time, still, {
+        x: (cat.x + PHYSICS.width / 2) / 256,
+        y: (cat.y + PHYSICS.height / 2) / 256,
+      });
+      drawWarnings(g, room, frame, time, still);
+      this.drawCat(g, runner, frame, fraction, time, still);
+      this.trap?.update(time);
+      this.feedback.end();
+      this.feedback.update(time, still);
+      this.lastTick = frame.tick;
       const open = wardensLeft(frame) === 0;
       const first = room.gates[0];
-      if (this.sealed && first)
+      if (this.sealed && first) {
+        // Over the gates, but kept inside the view so it never runs off
+        // the edge of the screen.
+        const view = this.cameras.main.worldView;
+        const half = this.sealed.width / 2 + 16;
+        const x = Math.max(
+          view.x + half,
+          Math.min(room.gates[1]?.x ?? first.x, view.right - half),
+        );
         this.sealed
-          .setPosition(room.gates[1]?.x ?? first.x, first.y - 150)
+          .setPosition(x, first.y - 150)
           .setVisible(!open && !frame.timedOut);
+      }
       if (!open)
         for (const gate of room.gates) {
           g.fillStyle(
@@ -204,93 +249,90 @@ export function renderDungeon(
           g.fillRect(gate.x - 26, gate.y - 60, 52, 6);
           g.fillRect(gate.x - 26, gate.y - 30, 52, 6);
         }
-      const budget =
-        roomBudgetMs(room, runner.cat, runner.rules) +
-        (frame.hourglass ? runner.rules.hourglassMs : 0);
-      const progress = Math.min(
-        1,
-        (frame.tick * 1000) / (budget * PHYSICS.ticksPerSecond),
-      );
-      const visibleWidth = this.scale.width / (this.scale.height / 600);
-      this.mist
-        ?.setSize(Math.max(1, visibleWidth * progress * 0.5), 600)
-        .setAlpha(frame.timedOut ? 0.6 : 0.08 + progress * 0.22);
+      if (frame.timedOut)
+        this.gas?.start(time, this.cameras.main.worldView, still);
+      this.gas?.update(time, this.scale.width / (this.scale.height / 600));
       if (frame.timedOut && !this.notified) {
         this.notified = true;
         options.onTimeout();
       }
     }
-    private drawMovers(
-      g: Phaser.GameObjects.Graphics,
-      room: DungeonRoom,
-      frame: DungeonFrame,
-    ) {
-      for (const m of room.movers) {
-        const s = moverSurface(m, frame.tick);
-        g.fillStyle(DUSK.ink);
-        g.fillRoundedRect(s.x - 2, s.y - 2, s.width + 4, 22, 5);
-        g.fillStyle(DUSK.gate);
-        g.fillRoundedRect(s.x, s.y, s.width, 18, 4);
-        g.fillStyle(DUSK.lip);
-        g.fillRect(s.x + 2, s.y, s.width - 4, 3);
-        g.fillStyle(DUSK.gold);
-        g.fillCircle(s.x + 10, s.y + 11, 3);
-        g.fillCircle(s.x + s.width - 10, s.y + 11, 3);
+    // Foe positions between ticks, so they glide instead of stepping.
+    private track(e: Enemy, tick: number, fraction: number) {
+      let t = this.tracks.get(e.id);
+      if (!t) {
+        t = { px: e.x, py: e.y, x: e.x, y: e.y, hp: e.hp };
+        this.tracks.set(e.id, t);
+      } else if (tick !== this.lastTick) {
+        t.px = tick === this.lastTick + 1 ? t.x : e.x;
+        t.py = tick === this.lastTick + 1 ? t.y : e.y;
+        t.x = e.x;
+        t.y = e.y;
       }
-    }
-    private drawHourglass(
-      g: Phaser.GameObjects.Graphics,
-      room: DungeonRoom,
-      frame: DungeonFrame,
-      time: number,
-      still: boolean,
-    ) {
-      if (frame.hourglass) return;
-      const { x } = room.hourglass;
-      const y = room.hourglass.y + (still ? 0 : Math.sin(time / 300) * 3);
-      g.fillStyle(DUSK.halo, 0.18);
-      g.fillCircle(x, y, 18);
-      g.fillStyle(DUSK.gold);
-      g.fillRect(x - 8, y - 12, 16, 3);
-      g.fillRect(x - 8, y + 9, 16, 3);
-      g.fillStyle(0xa8ecf5);
-      g.fillTriangle(x - 6, y - 9, x + 6, y - 9, x, y);
-      g.fillStyle(0xffe08a);
-      g.fillTriangle(x - 6, y + 9, x + 6, y + 9, x, y);
+      return {
+        x: (t.px + (t.x - t.px) * fraction) / 256,
+        y: (t.py + (t.y - t.py) * fraction) / 256,
+        track: t,
+      };
     }
     private drawFoes(
       g: Phaser.GameObjects.Graphics,
       room: DungeonRoom,
       frame: DungeonFrame,
+      fraction: number,
       time: number,
       still: boolean,
+      cat: { x: number; y: number },
     ) {
+      const feedback = this.feedback;
+      const shadows = this.shadows;
+      if (!feedback || !shadows) return;
       const present = new Set<number>();
       frame.enemies.forEach((e: Enemy, i) => {
         const sprite = this.foes[i];
         if (!sprite) return;
         const s = enemyStats(e.kind, room.level);
         const scale = s.height / (ENEMY_FEET[e.kind] - ENEMY_TOP[e.kind]);
-        const cx = e.x / 256 + s.width / 2;
-        const feet = e.y / 256 + s.height;
-        const bob = still
-          ? 0
-          : e.kind === "bat"
-            ? Math.sin(time / 90 + e.id) * 2
-            : Math.abs(Math.sin(time / 140 + e.id)) * -1.5;
-        const squash =
-          e.kind === "slime" && !still
-            ? 1 + Math.sin(time / 160 + e.id) * 0.06
-            : 1;
-        sprite
-          .setTexture(`enemy-${e.kind}`)
-          .setOrigin(0.5, ENEMY_FEET[e.kind] / 128)
-          .setDisplaySize(128 * scale * (2 - squash), 128 * scale * squash)
-          .setPosition(cx, feet + bob)
-          .setFlipX(e.dir > 0)
-          .setVisible(true);
-        if (e.stagger > 0) sprite.setTint(0xffb8b8);
-        else sprite.clearTint();
+        const at = this.track(e, frame.tick, fraction);
+        const cx = at.x + s.width / 2;
+        const feet = at.y + s.height;
+        if (e.hp < at.track.hp) {
+          feedback.pop(
+            cx,
+            feet - s.height - 14,
+            at.track.hp - e.hp,
+            "dealt",
+            time,
+          );
+          this.flashed.set(e.id, time);
+        }
+        at.track.hp = e.hp;
+        const hitAge = time - (this.flashed.get(e.id) ?? -Infinity);
+        const recoil = still ? 0 : Math.max(0, 1 - hitAge / 160);
+        const bob =
+          still || e.kind !== "bat" ? 0 : Math.sin(time / 90 + e.id) * 2;
+        if (e.kind !== "bat")
+          shadows
+            .fillStyle(DUSK.ink, 0.35)
+            .fillEllipse(cx, feet, s.width * 1.1, 7);
+        sprite.update(
+          {
+            id: e.id,
+            kind: e.kind,
+            x: cx,
+            feet: feet + bob,
+            scale,
+            flip: e.dir > 0,
+            engaged:
+              Math.abs(cx - cat.x) < s.width / 2 + 34 &&
+              Math.abs(feet - s.height / 2 - cat.y) < s.height / 2 + 40,
+            staggered: e.stagger > 0,
+            flash: hitAge < FLASH_MS,
+            recoil,
+          },
+          time,
+          still,
+        );
         present.add(e.id);
         this.seen.set(e.id, {
           kind: e.kind,
@@ -299,20 +341,31 @@ export function renderDungeon(
           scale,
           flip: e.dir > 0,
         });
-        bar(
+        feedback.bar(
           g,
+          `foe-${e.id}`,
           cx,
-          feet - s.height - 10,
-          Math.max(26, s.width),
+          feet - s.height - 12,
+          Math.max(28, s.width),
           e.hp / e.maxHp,
           DUSK.danger,
+          time,
+          still,
         );
       });
       for (let i = frame.enemies.length; i < this.foes.length; i++)
-        this.foes[i]?.setVisible(false);
+        this.foes[i]?.hide();
+      const beaten = frame.defeated > this.lastDefeated;
+      this.lastDefeated = frame.defeated;
       for (const [id, spot] of this.seen) {
         if (present.has(id)) continue;
         this.seen.delete(id);
+        const last = this.tracks.get(id);
+        this.tracks.delete(id);
+        this.flashed.delete(id);
+        // The final blow removes whatever HP the foe had left.
+        if (beaten && last && last.hp > 0)
+          feedback.pop(spot.x, spot.y - 40, last.hp, "dealt", time);
         if (still) continue;
         const ghost =
           this.ghosts.find((gh) => !gh.sprite.visible) ?? this.ghosts[0];
@@ -338,115 +391,76 @@ export function renderDungeon(
         ghost.sprite.setDisplaySize(128 * scale, 128 * scale).setAlpha(1 - t);
       }
     }
-    private drawWarnings(
-      g: Phaser.GameObjects.Graphics,
-      room: DungeonRoom,
-      frame: DungeonFrame,
-      time: number,
-      still: boolean,
-    ) {
-      room.ambushes.forEach((ambush, i) => {
-        const fired = frame.ambushes[i] ?? 0;
-        if (fired === 0 || frame.tick >= fired + AMBUSH_WARNING_TICKS) return;
-        if (!still && Math.floor(time / 120) % 2 === 1) return;
-        for (const s of ambush.spawns) {
-          const ground = room.surfaces[s.surface];
-          const y =
-            s.kind === "bat" || !ground
-              ? s.y
-              : ground.y +
-                Math.trunc((ground.rise * (s.x - ground.x)) / ground.width) -
-                70;
-          g.fillStyle(DUSK.ink);
-          g.fillRoundedRect(s.x - 11, y - 30, 22, 34, 6);
-          g.fillStyle(DUSK.gold);
-          g.fillRoundedRect(s.x - 9, y - 28, 18, 30, 5);
-          g.fillStyle(DUSK.ink);
-          g.fillRect(s.x - 2, y - 23, 4, 14);
-          g.fillRect(s.x - 2, y - 6, 4, 4);
-        }
-      });
-    }
     private drawCat(
       g: Phaser.GameObjects.Graphics,
       runner: DungeonRunner,
       frame: DungeonFrame,
+      fraction: number,
       time: number,
       still: boolean,
     ) {
-      const body = this.body;
-      const weapon = this.weapon;
-      if (!body || !weapon) return;
+      const rig = this.rig;
+      const feedback = this.feedback;
+      if (!rig || !feedback || !this.shadows) return;
       const position = runner.position(options.now());
       const x = (position.x + PHYSICS.width / 2) / 256;
       const feet = (position.y + PHYSICS.height) / 256;
-      const dir = frame.facing;
-      const moving = frame.grounded && frame.axis !== 0 && !still;
-      const step = moving ? Math.sin(time / 70) : 0;
-      const lift = moving ? -Math.abs(step) * 3 : 0;
-      const lean = moving
-        ? step * 0.05
-        : !frame.grounded && !still
-          ? -0.04 * dir
-          : 0;
-      const stretch =
-        !frame.grounded && !still ? (frame.vy < 0 ? 1.05 : 0.97) : 1;
-      g.fillStyle(DUSK.ink, 0.3);
-      g.fillEllipse(x, feet, 30, 6);
-      body
-        .setPosition(x, feet + lift)
-        .setFlipX(dir < 0)
-        .setRotation(frame.timedOut ? 1.3 * dir : lean)
-        .setDisplaySize(
-          128 * BODY_SCALE * (2 - stretch),
-          128 * BODY_SCALE * stretch,
-        )
-        .setAlpha(
-          frame.invuln > 0 && !still && Math.floor(time / 60) % 2 === 0
-            ? 0.45
-            : 1,
-        );
-      if (frame.timedOut) body.setTint(0x8f88ad);
-      else body.clearTint();
-      // Weapon swing: wind up, then sweep forward; the spear thrusts instead.
-      const p = frame.swing > 0 ? 1 - frame.swing / SWING_TICKS : -1;
-      let angle = 0.28;
-      let reach = 0;
-      if (p >= 0 && !still) {
-        if (warrior.weapon === "spear") {
-          angle = 1.45;
-          reach = Math.sin(Math.min(1, p * 1.6) * Math.PI) * 16;
-        } else angle = -1.1 + ease(Math.min(1, p * 1.5)) * 3;
-      } else if (p >= 0) angle = 1.2;
-      weapon
-        .setPosition(
-          x + (HAND.x * BODY_SCALE + reach) * dir,
-          feet + lift + HAND.y * BODY_SCALE,
-        )
-        .setFlipX(dir < 0)
-        .setRotation(angle * dir)
-        .setAlpha(body.alpha)
-        .setVisible(!frame.timedOut);
-      bar(g, x, feet - 74, 40, frame.hp / warrior.hp, 0x7be07a);
+      // The cat stands about 64 px tall at BODY_SCALE.
+      const head = feet - 84;
+      let hurt = false;
+      const sprung = this.trap?.started ?? null;
+      const trapped = sprung !== null && time - sprung >= TRAP_HIT_MS;
+      if (trapped && !this.trapHurt) {
+        this.trapHurt = true;
+        hurt = true;
+      }
+      if (frame.resets !== this.lastResets) {
+        // A knockout respawns at the checkpoint with full HP; no heal pop.
+        this.lastResets = frame.resets;
+      } else if (frame.hp < this.lastHp) {
+        feedback.pop(x, head, this.lastHp - frame.hp, "taken", time);
+        hurt = true;
+      } else if (frame.hp > this.lastHp)
+        feedback.pop(x, head, frame.hp - this.lastHp, "heal", time);
+      this.lastHp = frame.hp;
+      if (frame.grounded) this.ground = feet;
+      const ground = this.ground ?? feet;
+      const height = Math.max(0, ground - feet);
+      const spread = Math.max(0.45, 1 - height / 140);
+      this.shadows
+        .fillStyle(DUSK.ink, 0.4 * spread)
+        .fillEllipse(x, ground, 40 * spread, 8 * spread);
+      const swing =
+        frame.swing > 0
+          ? Math.max(0, Math.min(1, 1 - (frame.swing - fraction) / SWING_TICKS))
+          : null;
+      rig.update(
+        {
+          x,
+          feet,
+          dir: frame.facing,
+          grounded: frame.grounded,
+          vy: frame.vy,
+          swing,
+          hurt,
+          blink: frame.invuln > 0 && !still && Math.floor(time / 60) % 2 === 0,
+          down: frame.timedOut || trapped,
+        },
+        time,
+        still,
+      );
+      feedback.bar(
+        g,
+        "cat",
+        x,
+        feet - 76,
+        44,
+        frame.hp / warrior.hp,
+        0x7be07a,
+        time,
+        still,
+      );
       this.cameras.main.centerOn(Math.max(300, x + 120), 300);
-    }
-  }
-  function bar(
-    g: Phaser.GameObjects.Graphics,
-    cx: number,
-    y: number,
-    width: number,
-    fraction: number,
-    color: number,
-  ) {
-    const f = Math.max(0, Math.min(1, fraction));
-    g.fillStyle(DUSK.ink, 0.9);
-    g.fillRoundedRect(cx - width / 2 - 2, y - 2, width + 4, 8, 3);
-    g.fillStyle(0x4a2a3a);
-    g.fillRoundedRect(cx - width / 2, y, width, 4, 2);
-    if (f > 0) {
-      g.fillStyle(color);
-      g.fillRoundedRect(cx - width / 2, y, Math.max(2, width * f), 4, 2);
     }
   }
   const scene = new DungeonScene({ key: "Dungeon" });

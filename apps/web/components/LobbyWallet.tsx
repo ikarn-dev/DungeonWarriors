@@ -2,7 +2,9 @@ import type { useWallet } from "@solana/wallet-adapter-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { lobbySounds } from "../lib/audio/lobby-sounds";
+import { displayUsdc } from "../lib/game/custody-client";
 import { UiIcon } from "./UiIcon";
+import { WarriorIcon } from "./WarriorIcon";
 import { requestWalletConnection } from "./wallet-connect";
 
 type Wallet = ReturnType<typeof useWallet>;
@@ -84,8 +86,45 @@ export function WalletPicker({
   );
 }
 
-// Compact wallet pill: copy the address, or disconnect with the power icon.
+// Top-right bar: the in-game funds badge (settled Available credit, shown
+// once the player account exists), then the wallet pill to copy the address
+// or disconnect with the power icon.
 export function WalletChip({
+  address,
+  available,
+  busy,
+  onCopy,
+  onDisconnect,
+}: {
+  readonly address: string;
+  // Available credit in USDC base units; null hides the badge.
+  readonly available: string | null;
+  readonly busy: boolean;
+  readonly onCopy: () => void;
+  readonly onDisconnect: () => void;
+}) {
+  return (
+    <div className="lobby-topbar">
+      {available !== null && (
+        <p className="lobby-funds" title="Available to play in PURRPS">
+          <span className="lobby-funds-mark" aria-hidden="true">
+            <WarriorIcon name="coins" />
+          </span>
+          <span className="sr-only">Available in PURRPS: </span>
+          <strong>{displayUsdc(available)}</strong>
+          <span className="lobby-funds-unit">USDC</span>
+        </p>
+      )}
+      <WalletPill
+        address={address}
+        busy={busy}
+        onCopy={onCopy}
+        onDisconnect={onDisconnect}
+      />
+    </div>
+  );
+}
+function WalletPill({
   address,
   busy,
   onCopy,

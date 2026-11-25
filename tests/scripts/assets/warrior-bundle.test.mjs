@@ -10,7 +10,8 @@ test("all bundled gameplay SVGs match the generated manifest and public files", 
     readFileSync(new URL("apps/web/lib/dungeon/artwork-data.json", root)),
   );
   const expected = manifest.assets.filter((a) => !a.id.startsWith("warrior-"));
-  assert.equal(expected.length, 12);
+  // Eight rig parts per cat, four weapons, four foes and 15 foe rig parts.
+  assert.equal(expected.length, 55);
   assert.deepEqual(
     Object.keys(images).sort(),
     expected.map((a) => a.id).sort(),

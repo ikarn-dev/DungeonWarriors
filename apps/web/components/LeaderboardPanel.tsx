@@ -5,6 +5,7 @@ import { webApi } from "../lib/game/web-api";
 import { publicKeySchema } from "../lib/solana/addresses";
 import { u64Input } from "../lib/solana/program";
 import { useFinalized } from "./account-data";
+import DotsLoader from "./DotsLoader";
 
 const boardSchema = z
   .array(
@@ -36,7 +37,11 @@ export default function LeaderboardPanel({
     <div className="lobby-section">
       <header className="lobby-section-head">
         <h2>Leaderboard</h2>
-        {mine && <p className="lobby-section-note">Your rank #{mine.rank}</p>}
+        {mine && (
+          <p className="lobby-rank-note">
+            Your rank <strong>#{mine.rank}</strong>
+          </p>
+        )}
       </header>
       {failed && value === null ? (
         <div className="lobby-empty">
@@ -45,15 +50,21 @@ export default function LeaderboardPanel({
             Retry
           </button>
         </div>
-      ) : value !== null && value.length === 0 ? (
+      ) : value === null ? (
+        <div className="lobby-loading">
+          <DotsLoader label="Loading leaderboard" />
+        </div>
+      ) : value.length === 0 ? (
         <p className="lobby-empty">
           The first finalized expedition appears here.
         </p>
       ) : (
-        <table className="lobby-table" aria-busy={value === null}>
+        <table className="lobby-table">
           <thead>
             <tr>
-              <th scope="col">Rank</th>
+              <th scope="col" data-center>
+                Rank
+              </th>
               <th scope="col">Player</th>
               <th scope="col" data-number>
                 Rooms cleared
@@ -61,25 +72,17 @@ export default function LeaderboardPanel({
             </tr>
           </thead>
           <tbody>
-            {value === null &&
-              ["a", "b", "c"].map((row) => (
-                <tr key={row}>
-                  <td colSpan={3}>
-                    <span className="lobby-skeleton" data-wide />
-                  </td>
-                </tr>
-              ))}
-            {value?.map((row) => (
+            {value.map((row) => (
               <tr
                 key={row.wallet}
                 data-mine={row.wallet === wallet || undefined}
               >
-                <td>
+                <td data-center>
                   <span className="lobby-rank" data-rank={row.rank}>
                     {row.rank}
                   </span>
                 </td>
-                <td title={row.wallet}>
+                <td className="lobby-player" title={row.wallet}>
                   {row.wallet === wallet ? "You" : short(row.wallet)}
                 </td>
                 <td data-number>{count(row.score)}</td>

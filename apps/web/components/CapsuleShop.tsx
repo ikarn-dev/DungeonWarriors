@@ -1,8 +1,7 @@
 "use client";
-
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { MEDIA_ROOT } from "../lib/game/assets";
+import { CATALOG_V1 } from "../lib/game/catalog";
 import { displayUsdc, type PlayerIntent } from "../lib/game/custody-client";
 import {
   CAT_NAMES,
@@ -10,69 +9,20 @@ import {
   type CapsuleReceipt,
   type LobbyState,
 } from "../lib/game/lobby-state";
+import { warriorAvatar } from "../lib/game/warrior-avatars";
+import DotsLoader from "./DotsLoader";
+import { GachaMachine } from "./GachaMachine";
+import { WarriorIcon } from "./WarriorIcon";
 
 const percent = new Intl.NumberFormat("en-US", {
   style: "percent",
   maximumFractionDigits: 2,
 });
-
-function Offer({
-  title,
-  art,
-  price,
-  odds,
-  reason,
-  blocked,
-  opening,
-  onBuy,
-}: {
-  readonly title: string;
-  readonly art: readonly string[];
-  readonly price: bigint;
-  readonly odds: readonly (readonly [string, number])[];
-  readonly reason: string | null;
-  readonly blocked: boolean;
-  readonly opening: boolean;
-  readonly onBuy: () => void;
-}) {
-  return (
-    <article className="lobby-offer">
-      <span className="lobby-offer-art" data-opening={opening || undefined}>
-        {art.map((src) => (
-          <Image
-            key={src}
-            unoptimized
-            src={src}
-            alt=""
-            width={64}
-            height={64}
-          />
-        ))}
-      </span>
-      <h3>{title}</h3>
-      <p className="lobby-price">{displayUsdc(price.toString())} USDC</p>
-      <dl className="lobby-odds">
-        {odds.map(([name, chance]) => (
-          <div key={name}>
-            <dt>{name}</dt>
-            <dd>{percent.format(chance)}</dd>
-          </div>
-        ))}
-      </dl>
-      <button
-        type="button"
-        className="pixel-button"
-        data-tone="gold"
-        disabled={blocked || reason !== null}
-        onClick={onBuy}
-      >
-        {opening ? "Opening…" : "Buy & open"}
-      </button>
-      {reason && <p className="lobby-offer-note">{reason}</p>}
-    </article>
-  );
-}
-
+const rarityOf = (id: string) =>
+  CATALOG_V1.cats.find((cat) => cat.id === id)?.rarity ?? "common";
+// Shop (2026-11-24): the gold claw machine and one Summon key, then the odds
+// for every avatar in small type below (exact weight/total and percentage;
+// owned ones read Owned). The latest draw is listed under History with Replay or Refund.
 export default function CapsuleShop({
   state,
   blocked,
@@ -109,25 +59,38 @@ export default function CapsuleShop({
   if (!shopCatalog || catalogVersion === null)
     return (
       <div className="lobby-section">
-        <h2>Shop</h2>
-        <p>The shop catalog is unavailable.</p>
+        <header className="lobby-section-head">
+          <h2>Shop</h2>
+        </header>
+        <p>The shop is unavailable right now.</p>
       </div>
     );
-  const { catPriceBaseUnits: catPrice } = shopCatalog;
+  const price = shopCatalog.catPriceBaseUnits;
   const eligible = shopCatalog.cats.filter(
     ({ id }) => !state.cats.some((cat) => cat.id === id),
   );
   const total = eligible.reduce((sum, cat) => sum + cat.weight, 0);
   const paused = !state.allowPurchases;
+  const opening = pending && !canRefund;
   const unavailable =
-    blocked || paused || pending || nonce === null || inventoryVersion === null;
-  const available = BigInt(state.available);
-  const funds = (price: bigint) =>
-    available < price
-      ? `Needs ${displayUsdc(price.toString())} USDC available.`
-      : null;
-  const buy = () => {
-    if (unavailable || nonce === null || inventoryVersion === null) return;
+    blocked ||
+    paused ||
+    pending ||
+    total === 0 ||
+    nonce === null ||
+    inventoryVersion === null;
+  const short = BigInt(state.available) < price;
+  const reason =
+    total === 0
+      ? "Every avatar is yours"
+      : paused
+        ? "Summons are paused"
+        : !pending && short
+          ? `Needs ${displayUsdc(price.toString())} USDC`
+          : null;
+  const summon = () => {
+    if (unavailable || short || nonce === null || inventoryVersion === null)
+      return;
     action({
       kind: "purchaseCapsule",
       capsule: "paidCat",
@@ -136,87 +99,124 @@ export default function CapsuleShop({
       catalogVersion,
     });
   };
+  const reward = draw?.reward;
   return (
     <div className="lobby-section">
       <header className="lobby-section-head">
         <h2>Shop</h2>
       </header>
-      {paused && (
-        <p className="lobby-section-note">Purchases are paused on Devnet.</p>
-      )}
-      {pending ||
-      draw?.status === "fulfilled" ||
-      draw?.status === "refunded" ? (
-        <div className="lobby-banner">
-          <p aria-live="polite">
-            {pending
-              ? canRefund
-                ? "Your draw timed out. You can refund it."
-                : "Opening your capsule…"
-              : draw?.status === "fulfilled"
-                ? draw.reward?.kind === "cat"
-                  ? `You got ${CAT_NAMES[draw.reward.id]}.`
-                  : `You got a ${draw.reward?.rarity} upgrade.`
-                : draw?.status === "refunded"
-                  ? `${displayUsdc(draw.cost)} USDC returned to your PURRPS balance.`
-                  : null}
-          </p>
-          {canRefund && latest !== null && (
-            <button
-              type="button"
-              className="pixel-button"
-              disabled={blocked}
-              onClick={() =>
-                action({ kind: "refundCapsule", nonce: latest.toString() })
-              }
-            >
-              Refund
-            </button>
-          )}
-          {draw && latest !== null && !canRefund && (
-            <button
-              type="button"
-              className="pixel-button"
-              onClick={() => onViewDraw(latest, draw.kind)}
-            >
-              {draw.status === "fulfilled" ? "Replay reveal" : "View draw"}
-            </button>
-          )}
-          {retryDraw && (
-            <button type="button" className="pixel-button" onClick={retryDraw}>
-              Check draw
-            </button>
-          )}
-        </div>
-      ) : null}
-      <div className="lobby-columns">
-        <Offer
-          title="Cat capsule"
-          art={[
-            `${MEDIA_ROOT}/capsule-base.svg`,
-            `${MEDIA_ROOT}/capsule-lid.svg`,
-          ]}
-          price={catPrice}
-          odds={eligible.map(({ id, weight }) => [
-            CAT_NAMES[id],
-            weight / total,
-          ])}
-          reason={
-            total === 0
-              ? "You own every cat."
-              : paused || pending
-                ? null
-                : funds(catPrice)
-          }
-          blocked={unavailable}
-          opening={pending && !canRefund && draw?.kind === "paidCat"}
-          onBuy={buy}
-        />
+      <div className="gacha">
+        <GachaMachine price={displayUsdc(price.toString())} opening={opening} />
+        <button
+          type="button"
+          className="metal-key gacha-summon"
+          aria-busy={opening || undefined}
+          disabled={unavailable || short}
+          onClick={summon}
+        >
+          {opening && <DotsLoader label="Opening your capsule" />}
+          Summon
+        </button>
+        {reason && <p className="gacha-reason">{reason}</p>}
       </div>
-      <p className="lobby-section-note">
-        Purchases use your PURRPS balance. Your wallet pays the Devnet SOL cost
-        of opening the capsule.
-      </p>
+      <section className="gacha-chances" aria-labelledby="gacha-chances">
+        <h3 id="gacha-chances">Odds</h3>
+        <dl>
+          {shopCatalog.cats.map(({ id, weight }) => {
+            const owned = !eligible.some((cat) => cat.id === id);
+            return (
+              <div key={id} data-owned={owned || undefined}>
+                <dt>
+                  <span
+                    className="gacha-chance-mark"
+                    data-rarity={rarityOf(id)}
+                    aria-hidden="true"
+                  />
+                  {CAT_NAMES[id]}
+                </dt>
+                <dd>
+                  {owned ? (
+                    "Owned"
+                  ) : (
+                    <>
+                      <span className="gacha-chance-weight">
+                        {weight}/{total}
+                      </span>
+                      <span>{percent.format(weight / total)}</span>
+                    </>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
+      {draw && latest !== null && (
+        <section className="gacha-history" aria-labelledby="gacha-history">
+          <h3 id="gacha-history">History</h3>
+          <div className="gacha-entry">
+            <span className="gacha-entry-art" aria-hidden="true">
+              {reward?.kind === "cat" ? (
+                <Image
+                  src={warriorAvatar(reward.id)}
+                  alt=""
+                  width={1254}
+                  height={1254}
+                  sizes="2.5rem"
+                />
+              ) : (
+                <WarriorIcon name="gem" />
+              )}
+            </span>
+            <p aria-live="polite">
+              <strong>
+                {draw.status === "pending"
+                  ? canRefund
+                    ? "Timed out"
+                    : "Opening…"
+                  : draw.status === "refunded"
+                    ? "Refunded"
+                    : reward?.kind === "cat"
+                      ? CAT_NAMES[reward.id]
+                      : `${reward?.rarity ?? ""} upgrade`}
+              </strong>
+              <span>
+                {draw.status === "refunded"
+                  ? `${displayUsdc(draw.cost)} USDC returned`
+                  : `${displayUsdc(draw.cost)} USDC`}
+              </span>
+            </p>
+            {canRefund ? (
+              <button
+                type="button"
+                className="pixel-button"
+                disabled={blocked}
+                onClick={() =>
+                  action({ kind: "refundCapsule", nonce: latest.toString() })
+                }
+              >
+                Refund
+              </button>
+            ) : retryDraw ? (
+              <button
+                type="button"
+                className="pixel-button"
+                onClick={retryDraw}
+              >
+                Check
+              </button>
+            ) : draw.status !== "refunded" ? (
+              <button
+                type="button"
+                className="pixel-button"
+                onClick={() => onViewDraw(latest, draw.kind)}
+              >
+                {draw.status === "fulfilled" ? "Replay" : "View"}
+              </button>
+            ) : null}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

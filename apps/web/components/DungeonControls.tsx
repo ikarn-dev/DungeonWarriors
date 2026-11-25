@@ -1,15 +1,21 @@
 "use client";
 import { useCallback, useEffect, useRef } from "react";
 import type { Control } from "../lib/dungeon/simulation";
+import type { Weapon } from "../lib/dungeon/warriors";
+import { WarriorIcon } from "./WarriorIcon";
 
+// Control bar: movement keys on the left, actions on the right, each with its
+// keyboard key shown (hidden on touch-only screens).
 export default function DungeonControls({
   enabled,
   gate,
+  weapon,
   onControl,
   onEnter,
 }: {
   readonly enabled: boolean;
   readonly gate: number | null;
+  readonly weapon: Weapon;
   readonly onControl: (control: Control) => void;
   readonly onEnter: () => void;
 }) {
@@ -87,6 +93,11 @@ export default function DungeonControls({
       window.removeEventListener("blur", clear);
     };
   }, [enabled, onControl, onEnter, update]);
+  const hold = (direction: "left" | "right", down: boolean) => {
+    if (down) pressed.current.add(`pointer-${direction}`);
+    else pressed.current.delete(`pointer-${direction}`);
+    update();
+  };
   return (
     <fieldset className="dungeon-controls" aria-label="Dungeon controls">
       <div className="dungeon-movement">
@@ -94,47 +105,48 @@ export default function DungeonControls({
           <button
             key={direction}
             type="button"
-            className="pixel-button dungeon-direction"
+            className="dungeon-key"
             aria-label={`Move ${direction}`}
+            aria-keyshortcuts={
+              direction === "left" ? "ArrowLeft A" : "ArrowRight D"
+            }
             disabled={!enabled}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
-              pressed.current.add(`pointer-${direction}`);
-              update();
+              hold(direction, true);
             }}
-            onPointerUp={() => {
-              pressed.current.delete(`pointer-${direction}`);
-              update();
-            }}
-            onPointerCancel={() => {
-              pressed.current.delete(`pointer-${direction}`);
-              update();
-            }}
-            onLostPointerCapture={() => {
-              pressed.current.delete(`pointer-${direction}`);
-              update();
-            }}
+            onPointerUp={() => hold(direction, false)}
+            onPointerCancel={() => hold(direction, false)}
+            onLostPointerCapture={() => hold(direction, false)}
           >
-            {direction === "left" ? "◀" : "▶"}
+            <WarriorIcon name={direction} />
+            <span className="keycap" aria-hidden="true">
+              {direction === "left" ? "A" : "D"}
+            </span>
           </button>
         ))}
       </div>
-      <p className="dungeon-key-hint">
-        ← → Move · Space Jump · J Attack · Enter Gate
-      </p>
       <div className="dungeon-actions">
         <button
-          className="pixel-button"
+          className="dungeon-key"
+          data-wide
           type="button"
+          aria-keyshortcuts="Enter"
           disabled={!enabled || gate === null}
           onClick={onEnter}
         >
-          {gate === null ? "Find a gate" : `Enter ${gate + 1}`}
+          <WarriorIcon name="gate" />
+          <span>{gate === null ? "No gate" : `Gate ${gate + 1}`}</span>
+          <span className="keycap" aria-hidden="true">
+            Enter
+          </span>
         </button>
         <button
-          className="pixel-button dungeon-attack"
+          className="dungeon-key"
           data-tone="gold"
+          data-wide
           type="button"
+          aria-keyshortcuts="J"
           disabled={!enabled}
           onClick={(event) => {
             if (event.detail === 0) onControl({ kind: "attack" });
@@ -144,12 +156,18 @@ export default function DungeonControls({
             onControl({ kind: "attack" });
           }}
         >
-          Attack
+          <WarriorIcon name={weapon} />
+          <span>Attack</span>
+          <span className="keycap" aria-hidden="true">
+            J
+          </span>
         </button>
         <button
-          className="pixel-button"
-          data-tone="green"
+          className="dungeon-key"
+          data-tone="teal"
+          data-wide
           type="button"
+          aria-keyshortcuts="Space"
           disabled={!enabled}
           onClick={(event) => {
             if (event.detail === 0) onControl({ kind: "jump" });
@@ -159,7 +177,11 @@ export default function DungeonControls({
             onControl({ kind: "jump" });
           }}
         >
-          Jump
+          <WarriorIcon name="jump" />
+          <span>Jump</span>
+          <span className="keycap" aria-hidden="true">
+            Space
+          </span>
         </button>
       </div>
     </fieldset>

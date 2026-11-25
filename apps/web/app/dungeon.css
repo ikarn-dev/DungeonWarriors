@@ -4,11 +4,20 @@
   background: #322e48;
   color: #fff1cf;
 }
+/* Every layer (stage, Lobby key, toaster, notices) shares one grid cell,
+   so nothing in flow can push the stage down and crop its bottom edge
+   (2026-11-25). */
 .dungeon-dialog-content {
   position: relative;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 320px;
+  overflow: hidden;
+}
+.dungeon-dialog-content > * {
+  grid-area: 1 / 1;
 }
 .dungeon-stage {
   position: relative;
@@ -26,13 +35,6 @@
 .dungeon-canvas canvas {
   display: block;
 }
-.dungeon-lobby {
-  position: absolute;
-  z-index: 30;
-  left: max(12px, env(safe-area-inset-left));
-  top: max(12px, env(safe-area-inset-top));
-  min-height: 44px;
-}
 .dungeon-overlay {
   position: absolute;
   inset: 0;
@@ -42,39 +44,109 @@
   padding: 90px 20px 24px;
   background: #100d2140;
 }
+/* Result card (2026-11-25): the metal panel with a polished-gold Cinzel
+   title, the payout as a Cinzel figure with its unit, a quiet settling line
+   while the result settles, and metal keys set well clear of the text. */
 .dungeon-result {
-  width: min(100%, 510px);
+  display: grid;
+  justify-items: center;
+  width: min(100%, 30rem);
   max-height: 100%;
   overflow: auto;
+  padding: 2rem 2.25rem 2.25rem;
+  color: var(--cream);
+  font-family: var(--font-geist-sans), sans-serif;
   text-align: center;
 }
 .dungeon-result h2 {
-  margin: 6px 0 12px;
-  color: #fff1cf;
+  margin: 0;
+  background: var(--metal-ink);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #050908);
   font:
-    700 clamp(24px, 4vw, 38px) var(--font-geist-sans),
-    sans-serif;
+    700 clamp(1.625rem, 1.2rem + 1.6vw, 2.25rem) / 1.15 var(--font-display),
+    serif;
+  letter-spacing: 0.04em;
+  text-wrap: balance;
 }
-.dungeon-result p {
-  color: #c6bfd7;
-  line-height: 1.55;
+.treasure-chest {
+  width: 4.5rem;
+  height: auto;
+  margin-bottom: 0.75rem;
+  filter: grayscale(0.5) brightness(0.7) drop-shadow(0 6px 10px #000000b3);
 }
-.dungeon-result-symbol {
-  color: #ffd36d;
-  font-size: 40px;
-  text-shadow: 0 0 20px #ffbf5040;
+.result-skull {
+  width: 4.25rem;
+  height: auto;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 0 0.875rem #ff6a5a2e) drop-shadow(0 6px 10px #000000b3);
 }
-.dungeon-result .dungeon-treasure {
-  color: #ffdc87;
+.treasure-chest[data-open] {
+  filter: drop-shadow(0 0 1rem #f7c84f59) drop-shadow(0 6px 10px #000000b3);
+}
+/* Payout: the figure in gold Cinzel with its unit, then the signed net
+   against the wager in a green (profit) or red (loss) badge. */
+.dungeon-result-figure {
+  display: grid;
+  justify-items: center;
+  gap: 0.625rem;
+  margin-top: 1rem;
+}
+.dungeon-result-figure p {
+  margin: 0;
+}
+.dungeon-result-figure p:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  color: var(--soft);
   font:
-    700 30px var(--font-geist-mono),
-    monospace;
+    700 0.875rem / 1 var(--font-display),
+    serif;
+  letter-spacing: 0.08em;
+}
+.dungeon-result-figure strong {
+  color: var(--gold-hi);
+  font:
+    700 2.25rem / 1 var(--font-display),
+    serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 1rem #e2b04e4d;
+}
+.dungeon-result-net {
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font:
+    700 0.875rem / 1 var(--font-display),
+    serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.04em;
+}
+.dungeon-result-net[data-sign="profit"] {
+  border-color: #5fd39a66;
+  background: #0f2a1ccc;
+  color: #7ee3ad;
+}
+.dungeon-result-net[data-sign="loss"] {
+  border-color: #ff8a7a59;
+  background: #2a1512cc;
+  color: #ff9d8f;
+}
+.dungeon-result output {
+  margin-top: 0.75rem;
+  color: #ffb3b3;
+  font-size: 0.875rem;
 }
 .dungeon-result-actions {
   display: flex;
-  justify-content: center;
-  gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1.75rem;
 }
 .dungeon-controls {
   position: absolute;
@@ -87,221 +159,137 @@
   gap: 16px;
   pointer-events: none;
 }
-.dungeon-controls button {
-  pointer-events: auto;
-  min-width: 64px;
-  min-height: 56px;
-  touch-action: none;
-  user-select: none;
-}
 .dungeon-movement,
 .dungeon-actions {
   display: flex;
   gap: 10px;
 }
-.dungeon-direction {
-  font-size: 25px;
-}
-.dungeon-key-hint {
-  padding: 8px 12px;
-  color: #e0d7e9;
-  background: #171426c9;
-  font-size: 13px;
-  border-radius: 4px;
-}
-.dungeon-hourglass {
-  position: absolute;
-  z-index: 20;
-  left: 50%;
-  top: 100px;
-  transform: translateX(-50%);
-  padding: 6px 12px;
-  color: #d4ff9a;
-  background: #203125;
-  border: 2px solid #76935b;
-  font-family: var(--font-geist-sans), sans-serif;
-}
-.dungeon-notice {
-  position: absolute;
-  z-index: 25;
-  left: 50%;
-  bottom: 90px;
-  transform: translateX(-50%);
-  background: #221e35;
-  padding: 8px 14px;
-}
-/* Selected warrior tile: framed portrait, name and class, a three-cell stat
-   table and the trait pills along a ruled bottom row. */
-.bet-hero {
+/* Control keys: metal slots like an action bar, each with its key cap in
+   the corner. Gold for Attack, teal for Jump. */
+.dungeon-key {
+  --face: #1c302d;
+  --face-hi: #36524d;
+  --face-lo: #12201e;
+  position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.875rem 1rem;
-  margin-bottom: 1.25rem;
-  padding: 0.875rem;
-  border: 1px solid #c9a04e3d;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #16302c, #0c1a18);
-  box-shadow:
-    inset 0 1px 0 #ffffff0f,
-    0 6px 18px #00000059;
-}
-.bet-hero-portrait {
-  display: grid;
+  grid-auto-flow: row;
   place-items: center;
-  width: 4.5rem;
-  height: 4.5rem;
+  align-content: center;
+  gap: 2px;
+  min-width: 3.75rem;
+  min-height: 3.75rem;
+  padding: 6px 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   background:
-    radial-gradient(circle at 50% 40%, #24806f66, #0a1413 72%) padding-box,
+    linear-gradient(var(--face-hi), var(--face) 55%, var(--face-lo)) padding-box,
     var(--metal) border-box;
   box-shadow:
-    inset 0 0 0 2px #050908cc,
-    0 3px 8px #000000aa;
-}
-.bet-hero-portrait img {
-  width: 4rem;
-  height: 4rem;
-}
-.bet-hero-copy {
-  display: grid;
-  gap: 0.375rem;
-  min-width: 0;
-}
-.bet-hero h3 {
-  color: var(--gold-hi);
-  font-family: var(--font-display), serif;
-  font-size: 1.375rem;
-  letter-spacing: 0.03em;
-  line-height: 1.15;
-}
-.bet-hero-copy p {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font-size: 0.875rem;
-}
-.bet-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 3.75rem);
-  margin: 0;
-  border: 1px solid #c9a04e3d;
-  border-radius: 6px;
-  background: #08100f99;
-}
-.bet-hero-stats div {
-  display: grid;
-  justify-items: center;
-  gap: 0.125rem;
-  padding-block: 0.4375rem;
-}
-.bet-hero-stats div + div {
-  border-left: 1px solid #c9a04e2e;
-}
-.bet-hero-stats dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-.bet-hero-stats dd {
-  margin: 0;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 1.0625rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-.bet-hero-traits {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0.875rem 0 0;
-  border-top: 1px solid #c9a04e24;
-  list-style: none;
-}
-.bet-hero-traits li {
-  padding: 0.1875rem 0.625rem;
-  border: 1px solid #c9a04e40;
-  border-radius: 999px;
-  background: #0a1413;
-  color: var(--cream);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-/* Wager card: a labelled amount field with the balance on the same line,
-   a gold Play button and the rules note under a rule. */
-.dungeon-bet {
-  gap: 1rem;
-}
-.bet-field {
-  display: grid;
-  gap: 0.5rem;
-}
-.bet-field-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 1rem;
-}
-.bet-field-head label {
-  color: var(--cream);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.bet-field-head span {
-  color: var(--soft);
-  font-size: 0.8125rem;
-}
-.dungeon-bet .bet-amount {
-  border-color: #c9a04e4d;
-  background: #050b0a;
-}
-.dungeon-bet .bet-amount input {
-  flex: 1;
-  min-width: 0;
-  min-height: 3.5rem;
-  padding: 0 1rem;
-  background: transparent;
+    inset 0 1px 0 #ffffff26,
+    inset 0 -2px 0 #00000059,
+    0 6px 16px #000000a6;
   color: var(--cream);
   font:
-    600 1.375rem var(--font-geist-mono),
-    monospace;
-  border: 0;
-  outline: none;
+    600 0.75rem / 1.1 var(--font-geist-sans),
+    sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #000000b3;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    filter 120ms ease-out,
+    transform 120ms ease-out;
 }
-.dungeon-bet .bet-amount > span {
-  margin-right: 0.625rem;
-  padding: 0.25rem 0.625rem;
-  border: 1px solid #e2b04e66;
-  border-radius: 999px;
-  background: #e2b04e1a;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.dungeon-key[data-wide] {
+  min-width: 4.75rem;
 }
-.dungeon-bet .pixel-button.lobby-play {
-  min-height: 3.5rem;
-  margin-top: 0;
-  font-family: var(--font-display), serif;
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
+.dungeon-key .warrior-icon {
+  width: 1.375rem;
+  height: 1.375rem;
 }
-.dungeon-offer {
+.dungeon-key[data-tone="gold"] {
+  --face: #e0ac45;
+  --face-hi: #fff0b8;
+  --face-lo: #a8741f;
+  color: #2a1a05;
+  text-shadow: 0 1px 0 #fff3c480;
+}
+.dungeon-key[data-tone="teal"] {
+  --face: #24806f;
+  --face-hi: #5fc4ad;
+  --face-lo: #165045;
+}
+.dungeon-key .keycap {
+  position: absolute;
+  top: -7px;
+  left: -5px;
+  min-width: 1.25rem;
+  padding: 1px 5px;
+  border: 1px solid #c9a04e80;
+  border-radius: 4px;
+  background: #050b0a;
+  box-shadow: 0 2px 0 #000000;
   color: var(--gold-hi);
+  font:
+    700 0.75rem / 1.2 var(--font-geist-mono),
+    monospace;
+  text-shadow: none;
 }
-.dungeon-odds-note {
+.dungeon-key:not(:disabled) {
+  cursor: var(--cursor-pointer);
+}
+.dungeon-key:not(:disabled):active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+.dungeon-key:disabled {
+  filter: grayscale(0.6) brightness(0.75);
+  opacity: 0.75;
+}
+.dungeon-key:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .dungeon-key:not(:disabled):hover {
+    filter: brightness(1.12);
+  }
+}
+/* Touch-only screens have no keyboard, so the key caps go. */
+@media (hover: none) and (pointer: coarse) {
+  .dungeon-key .keycap {
+    display: none;
+  }
+}
+.dungeon-hourglass,
+.dungeon-notice {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   margin: 0;
-  padding-top: 1rem;
-  border-top: 1px solid #c9a04e24;
-  color: var(--soft);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(#0f1c1af2, #081110f2) padding-box,
+    var(--metal) border-box;
+  box-shadow: 0 8px 20px #000000a6;
+  color: var(--cream);
+  font:
+    600 0.8125rem var(--font-geist-sans),
+    sans-serif;
+}
+.dungeon-hourglass {
+  z-index: 20;
+  top: 6.5rem;
+  color: #c8fc86;
+}
+.dungeon-notice {
+  z-index: 25;
+  bottom: 6.5rem;
 }
 .dungeon-loading {
   display: grid;
@@ -330,27 +318,18 @@
   font-family: var(--font-geist-mono), monospace;
 }
 @media (max-width: 800px) {
-  .dungeon-lobby {
-    min-height: 40px;
-    padding: 8px 12px;
-    font-size: 14px;
+  .dungeon-key {
+    min-width: 3.25rem;
+    min-height: 3.25rem;
   }
-  .dungeon-key-hint {
-    display: none;
-  }
-  .dungeon-controls button {
-    min-height: 48px;
-    min-width: 54px;
+  .dungeon-key[data-wide] {
+    min-width: 4rem;
   }
   .dungeon-result {
-    padding: 16px;
+    padding: 1.25rem 1.25rem 1.5rem;
   }
-  .dungeon-result h2 {
-    font-size: 25px;
-  }
-  .dungeon-result p {
-    margin: 8px 0;
-    font-size: 14px;
+  .dungeon-result-actions {
+    margin-top: 1.25rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -368,10 +347,6 @@ fieldset.dungeon-controls {
   min-inline-size: 0;
 }
 
-.dungeon-treasure,
-.dungeon-offer {
-  font-variant-numeric: tabular-nums;
-}
 .dungeon-result {
   animation: dungeon-reveal 180ms ease-out both;
 }
@@ -389,14 +364,5 @@ fieldset.dungeon-controls {
 @media (prefers-reduced-motion: reduce) {
   .dungeon-result {
     animation: none;
-  }
-}
-@media (max-width: 40rem) {
-  .bet-hero {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .bet-hero-stats {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

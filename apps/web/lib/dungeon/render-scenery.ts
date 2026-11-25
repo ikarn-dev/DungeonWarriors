@@ -10,6 +10,8 @@ export const DUSK = {
   recess: 0x2b2840,
   floor: 0x625c7e,
   floorShade: 0x4e4964,
+  // Walkable top plane seen from slightly above, as in a side-view brawler.
+  floorTop: 0x7c7598,
   edge: 0x9a93b5,
   lip: 0xc9b79a,
   gate: 0x8f88ad,
@@ -22,7 +24,6 @@ export const DUSK = {
   gold: 0xffc531,
   steel: 0xd9dde8,
   danger: 0xe24a4a,
-  gas: 0x8fe36a,
 } as const;
 
 // Static room art, drawn once per room. Moving parts are drawn per frame.
@@ -78,6 +79,11 @@ export function drawScenery(g: Phaser.GameObjects.Graphics, room: DungeonRoom) {
         );
         g.fillRect(s.x + x, y, 8, 3);
       }
+      // Top plane behind the walkable edge: feet stand on its front edge.
+      g.fillStyle(DUSK.floorTop);
+      g.fillRect(s.x + x, top - 8, 8, 8);
+      g.fillStyle(DUSK.lip, 0.45);
+      g.fillRect(s.x + x, top - 8, 8, 1.5);
       g.fillStyle(DUSK.edge);
       g.fillRect(s.x + x, top, 8, 6);
       g.fillStyle(DUSK.lip);

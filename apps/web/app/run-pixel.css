@@ -33,11 +33,27 @@
     #fff1c2 100%
   );
   --sky: #3e95e6;
+  /* Metallic game cursors (32 px, the largest size every platform accepts),
+     hotspots at the arrow tip and the fingertip, with system fallbacks. */
+  --cursor-arrow: url("/cursors/arrow.svg") 4 3, default;
+  --cursor-pointer: url("/cursors/pointer.svg") 11 3, pointer;
   --icon: 24px;
   --edge-top: max(0.5rem, env(safe-area-inset-top));
   --edge-right: max(0.75rem, env(safe-area-inset-right));
   --edge-bottom: max(0.75rem, env(safe-area-inset-bottom));
   --edge-left: max(0.75rem, env(safe-area-inset-left));
+}
+
+/* The arrow everywhere, the gauntlet on anything clickable, and the text
+   caret kept in text fields. Disabled controls keep the arrow. */
+html {
+  cursor: var(--cursor-arrow);
+}
+:is(button, a[href], summary, select, [role="button"]):not(:disabled) {
+  cursor: var(--cursor-pointer);
+}
+:is(input:not([type="checkbox"], [type="radio"]), textarea):not(:disabled) {
+  cursor: text;
 }
 
 .pixel-panel {
@@ -97,7 +113,7 @@
   filter: brightness(0.92);
 }
 .pixel-button:not(:disabled) {
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 .pixel-button:disabled,
 :where(.lobby-panel) button:disabled {

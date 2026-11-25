@@ -1,8 +1,4 @@
-import Image from "next/image";
 import { type ReactNode, useEffect, useRef } from "react";
-import { WARRIORS } from "../lib/dungeon/warriors";
-import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
-import { warriorAvatar } from "../lib/game/warrior-avatars";
 import FrameCorners from "./FrameCorners";
 import { UiIcon } from "./UiIcon";
 
@@ -15,7 +11,7 @@ export type LobbyTab =
   | "leaderboard";
 const TABS = [
   ["play", "Play"],
-  ["cats", "Cats"],
+  ["cats", "Avatars"],
   ["shop", "Shop"],
   ["wallet", "Wallet"],
   ["history", "History"],
@@ -122,51 +118,6 @@ export function LobbyMenu({
           </section>
         ))}
       </div>
-    </div>
-  );
-}
-
-export function LobbyHero({
-  cat,
-}: {
-  readonly cat: LobbyState["cats"][number];
-}) {
-  const warrior = WARRIORS[cat.id];
-  return (
-    <div className="bet-hero">
-      <span className="bet-hero-portrait">
-        <Image src={warriorAvatar(cat.id)} alt="" width={64} height={64} />
-      </span>
-      <div className="bet-hero-copy">
-        <h3>{CAT_NAMES[cat.id]}</h3>
-        <p>
-          <span className="lobby-rarity" data-rarity={cat.rarity}>
-            {cat.rarity}
-          </span>
-          {warrior.title}
-        </p>
-      </div>
-      <dl className="bet-hero-stats">
-        <div>
-          <dt>HP</dt>
-          <dd>{warrior.hp}</dd>
-        </div>
-        <div>
-          <dt>ATK</dt>
-          <dd>{warrior.atk}</dd>
-        </div>
-        <div>
-          <dt>DEF</dt>
-          <dd>{warrior.def}</dd>
-        </div>
-      </dl>
-      <ul className="bet-hero-traits" aria-label="Traits">
-        {warrior.traits.map((trait) => (
-          <li key={trait.id} title={trait.description}>
-            {trait.name}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

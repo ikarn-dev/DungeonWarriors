@@ -38,10 +38,25 @@ describe("bundled dungeon startup", () => {
     expect(loadDungeonArtwork(cat)).toBe(first);
     const loaded = await first;
     expect(loaded.cat).toBe(cat);
-    expect(loaded.images.size).toBe(6);
-    expect(await loaded.images.get(`body-${cat}`)?.text()).toContain("<svg");
+    // Eight rig parts, the weapon, four foes and 15 foe rig parts.
+    expect(loaded.images.size).toBe(28);
+    for (const part of [
+      "tail",
+      "cape",
+      "arm-far",
+      "leg-far",
+      "leg-near",
+      "torso",
+      "head",
+      "arm-near",
+    ])
+      expect(await loaded.images.get(`rig-${cat}-${part}`)?.text()).toContain(
+        "<svg",
+      );
     for (const enemy of ["bat", "skeleton", "slime", "warden"])
       expect(loaded.images.has(`enemy-${enemy}`)).toBe(true);
+    for (const part of ["skeleton-weapon-arm", "bat-wing-front", "warden-axe"])
+      expect(loaded.images.has(`enemy-${part}`)).toBe(true);
     expect(loaded.engine.Game).toBeTypeOf("function");
     expect(loadDungeonArtwork(cat)).toBe(first);
     expect(fetch).not.toHaveBeenCalled();

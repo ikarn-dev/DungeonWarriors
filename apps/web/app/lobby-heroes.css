@@ -1,0 +1,347 @@
+/* Cat collection cards (2026-11-24): a hero-roster portrait above the stats.
+   Rarity gems crown a bronze frame with scroll corners; the art carries the
+   level, a name plate runs along its foot with the class emblem. The chosen
+   cat's frame turns polished gold. */
+/* Two equal columns, centred; further cats wrap into the next row. Every
+   card has the same rows and Select sits at the foot, so rows line up. Each
+   card is at most 11.25rem wide, so a row of two fits the 36rem window
+   without scrolling: the card is about 1.25 × its width + 13rem tall, and
+   the window chrome and title take about 9.5rem. Shorter screens narrow the
+   cards with the viewport height (80dvh − 26rem), down to 8rem. */
+.hero-cards {
+  display: grid;
+  grid-template-columns: repeat(
+      2,
+      minmax(0, clamp(8rem, 80dvh - 26rem, 11.25rem))
+    );
+  justify-content: center;
+  align-items: stretch;
+  gap: 1.5rem 2rem;
+  margin: 0;
+  padding: 0.75rem 0 0;
+  list-style: none;
+}
+:is(.hero-card, .hero-portrait) {
+  --rarity: #8fd0b8;
+  --frame: linear-gradient(
+    160deg,
+    #f5dfae,
+    #b88a45 30%,
+    #f0d49a 52%,
+    #8a6128 76%,
+    #d9b46e
+  );
+}
+.hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+:is(.hero-card, .hero-portrait)[data-rarity="rare"] {
+  --rarity: #6ea2ff;
+}
+:is(.hero-card, .hero-portrait)[data-rarity="epic"] {
+  --rarity: #b98aff;
+}
+:is(.hero-card, .hero-portrait)[data-chosen] {
+  --frame: var(--metal);
+}
+
+.hero-portrait {
+  position: relative;
+}
+/* Frame: bronze rim with chamfered top corners, then a dark inner line. */
+.hero-frame {
+  --cut: 0.875rem;
+  position: relative;
+  display: grid;
+  padding: 5px;
+  background: var(--frame);
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    0 100%,
+    0 var(--cut)
+  );
+  filter: drop-shadow(0 8px 14px #000000b3);
+}
+.hero-portrait[data-chosen] .hero-frame {
+  filter: drop-shadow(0 0 10px #e2b04e80) drop-shadow(0 8px 14px #000000b3);
+}
+.hero-art {
+  --cut: 0.625rem;
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 40%,
+      color-mix(in srgb, var(--rarity) 32%, #13221f),
+      #070d0c 80%
+    ),
+    #070d0c;
+  box-shadow: inset 0 0 0 1px #2a1a0a;
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    0 100%,
+    0 var(--cut)
+  );
+}
+.hero-art img {
+  width: 100%;
+  height: 100%;
+  /* The square avatar fills the 4:5 window, trimming only empty sides. */
+  object-fit: cover;
+}
+/* A faint light sweep across each portrait, every 8s, offset per card so
+   they never pass together; still under reduced motion. */
+.hero-art::after {
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 45%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    #ffffff00,
+    #fff6d80a 40%,
+    #ffffff1a 50%,
+    #fff6d80a 60%,
+    #ffffff00
+  );
+  transform: translateX(0) skewX(-14deg);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-art::after {
+    animation: hero-shimmer 8s ease-in-out 0.8s infinite;
+  }
+  .hero-card:nth-child(4n + 2) .hero-art::after {
+    animation-delay: 2.8s;
+  }
+  .hero-card:nth-child(4n + 3) .hero-art::after {
+    animation-delay: 4.8s;
+  }
+  .hero-card:nth-child(4n + 4) .hero-art::after {
+    animation-delay: 6.8s;
+  }
+}
+@keyframes hero-shimmer {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-14deg);
+  }
+  5% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(400%) skewX(-14deg);
+  }
+  21%,
+  100% {
+    opacity: 0;
+    transform: translateX(400%) skewX(-14deg);
+  }
+}
+.hero-level {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.375rem;
+  color: #ffffff;
+  font:
+    800 0.875rem / 1 var(--font-geist-sans),
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 1px 0 #050908,
+    0 0 4px #050908,
+    0 0 2px #050908;
+}
+
+/* Name plate along the foot of the art, with the class emblem at its left. */
+.hero-plate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.875rem;
+  margin: 0;
+  padding: 0 0.5rem 0 2.25rem;
+  background: linear-gradient(#2e2112, #170f07);
+  box-shadow: inset 0 1px 0 #f0d49a66;
+}
+.hero-name {
+  overflow: hidden;
+  color: var(--gold-hi);
+  font-family: var(--font-display), serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-emblem {
+  position: absolute;
+  left: 0.25rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(circle at 50% 35%, #24806f, #0d1f1c 75%) padding-box,
+    var(--frame) border-box;
+  box-shadow: 0 2px 4px #000000aa;
+  color: #e9fff8;
+  transform: translateY(-50%) rotate(45deg);
+}
+.hero-emblem .warrior-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  transform: rotate(-45deg);
+}
+
+/* Rarity gems crown the frame, centred and overlapping its top edge. */
+.hero-gems {
+  position: absolute;
+  z-index: 2;
+  top: -0.5rem;
+  left: 50%;
+  display: flex;
+  gap: 0.375rem;
+  translate: -50% 0;
+}
+.hero-gems > span {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1px solid #2a1a0a;
+  background: linear-gradient(135deg, #ffffffb3, #ffffff00 45%), var(--rarity);
+  box-shadow:
+    0 0 0 2px #d9b46e,
+    0 2px 4px #000000aa;
+  transform: rotate(45deg);
+}
+/* Scroll curls on the top corners, over the chamfer. */
+.hero-curl {
+  position: absolute;
+  z-index: 1;
+  top: -0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  filter: drop-shadow(0 1px 1px #000000a6);
+}
+.hero-curl[data-side="l"] {
+  left: -0.25rem;
+}
+.hero-curl[data-side="r"] {
+  right: -0.25rem;
+  transform: scaleX(-1);
+}
+
+/* Below the portrait: class, stats and Select, left-aligned. */
+.hero-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+.hero-role {
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.hero-body .warrior-stats div {
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+}
+.hero-body .warrior-stats dd {
+  grid-template-columns: minmax(0, 1fr) 1.5rem;
+}
+/* Select: a chamfered bronze-rimmed key with a teal face and a Cinzel label;
+   the chosen cat's key turns into a gold "Selected" plate. */
+.lobby-panel .hero-select {
+  --cut: 0.625rem;
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 0;
+  background: var(--frame);
+  box-shadow: none;
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% 50%,
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 50%
+  );
+  filter: drop-shadow(0 4px 8px #000000a6);
+  text-shadow: none;
+}
+.hero-select-face {
+  --cut: 0.5625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 100%;
+  min-height: calc(2.75rem - 4px);
+  background: linear-gradient(#3f9f8b, #1f6f61 50%, #14493f);
+  box-shadow: inset 0 1px 0 #c8fff166;
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% 50%,
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 50%
+  );
+  color: #f3fff9;
+  font:
+    700 0.875rem / 1 var(--font-display),
+    serif;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 #0b2f28;
+  transition: filter 150ms ease-out;
+}
+@media (hover: hover) {
+  .lobby-panel .hero-select:not(:disabled):hover {
+    filter: drop-shadow(0 4px 8px #000000a6) brightness(1.12);
+  }
+}
+.lobby-panel .hero-select:not(:disabled):active .hero-select-face {
+  filter: brightness(0.9);
+}
+.lobby-panel .hero-select:focus-visible {
+  outline: none;
+}
+.lobby-panel .hero-select:focus-visible .hero-select-face {
+  box-shadow:
+    inset 0 0 0 2px var(--gold-hi),
+    inset 0 1px 0 #c8fff166;
+}
+.lobby-panel .hero-select:disabled {
+  opacity: 1;
+  filter: drop-shadow(0 4px 8px #000000a6) grayscale(0.5) brightness(0.8);
+}
+.lobby-panel .hero-select[aria-pressed="true"]:disabled {
+  filter: drop-shadow(0 0 8px #e2b04e59);
+}
+.hero-select[aria-pressed="true"] .hero-select-face {
+  background: linear-gradient(#2a2112, #120d06);
+  box-shadow: inset 0 1px 0 #f0d49a40;
+  color: var(--gold-hi);
+  text-shadow: none;
+}

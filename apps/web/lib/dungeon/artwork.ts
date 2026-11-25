@@ -1,4 +1,4 @@
-import { parseAssetManifest } from "../game/assets";
+import { ENEMY_PART_IDS, parseAssetManifest, RIG_PARTS } from "../game/assets";
 import type { CatId } from "../game/catalog";
 import { WARRIORS } from "./warriors";
 
@@ -35,9 +35,10 @@ export function loadDungeonArtwork(cat: CatId): Promise<DungeonArtwork> {
     const source: Readonly<Record<string, string>> = bundle.images;
     const images = new Map<string, Blob>();
     for (const id of [
-      `body-${cat}`,
+      ...RIG_PARTS.map((part) => `rig-${cat}-${part}`),
       `weapon-${WARRIORS[cat].weapon}`,
       ...ENEMY_ART,
+      ...ENEMY_PART_IDS,
     ]) {
       const svg = source[id];
       if (!svg) throw new Error("ASSETS_NOT_READY");

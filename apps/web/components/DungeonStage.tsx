@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DungeonArtwork } from "../lib/dungeon/artwork";
-import { displayMultiplier } from "../lib/dungeon/format";
 import type { DungeonRequest, DungeonView } from "../lib/dungeon/protocol";
 import { DungeonRunner } from "../lib/dungeon/replay";
 import { PHYSICS } from "../lib/dungeon/rules";
@@ -12,10 +11,13 @@ import {
   nearbyGate,
   roomBudgetMs,
 } from "../lib/dungeon/simulation";
-import { displayUsdc } from "../lib/game/custody-client";
+import { WARRIORS } from "../lib/dungeon/warriors";
 import DungeonControls from "./DungeonControls";
 import DungeonHud from "./DungeonHud";
+import { DungeonResult } from "./DungeonResult";
 
+// The trap fires, the warrior falls, then the result card appears.
+const TRAP_CARD_MS = 2000;
 export default function DungeonStage({
   view,
   artwork,
@@ -38,6 +40,14 @@ export default function DungeonStage({
     sending = useRef(false),
     notified = useRef(false);
   const autoStarted = useRef(false);
+  // A trapped gate: the server records the chosen gate without clearing the
+  // room, then ends the run as lost.
+  const trapGate =
+    view.phase === "lost" && view.gates.length > view.cleared
+      ? (view.gates[view.cleared] ?? null)
+      : null;
+  const trap = useRef<number | null>(null);
+  const [trapShown, setTrapShown] = useState(false);
   const [frame, setFrame] = useState<DungeonFrame | null>(null);
   const [ready, setReady] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -48,6 +58,20 @@ export default function DungeonStage({
   useEffect(() => {
     current.current = view;
   }, [view]);
+  // Let the trap fire before the result card covers it; with no room on
+  // screen (a reload) or under reduced motion, show the card at once.
+  useEffect(() => {
+    trap.current = trapGate;
+    if (trapGate === null) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const timer = setTimeout(
+      () => setTrapShown(true),
+      reduced || !runner.current ? 0 : TRAP_CARD_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [trapGate]);
   useEffect(() => {
     if (
       view.phase === "playing" &&
@@ -172,6 +196,7 @@ export default function DungeonStage({
           },
           onError: report,
           onTimeout: timeout,
+          trap: () => trap.current,
           preloaded: artwork.images,
         },
       );
@@ -255,11 +280,13 @@ export default function DungeonStage({
     : view.phase === "ready"
       ? "Opening the catacombs…"
       : view.phase === "intermission"
-        ? "Treasure found!"
+        ? "Treasure found"
         : view.phase === "won"
           ? "Treasure secured"
           : view.phase === "lost"
-            ? "Expedition ended"
+            ? trapGate === null
+              ? "Expedition ended"
+              : "The gate was trapped"
             : view.phase === "refunded"
               ? "Wager returned"
               : "Expedition cancelled";
@@ -269,7 +296,7 @@ export default function DungeonStage({
         className="dungeon-canvas"
         ref={mount}
         role="application"
-        aria-label="Dungeon. Move with arrows, jump with Space, attack with J, enter a nearby gate with Enter."
+        aria-label="Dungeon. Move with A and D or the arrows, jump with Space, attack with J, enter a nearby gate with Enter, leave with Escape."
       />
       <DungeonHud
         cat={view.cat}
@@ -281,6 +308,7 @@ export default function DungeonStage({
         graceActive={view.cat === "guardian" && ordinary <= 0}
         payout={view.payout}
         stake={view.stake}
+        rules={view.rules}
         playing={view.phase === "playing"}
       />
       {frame?.hourglass && active && (
@@ -288,84 +316,36 @@ export default function DungeonStage({
           Hourglass +{view.rules.hourglassMs / 1000}s
         </p>
       )}
-      {(!active || !ready) && (
+      {(!active || !ready) && (trapGate === null || trapShown) && (
         <div className="dungeon-overlay">
-          <div className="dungeon-result pixel-panel" aria-live="polite">
-            <span className="dungeon-result-symbol" aria-hidden="true">
-              {view.phase === "intermission" || view.phase === "won"
-                ? "✦"
-                : "◆"}
-            </span>
-            <h2>{title}</h2>
-            {error && <output>{error}</output>}
-            {view.phase === "intermission" && (
-              <>
-                <p className="dungeon-treasure">
-                  {displayUsdc(view.payout)} USDC
-                </p>
-                <p>
-                  {displayMultiplier(view.payout, view.stake)} gross return,
-                  including your bet. Bank it or risk it in the next room.
-                </p>
-                <div className="dungeon-result-actions">
-                  <button
-                    className="pixel-button"
-                    data-tone="gold"
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      void action({
-                        kind: "cashout",
-                        nonce: view.nonce,
-                        client,
-                      })
-                    }
-                  >
-                    Cash out
-                  </button>
-                  <button
-                    className="pixel-button"
-                    data-tone="green"
-                    type="button"
-                    disabled={busy || !ready}
-                    onClick={() =>
-                      void action({
-                        kind: "start",
-                        nonce: view.nonce,
-                        client,
-                        room: view.cleared,
-                      })
-                    }
-                  >
-                    Go deeper
-                  </button>
-                </div>
-              </>
-            )}
-            {(finished || frame?.timedOut) && (
-              <>
-                {view.phase !== "lost" && !frame?.timedOut && (
-                  <p className="dungeon-treasure">
-                    {displayUsdc(view.payout)} USDC
-                  </p>
-                )}
-                <p>
-                  {view.settled
-                    ? "Your expedition is finalized."
-                    : "Saving your result and settling automatically…"}
-                </p>
-                <button className="pixel-button" type="button" onClick={onDone}>
-                  Back to lobby
-                </button>
-              </>
-            )}
-          </div>
+          <DungeonResult
+            view={view}
+            title={title}
+            timedOut={frame?.timedOut === true}
+            finished={finished}
+            error={error}
+            busy={busy}
+            ready={ready}
+            onCashOut={() =>
+              void action({ kind: "cashout", nonce: view.nonce, client })
+            }
+            onDescend={() =>
+              void action({
+                kind: "start",
+                nonce: view.nonce,
+                client,
+                room: view.cleared,
+              })
+            }
+            onDone={onDone}
+          />
         </div>
       )}
       {active && ready && (
         <DungeonControls
           enabled={!busy}
           gate={gate}
+          weapon={WARRIORS[view.cat].weapon}
           onControl={input}
           onEnter={enter}
         />

@@ -1,0 +1,416 @@
+/* Play window (2026-11-24): selected warrior tile and wager field. */
+/* Selected warrior tile: the painted avatar alone in a framed well on the
+   left; name, rarity and class badges, stat bars and trait chips on the
+   right, all left-aligned. */
+.bet-hero {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.875rem;
+  border: 1px solid #c9a04e3d;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #16302c, #0c1a18);
+  box-shadow:
+    inset 0 1px 0 #ffffff0f,
+    0 6px 18px #00000059;
+}
+/* Avatar frame: forged steel, unlike the gold rims elsewhere. A brushed
+   steel bevel (conic gradient) with a rivet in each corner, a dark gap and a
+   thin bronze inlay, over a cool vignette. One faint light sweep every 9s;
+   still under reduced motion. */
+.bet-hero-portrait {
+  position: relative;
+  display: grid;
+  min-height: 8rem;
+  overflow: hidden;
+  border: 5px solid transparent;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse 85% 70% at 50% 38%, #34464b, #0c1214 78%)
+    padding-box,
+    radial-gradient(
+      circle at 2.5px 2.5px,
+      #f7f9fa 0 0.5px,
+      #9aa3aa 1.25px,
+      #2b3035 2px,
+      #0000 2.5px
+    )
+    border-box,
+    radial-gradient(
+      circle at calc(100% - 2.5px) 2.5px,
+      #f7f9fa 0 0.5px,
+      #9aa3aa 1.25px,
+      #2b3035 2px,
+      #0000 2.5px
+    )
+    border-box,
+    radial-gradient(
+      circle at 2.5px calc(100% - 2.5px),
+      #f7f9fa 0 0.5px,
+      #9aa3aa 1.25px,
+      #2b3035 2px,
+      #0000 2.5px
+    )
+    border-box,
+    radial-gradient(
+      circle at calc(100% - 2.5px) calc(100% - 2.5px),
+      #f7f9fa 0 0.5px,
+      #9aa3aa 1.25px,
+      #2b3035 2px,
+      #0000 2.5px
+    )
+    border-box,
+    conic-gradient(
+      from 210deg,
+      #eef1f3,
+      #7d868e 12%,
+      #dde2e6 24%,
+      #545c63 37%,
+      #c3c9ce 50%,
+      #646c73 63%,
+      #e8ecef 76%,
+      #6f787f 89%,
+      #eef1f3
+    )
+    border-box;
+  box-shadow:
+    inset 0 0 0 1px #101315,
+    inset 0 0 0 2px #b0864a99,
+    inset 0 10px 22px #00000080,
+    0 0 0 1px #050708,
+    0 4px 12px #000000aa;
+}
+.bet-hero-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 100%;
+}
+.bet-hero-portrait::after {
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 45%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    #ffffff00,
+    #ffffff08 40%,
+    #ffffff14 50%,
+    #ffffff08 60%,
+    #ffffff00
+  );
+  transform: translateX(0) skewX(-14deg);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bet-hero-portrait::after {
+    animation: portrait-shimmer 9s ease-in-out 1.5s infinite;
+  }
+}
+@keyframes portrait-shimmer {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-14deg);
+  }
+  6% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 1;
+    transform: translateX(380%) skewX(-14deg);
+  }
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateX(380%) skewX(-14deg);
+  }
+}
+.bet-hero-body {
+  display: grid;
+  align-content: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.bet-hero h3 {
+  color: var(--gold-hi);
+  font-family: var(--font-display), serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+.warrior-icon {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Badges: one height and type style; rarity carries its tier colour. */
+.bet-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+}
+.bet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid #c9a04e40;
+  border-radius: 999px;
+  background: #0a1413;
+  color: var(--cream);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.bet-badge .warrior-icon {
+  color: var(--gold);
+}
+.bet-badge[data-rarity] {
+  text-transform: capitalize;
+}
+.bet-badge[data-rarity="common"] {
+  border-color: #a9bcb55c;
+  background: #a9bcb514;
+  color: #dde7e3;
+}
+.bet-badge[data-rarity="rare"] {
+  border-color: #6ea2ff80;
+  background: #3a7bff1f;
+  color: #c4daff;
+}
+.bet-badge[data-rarity="epic"] {
+  border-color: #b98aff80;
+  background: #8f62e024;
+  color: #e0caff;
+}
+
+/* Stat bars (shared by the Play tile and the cat cards): icon and label, a segmented gold bar, then the exact value. */
+.warrior-stats {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.125rem 0;
+}
+.warrior-stats div {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+.warrior-stats dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.warrior-stats dt .warrior-icon {
+  color: var(--gold);
+}
+.warrior-stats dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+.bet-stat-bar {
+  position: relative;
+  height: 0.4375rem;
+  overflow: hidden;
+  border: 1px solid #c9a04e33;
+  border-radius: 999px;
+  background: #050b0a;
+}
+.bet-stat-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #9c6c1e, #e2b04e 60%, #fbe7a6);
+  transform-origin: left;
+}
+/* Ten segments. */
+.bet-stat-bar::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: repeating-linear-gradient(
+    90deg,
+    #0000 0 calc(10% - 1px),
+    #050b0acc calc(10% - 1px) 10%
+  );
+}
+.bet-stat-value {
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Trait chips: squarer than the badges, with a teal icon; the description
+   is the tooltip. */
+.warrior-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.warrior-traits li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.5rem;
+  padding: 0 0.5rem 0 0.4375rem;
+  border: 1px solid #5fe0c833;
+  border-radius: 6px;
+  background: #0a1413;
+  color: var(--cream);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: var(--cursor-arrow);
+}
+.warrior-traits .warrior-icon {
+  color: #5fe0c8;
+}
+
+/* Wager card: label and balance on one line, a minimal 1px amount field,
+   then the gold Play button. */
+.dungeon-bet {
+  gap: 1rem;
+}
+.bet-field {
+  display: grid;
+  gap: 0.5rem;
+}
+.bet-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+.bet-field-head label {
+  color: var(--cream);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.bet-field-head span {
+  color: var(--soft);
+  font-size: 0.8125rem;
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount {
+  border: 1px solid #c9a04e40;
+  border-radius: 6px;
+  background: #050b0a99;
+  box-shadow: none;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+@media (hover: hover) {
+  :is(.dungeon-bet, .vault-transfer) .bet-amount:hover {
+    border-color: #c9a04e73;
+  }
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount:focus-within {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px #e2b04e29;
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount:has(input[aria-invalid="true"]) {
+  border-color: #ff6b6b;
+  box-shadow: none;
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount input {
+  flex: 1;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0 0.875rem;
+  border: 0;
+  background: transparent;
+  color: var(--cream);
+  font:
+    500 1.125rem var(--font-geist-mono),
+    monospace;
+  outline: none;
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount input:disabled {
+  color: var(--soft);
+}
+:is(.dungeon-bet, .vault-transfer) .bet-amount > span {
+  padding-right: 0.875rem;
+  color: var(--soft);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+/* The loader replaces the label in place, so the button keeps its size. */
+.pixel-button[aria-busy="true"]:disabled {
+  filter: none;
+  opacity: 1;
+}
+.pixel-button .dots-loader {
+  gap: 0.5rem;
+  height: 1.25rem;
+}
+.pixel-button .dots-loader > span[aria-hidden] {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+.dungeon-bet .pixel-button.lobby-play {
+  min-height: 3.25rem;
+  margin-top: 0;
+  font-family: var(--font-display), serif;
+  font-size: 1.1875rem;
+  letter-spacing: 0.08em;
+}
+@media (max-width: 40rem) {
+  .bet-hero {
+    grid-template-columns: 6rem minmax(0, 1fr);
+  }
+  .bet-hero-portrait {
+    min-height: 6rem;
+  }
+}
+/* Warning note under Play: an amber diamond mark and one quiet line on a
+   faint strip, like an in-game notice. Amber means warning only. */
+.quest-note {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #f0b4483d;
+  border-left: 2px solid #f0b448;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f0b4481a, #f0b44805 70%);
+  color: var(--soft);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-wrap: pretty;
+}
+.quest-note-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1px solid #f0b44899;
+  background: #0a1413;
+  color: #f6c86a;
+  transform: rotate(45deg);
+}
+.quest-note-mark svg {
+  transform: rotate(-45deg);
+}

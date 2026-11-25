@@ -2,18 +2,13 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseAssetManifest } from "../../apps/web/lib/game/assets.ts";
-import { ENEMIES, ENEMY_TOP } from "./enemy-art.mjs";
-import {
-  CATS,
-  catBody,
-  catPortrait,
-  HAND,
-  WEAPON_PIVOT,
-  weapon,
-} from "./warrior-art.mjs";
+import { ENEMIES, ENEMY_RIG, ENEMY_TOP, enemyPart } from "./enemy-art.mjs";
+import { CATS, catPortrait, WEAPON_PIVOT, weapon } from "./warrior-art.mjs";
+import { RIG, RIG_HAND, rigPart } from "./warrior-rig.mjs";
 
-// Version 3 smooth vector set (2026-11-24): warrior cats, their weapons and
-// catacomb foes. Run with --check to confirm the committed files match.
+// Version 3 smooth vector set (2026-11-24): rigged side-view warrior cats,
+// front-facing portraits, their weapons and catacomb foes (whole, for
+// silhouettes, and as rig parts). Run with --check to confirm the committed files match.
 const VERSION = 3;
 const directory = fileURLToPath(
   new URL(`../../apps/web/public/game-assets/v${VERSION}/`, import.meta.url),
@@ -47,13 +42,17 @@ function emit(id, size, content, anchor) {
   });
 }
 for (const id of Object.keys(CATS)) {
-  emit(`body-${id}`, 128, catBody(id), { x: 61, y: 120 });
+  for (const [part, pivot] of RIG)
+    emit(`rig-${id}-${part}`, 128, rigPart(id, part), pivot);
   emit(`warrior-${id}`, 128, catPortrait(id), { x: 61, y: 120 });
 }
 for (const [kind, pivot] of Object.entries(WEAPON_PIVOT))
   emit(`weapon-${kind}`, 96, weapon(kind), pivot);
 for (const [kind, draw] of Object.entries(ENEMIES))
   emit(`enemy-${kind}`, 128, draw(), { x: 64, y: kind === "bat" ? 90 : 120 });
+for (const [kind, parts] of Object.entries(ENEMY_RIG))
+  for (const [part, pivot] of parts)
+    emit(`enemy-${kind}-${part}`, 128, enemyPart(kind, part), pivot);
 assets.sort((a, b) => a.id.localeCompare(b.id));
 const manifest = parseAssetManifest({
   schemaVersion: 1,
@@ -78,5 +77,5 @@ if (check) {
 // Layout values the renderer needs, printed for review.
 if (!check)
   process.stdout.write(
-    `${JSON.stringify({ hand: HAND, enemyTop: ENEMY_TOP })}\n`,
+    `${JSON.stringify({ hand: RIG_HAND, enemyTop: ENEMY_TOP })}\n`,
   );

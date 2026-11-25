@@ -1,0 +1,177 @@
+/* Metal key (2026-11-25): the shared primary key with pointed ends, used by
+   Summon and the dungeon result card. The button paints a bevelled bronze
+   rim, ::before the face inset 3px (its points sit ~4px in so the rim stays
+   even along the slants; the geometry assumes the fixed 3rem height) and
+   ::after a slow sheen. Both layers sit at z-index -1 inside an isolated
+   button, under the label. Gold is the primary tone, teal the secondary. */
+.metal-key {
+  --cut: 1.375rem;
+  --key-face: linear-gradient(
+    180deg,
+    #fff3b0 0%,
+    #ffd95e 24%,
+    #f6b731 48%,
+    #d88b1c 54%,
+    #eda936 78%,
+    #ffd466 100%
+  );
+  --key-glare: #fffbe8cc;
+  --key-bevel-hi: #fffbe6;
+  --key-bevel-lo: #9c5f12b3;
+  --key-halo: #f7c84f59;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 9.5rem;
+  height: 3rem;
+  padding: 0 calc(var(--cut) + 0.5rem);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    180deg,
+    #fff7d4 0%,
+    #f2c45a 22%,
+    #8a5a14 52%,
+    #5c3a0b 70%,
+    #d89a32 100%
+  );
+  box-shadow: none;
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% 50%,
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 50%
+  );
+  color: #3b2204;
+  font:
+    700 1.125rem / 1 var(--font-display),
+    serif;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 0 #fff6cc,
+    0 -1px 0 #a8661a66;
+  filter: drop-shadow(0 0 0.625rem var(--key-halo))
+    drop-shadow(0 6px 10px #000000a6);
+  transition:
+    filter 160ms ease-out,
+    transform 120ms ease-out;
+}
+.metal-key[data-tone="teal"] {
+  --key-face: linear-gradient(
+    180deg,
+    #6fd3bb 0%,
+    #2f927e 22%,
+    #1d6658 48%,
+    #12443b 54%,
+    #1a5a4e 78%,
+    #2c7f6e 100%
+  );
+  --key-glare: #d6fff433;
+  --key-bevel-hi: #a8eedd;
+  --key-bevel-lo: #04110eb3;
+  --key-halo: #2fb39a40;
+  color: var(--gold-hi);
+  text-shadow:
+    0 1px 0 #04110e,
+    0 0 0.5rem #000000a6;
+}
+.metal-key:not(:disabled) {
+  cursor: var(--cursor-pointer);
+}
+.metal-key::before,
+.metal-key::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.metal-key::before {
+  inset: 0;
+  clip-path: polygon(
+    calc(var(--cut) + 1.5px) 3px,
+    calc(100% - var(--cut) - 1.5px) 3px,
+    calc(100% - 4px) 50%,
+    calc(100% - var(--cut) - 1.5px) calc(100% - 3px),
+    calc(var(--cut) + 1.5px) calc(100% - 3px),
+    4px 50%
+  );
+  background:
+    radial-gradient(
+      circle at 0.875rem 50%,
+      #fff6d0 0 1.5px,
+      #7a4a10 2px 3px,
+      transparent 3.5px
+    ),
+    radial-gradient(
+      circle at calc(100% - 0.875rem) 50%,
+      #fff6d0 0 1.5px,
+      #7a4a10 2px 3px,
+      transparent 3.5px
+    ),
+    radial-gradient(120% 70% at 50% 0%, var(--key-glare), transparent 60%),
+    var(--key-face);
+  box-shadow:
+    inset 0 2px 0 var(--key-bevel-hi),
+    inset 0 -2px 0 var(--key-bevel-lo);
+}
+.metal-key::after {
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    #fffdf080 50%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .metal-key:not(:disabled)::after {
+    animation: metal-key-sheen 4.5s ease-in-out infinite;
+  }
+}
+@keyframes metal-key-sheen {
+  0%,
+  62% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (hover: hover) {
+  .metal-key:not(:disabled):hover {
+    filter: drop-shadow(0 0 0.875rem var(--key-halo))
+      drop-shadow(0 6px 10px #000000a6) brightness(1.08) saturate(1.1);
+  }
+}
+.metal-key:not(:disabled):active {
+  transform: translateY(1px);
+}
+.metal-key:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 4px;
+}
+.metal-key:disabled {
+  opacity: 1;
+  filter: drop-shadow(0 6px 10px #000000a6) grayscale(0.7) brightness(0.65);
+}
+.metal-key[aria-busy="true"]:disabled {
+  filter: drop-shadow(0 0 0.625rem var(--key-halo))
+    drop-shadow(0 6px 10px #000000a6);
+}
+.metal-key .dots-loader {
+  gap: 0.25rem;
+  height: 1rem;
+}
+.metal-key .dots-loader > span[aria-hidden] {
+  width: 0.375rem;
+  height: 0.375rem;
+}

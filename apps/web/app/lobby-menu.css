@@ -56,7 +56,7 @@
   border: 0;
   background: none;
   color: var(--cream);
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
   touch-action: manipulation;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -215,10 +215,11 @@
   }
 }
 
-/* A chosen section: one framed window as tall as its content, up to the
-   available height; longer content scrolls inside. The frame matches the
-   title screen: polished gold rim, dark gap, gold hairline and filigree
-   corners, with the close button on the top-right corner. */
+/* A chosen section: one framed window, the same size for every section
+   (40 × 36rem, smaller only when the screen is); longer content scrolls
+   inside. The frame matches the title screen: polished gold rim, dark gap,
+   gold hairline and filigree corners, with the close button on the
+   top-right corner. */
 .lobby-section-view {
   position: relative;
   display: flex;
@@ -226,9 +227,10 @@
   align-self: center;
   justify-self: center;
   width: min(40rem, 100%);
-  max-height: 100%;
+  height: min(36rem, 100%);
 }
 .lobby-section-view > .lobby-panel {
+  flex: 1 1 auto;
   border: 3px solid transparent;
   border-radius: 6px;
   padding: 1.75rem;

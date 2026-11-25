@@ -14,6 +14,7 @@ import {
   type LobbyState,
 } from "../lib/game/lobby-state";
 import { RULES_V1 } from "../lib/game/rules";
+import { transactionCopy } from "../lib/game/transaction-copy";
 import {
   type LobbyIntent,
   lobbyPreparedSchema,
@@ -175,12 +176,17 @@ export default function StarterPanel() {
       if (controller.signal.aborted) return;
       if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
         setSessionWallet(null);
-      notifyError(
-        failure instanceof WebApiError
-          ? failure.code
-          : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
+      // Replaces the live transaction toast in place when one is showing.
+      toast.error(
+        webErrorMessage(
+          failure instanceof WebApiError
+            ? failure.code
+            : "WALLET_OR_ACCOUNT_REQUEST_FAILED",
+        ),
+        { id: TX_TOAST },
       );
     } finally {
+      if (controller.signal.aborted) toast.dismiss(TX_TOAST);
       if (work.current === controller) {
         work.current = null;
         if (!controller.signal.aborted) setBusy(false);
@@ -199,6 +205,7 @@ export default function StarterPanel() {
     signature: string,
     lastValidBlockHeight: number,
     signal: AbortSignal,
+    done = "Transaction confirmed",
   ) {
     for (let attempt = 0; attempt < 20 && !signal.aborted; attempt++) {
       const result = await webApi<{
@@ -223,7 +230,7 @@ export default function StarterPanel() {
               : "TRANSACTION_FAILED",
           );
         }
-        toast.success("Transaction confirmed", { id: TX_TOAST });
+        toast.success(done, { id: TX_TOAST });
         return;
       }
       await pause(3000, signal);
@@ -237,7 +244,7 @@ export default function StarterPanel() {
           label: "Check again",
           onClick: () =>
             void perform((next) =>
-              reconcile(signature, lastValidBlockHeight, next),
+              reconcile(signature, lastValidBlockHeight, next, done),
             ),
         },
       });
@@ -249,6 +256,8 @@ export default function StarterPanel() {
   ) {
     if (address === null || wallet.signTransaction === undefined)
       throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
+    const copy = transactionCopy(intent);
+    toast.loading(copy.preparing, { id: TX_TOAST });
     if (
       intent.operation === "claimStarter" ||
       (intent.operation === "game" && intent.action.kind === "purchaseCapsule")
@@ -278,8 +287,10 @@ export default function StarterPanel() {
     if (intent.operation === "game")
       validatePreparedPlayerAction(tx, address, intent);
     else validatePreparedTransaction(tx, address, intent);
+    toast.loading(copy.approve, { id: TX_TOAST });
     const signed = await wallet.signTransaction(tx);
     if (signal.aborted) return;
+    toast.loading(copy.confirming, { id: TX_TOAST });
     const result = lobbySubmittedSchema.parse(
       await webApi(
         "/api/tx/submit",
@@ -309,8 +320,12 @@ export default function StarterPanel() {
       lastValidBlockHeight: prepared.lastValidBlockHeight,
       starter: intent.operation === "claimStarter",
     });
-    toast.loading("Confirming…", { id: TX_TOAST });
-    await reconcile(result.signature, prepared.lastValidBlockHeight, signal);
+    await reconcile(
+      result.signature,
+      prepared.lastValidBlockHeight,
+      signal,
+      copy.done,
+    );
   }
   const paidDraw = state?.starter === "fulfilled";
   useEffect(() => {
@@ -389,6 +404,9 @@ export default function StarterPanel() {
       {wallet.connected && address !== null && (
         <WalletChip
           address={address}
+          available={
+            authenticated && state?.hasPlayer === true ? state.available : null
+          }
           busy={busy || restoring}
           onCopy={copy}
           onDisconnect={disconnect}

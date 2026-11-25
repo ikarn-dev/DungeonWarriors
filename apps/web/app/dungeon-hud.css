@@ -1,245 +1,315 @@
-/* Combat HUD (2026-11-24): rounded dusk panels; smooth art, not pixel. */
+/* Dungeon HUD (2026-11-24): metal plates matching the lobby: dark teal
+   glass under a thin polished-gold rim with an inner hairline. */
 .dungeon-hud {
   position: absolute;
-  top: max(10px, env(safe-area-inset-top));
-  left: 140px;
-  right: max(10px, env(safe-area-inset-right));
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
   z-index: 20;
-  display: flex;
-  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
   gap: 10px;
   pointer-events: none;
+  color: var(--cream);
   font-family: var(--font-geist-sans), sans-serif;
 }
-.hud-card {
+.hud-plate {
   display: grid;
+  align-content: center;
   gap: 4px;
-  padding: 10px 14px;
-  color: #fff1cf;
-  background: #2f2b45f2;
-  border: 2px solid #5d5680;
-  border-radius: 14px;
-  box-shadow: 0 4px 0 #1e1626;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background:
+    linear-gradient(170deg, #12211ff0, #081110f2) padding-box,
+    var(--metal) border-box;
+  box-shadow:
+    inset 0 0 0 2px #08100f,
+    inset 0 0 0 3px #6e542066,
+    0 8px 22px #000000a6;
 }
-.hud-card > span,
-.hud-floor > p,
-.hud-cash small {
-  color: #b9b1cc;
-  font-size: 13px;
+.hud-plate p {
+  margin: 0;
 }
-.hud-card strong {
-  font-variant-numeric: tabular-nums;
+.hud-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
+.hud-plate .warrior-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Hero: steel-framed portrait, name, HP bar, ATK/DEF and trait icons. */
 .hud-hero {
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 3.5rem minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-width: 260px;
+  justify-self: start;
+  width: 17.5rem;
+  padding: 8px 12px 8px 8px;
 }
-.hud-hero img {
-  border-radius: 10px;
-  background: #3d3956;
+.hud-portrait {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  overflow: hidden;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse 85% 70% at 50% 38%, #34464b, #0c1214 78%)
+    padding-box,
+    conic-gradient(
+      from 210deg,
+      #eef1f3,
+      #7d868e 12%,
+      #dde2e6 24%,
+      #545c63 37%,
+      #c3c9ce 50%,
+      #646c73 63%,
+      #e8ecef 76%,
+      #6f787f 89%,
+      #eef1f3
+    )
+    border-box;
+  box-shadow: inset 0 0 0 1px #101315;
+}
+.hud-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 100%;
 }
 .hud-hero-body {
   display: grid;
   gap: 5px;
+  min-width: 0;
 }
 .hud-name {
-  margin: 0;
+  overflow: hidden;
+  color: var(--gold-hi);
+  font-family: var(--font-display), serif;
+  font-size: 0.9375rem;
   font-weight: 700;
-  font-size: 15px;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* The trail keeps the lost HP visible for a moment, then drains. */
 .hud-health {
   position: relative;
-  height: 18px;
+  height: 16px;
   overflow: hidden;
-  background: #4a2a3a;
-  border: 2px solid #1e1626;
-  border-radius: 9px;
+  border: 1px solid #c9a04e40;
+  border-radius: 999px;
+  background: #050b0a;
 }
-.hud-health span {
+.hud-health > span {
   position: absolute;
   inset: 0;
-  background: linear-gradient(#9cf08f, #4cb85a);
   transform-origin: left;
-  transition: transform 150ms ease-out;
+}
+.hud-health-trail {
+  background: #fff1cfcc;
+  transition: transform 420ms ease-in-out 260ms;
+}
+.hud-health-fill {
+  background: linear-gradient(#8ef08a, #3fae58);
+  box-shadow: inset 0 1px 0 #ffffff59;
+  transition: transform 140ms ease-out;
+}
+.hud-health[data-low] .hud-health-fill {
+  background: linear-gradient(#ff8a7a, #c8323a);
 }
 .hud-health strong {
   position: relative;
   display: block;
+  color: #ffffff;
   font:
-    700 11px / 14px var(--font-geist-mono),
+    700 0.75rem / 14px var(--font-geist-mono),
     monospace;
+  font-variant-numeric: tabular-nums;
   text-align: center;
-  text-shadow: 0 1px 0 #1e1626;
+  text-shadow:
+    0 1px 0 #050908,
+    0 0 3px #050908;
 }
 .hud-stats {
   display: flex;
-  gap: 12px;
-  margin: 0;
+  align-items: center;
+  gap: 10px;
+  color: var(--cream);
   font:
-    600 13px var(--font-geist-mono),
+    600 0.75rem var(--font-geist-mono),
     monospace;
+  font-variant-numeric: tabular-nums;
 }
-.hud-stats span {
+.hud-stats > span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.hud-stats span:first-child {
-  color: #ffc531;
-}
-.hud-stats span:last-child {
-  color: #8fc8ff;
+.hud-stats .warrior-icon {
+  color: var(--gold);
 }
 .hud-traits {
-  display: flex;
-  flex-wrap: wrap;
+  margin-left: auto;
   gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  pointer-events: auto;
 }
-.hud-traits li {
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff1cf;
-  background: #4b4668;
-  border-radius: 999px;
+.hud-traits > span {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid #5fe0c840;
+  border-radius: 5px;
+  background: #0a1413;
 }
+.hud-traits .warrior-icon {
+  color: #5fe0c8;
+}
+
+/* Room progress, centred over the scene: the room and its pips, what
+   clearing it pays, and the foes left. */
 .hud-floor {
   justify-items: center;
-  min-width: 170px;
+  gap: 5px;
+  min-width: 13rem;
 }
-.hud-floor > p {
-  margin: 0;
+.hud-floor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hud-prize {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.hud-prize strong {
+  color: var(--gold-hi);
+  font:
+    700 0.9375rem / 1 var(--font-geist-mono),
+    monospace;
+  font-variant-numeric: tabular-nums;
+}
+.hud-prize-value {
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 .hud-floor strong {
-  color: #fff1cf;
-  font-size: 16px;
+  color: var(--cream);
+  font-size: 0.9375rem;
 }
-.hud-dots {
+.hud-pips {
   display: flex;
   gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.hud-dots li {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #8f88ad;
-  background: #3d3956;
+.hud-pips li {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #c9a04e80;
+  background: #050b0a;
+  transform: rotate(45deg);
 }
-.hud-dots li[data-state="done"] {
-  background: #ffc531;
-  border-color: #ffc531;
+.hud-pips li[data-state="done"] {
+  border-color: var(--gold-hi);
+  background: linear-gradient(135deg, #fff0b8, #e0ac45 55%, #a8741f);
 }
-.hud-dots li[data-state="here"] {
-  border-color: #fff1cf;
-  box-shadow: 0 0 0 3px #fff1cf33;
-}
-.hud-dots li:last-child {
-  border-radius: 4px;
+.hud-pips li[data-state="here"] {
+  border-color: var(--gold-hi);
+  box-shadow: 0 0 0 3px #e2b04e33;
 }
 .hud-foes {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 12px;
-  color: #b9b1cc;
-}
-.hud-foes span {
-  color: #ff9a9a;
-  font-weight: 600;
-}
-.hud-foes span[data-open] {
-  color: #9cf08f;
-}
-.hud-timer {
-  margin-left: auto;
-  min-width: 110px;
-}
-.hud-timer > span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  color: #ff9a9a;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
-.hud-timer strong {
+.hud-foes[data-open] {
+  color: #8ef08a;
+}
+
+.hud-right {
+  display: flex;
+  justify-self: end;
+  gap: 10px;
+}
+.hud-timer,
+.hud-cash {
+  min-width: 6.5rem;
+}
+.hud-timer strong,
+.hud-cash strong {
   font:
-    700 22px var(--font-geist-mono),
+    700 1.375rem / 1.1 var(--font-geist-mono),
     monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .hud-timer[data-urgent] {
-  border-color: #8fe36a;
-  background: #2d4430f2;
+  background:
+    linear-gradient(170deg, #2a3a1ff0, #121c0cf2) padding-box,
+    var(--metal) border-box;
 }
 .hud-timer[data-urgent] strong {
   color: #c8fc86;
 }
 .hud-cash strong {
-  font:
-    700 18px var(--font-geist-mono),
-    monospace;
-  color: #ffc531;
-  white-space: nowrap;
+  color: var(--gold-hi);
 }
 .hud-cash small {
-  font-family: var(--font-geist-mono), monospace;
+  color: var(--soft);
+  font:
+    500 0.75rem var(--font-geist-mono),
+    monospace;
 }
-.dungeon-traits {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
-  text-align: left;
-}
-.dungeon-traits li {
-  padding: 8px 12px;
-  color: #c6bfd7;
-  background: #3d3956;
-  border-radius: 10px;
-}
-.dungeon-traits strong {
-  color: #fff1cf;
-  margin-right: 6px;
-}
-.dungeon-attack {
-  min-width: 84px;
-}
+
 @media (max-width: 900px) {
   .dungeon-hud {
-    left: 96px;
+    left: max(10px, env(safe-area-inset-left));
     gap: 6px;
   }
-  .hud-card {
+  .hud-plate {
     padding: 6px 9px;
-    border-radius: 10px;
   }
   .hud-hero {
-    min-width: 0;
-    grid-template-columns: 36px minmax(0, 1fr);
+    width: 13rem;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
   }
-  .hud-hero img {
-    width: 36px;
-    height: 36px;
+  .hud-portrait {
+    width: 2.5rem;
+    height: 2.5rem;
   }
   .hud-traits,
-  .hud-foes span {
+  .hud-foes {
     display: none;
-  }
-  .hud-timer strong {
-    font-size: 18px;
-  }
-  .hud-cash strong {
-    font-size: 14px;
   }
   .hud-floor {
     min-width: 0;
+  }
+  .hud-timer strong,
+  .hud-cash strong {
+    font-size: 1.0625rem;
   }
 }
 @media (max-width: 640px) {
@@ -249,7 +319,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hud-health span {
+  .hud-health > span {
     transition: none;
   }
 }

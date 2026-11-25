@@ -9,9 +9,12 @@ const toasterStyle: CSSProperties & { "--width": string } = {
 };
 
 // Sonner with its own styling switched off; the metal theme lives in CSS.
-export default function LobbyToaster() {
+// The dungeon renders a second one (id "dungeon") inside its modal dialog,
+// because the dialog's top layer covers the page toaster.
+export default function LobbyToaster({ id }: { readonly id?: string }) {
   return (
     <Toaster
+      {...(id === undefined ? {} : { id })}
       position="top-center"
       offset={{ top: "4.75rem" }}
       mobileOffset={{ top: "4.75rem" }}
@@ -41,6 +44,7 @@ export default function LobbyToaster() {
         classNames: {
           toast: "pixel-toast",
           title: "pixel-toast-title",
+          loader: "pixel-toast-loader",
           icon: "pixel-toast-icon",
           actionButton: "pixel-toast-action",
         },

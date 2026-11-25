@@ -109,15 +109,20 @@
   color: var(--soft);
 }
 
-/* Section card; long content scrolls inside it. */
+/* Section card; long content scrolls inside it with the scrollbar hidden
+   (2026-11-25): wheel, touch and keyboard scrolling still work. */
 .lobby-panel {
   min-width: 0;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 0.9375rem;
   line-height: 1.45;
+}
+.lobby-panel::-webkit-scrollbar {
+  display: none;
 }
 .lobby-panel[hidden] {
   display: none;
@@ -141,7 +146,7 @@
   color: transparent;
   filter: drop-shadow(0 1px 0 #050908);
   font-family: var(--font-display), serif;
-  font-size: 1.75rem;
+  font-size: 1.375rem;
   letter-spacing: 0.04em;
 }
 @media (forced-colors: active) {
@@ -181,7 +186,7 @@
   font-variant-numeric: tabular-nums;
 }
 :where(.lobby-panel) summary {
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 .lobby-link,
 :where(.lobby-panel) a {
@@ -193,140 +198,6 @@
 .lobby-stack {
   display: grid;
   gap: 0.875rem;
-}
-.lobby-card img {
-  border-radius: 0.75rem;
-  background: var(--panel);
-}
-.lobby-card-title {
-  color: var(--soft);
-  font-size: 0.875rem;
-}
-.lobby-card-stats {
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-}
-.lobby-traits {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.25rem;
-  margin: 0 0 0.25rem;
-  padding: 0;
-  list-style: none;
-}
-.lobby-traits li {
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--cream);
-  font-size: 0.75rem;
-}
-.lobby-rarity {
-  display: inline-block;
-  padding: 0.0625rem 0.5rem;
-  border: 1px solid #c9a04e80;
-  border-radius: 999px;
-  background: #2a3b38;
-  color: var(--cream);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.lobby-rarity[data-rarity="rare"] {
-  background: #1f4f8f;
-}
-.lobby-rarity[data-rarity="epic"] {
-  background: #5f2a8f;
-}
-.lobby-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-  gap: 1.25rem;
-  margin: 0;
-  padding: var(--px);
-  list-style: none;
-}
-.lobby-card {
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 0.375rem;
-  padding: 1rem;
-  border: 1px solid var(--panel-hi);
-  border-radius: 8px;
-  background: linear-gradient(#152825, var(--panel-lo));
-  box-shadow: inset 0 1px 0 #ffffff12;
-  text-align: center;
-}
-/* Character cards (collection cards and the Play warrior tile): a faint
-   light sweep every 7s, staggered per card; still under reduced motion. */
-.lobby-card,
-.bet-hero {
-  position: relative;
-  overflow: hidden;
-}
-.lobby-card::after,
-.bet-hero::after {
-  position: absolute;
-  inset: -20% auto -20% -50%;
-  width: 35%;
-  content: "";
-  pointer-events: none;
-  background: linear-gradient(
-    105deg,
-    #ffffff00,
-    #fff6d812 40%,
-    #ffffff24 50%,
-    #fff6d812 60%,
-    #ffffff00
-  );
-  transform: translateX(0) skewX(-14deg);
-  opacity: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .lobby-card::after,
-  .bet-hero::after {
-    animation: card-shimmer 7s ease-in-out 1.2s infinite;
-  }
-  .lobby-cards li:nth-child(2)::after {
-    animation-delay: 2.2s;
-  }
-  .lobby-cards li:nth-child(3)::after {
-    animation-delay: 3.2s;
-  }
-  .lobby-cards li:nth-child(4)::after {
-    animation-delay: 4.2s;
-  }
-}
-@keyframes card-shimmer {
-  0% {
-    opacity: 0;
-    transform: translateX(0) skewX(-14deg);
-  }
-  8% {
-    opacity: 1;
-  }
-  32% {
-    opacity: 1;
-    transform: translateX(460%) skewX(-14deg);
-  }
-  33%,
-  100% {
-    opacity: 0;
-    transform: translateX(460%) skewX(-14deg);
-  }
-}
-.lobby-card p {
-  margin: 0;
-}
-.lobby-card[data-chosen] {
-  border-color: var(--gold);
-  box-shadow:
-    inset 0 1px 0 #ffffff12,
-    0 0 0 1px var(--gold),
-    0 0 18px #e2b04e33;
 }
 
 @media (max-height: 30rem) {

@@ -261,7 +261,7 @@
   }
 }
 .title-start:not(:disabled) {
-  cursor: pointer;
+  cursor: var(--cursor-pointer);
 }
 .title-start:disabled {
   filter: saturate(0.6) brightness(0.85);

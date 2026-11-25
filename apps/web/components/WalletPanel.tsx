@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { displaySol, displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import { readWallet, useFinalized } from "./account-data";
+import DotsLoader from "./DotsLoader";
+import { type WalletIcon, WarriorIcon } from "./WarriorIcon";
 
+// A figure and its unit; a skeleton until the finalized read arrives.
 function Amount({
   value,
   unit,
@@ -15,11 +18,29 @@ function Amount({
     <span className="lobby-skeleton" />
   ) : (
     <>
-      {value} {unit}
+      {value} <span className="vault-unit">{unit}</span>
     </>
   );
 }
-
+function Row({
+  icon,
+  label,
+  children,
+}: {
+  readonly icon: WalletIcon;
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div>
+      <dt>
+        <WarriorIcon name={icon} />
+        {label}
+      </dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
 export default function WalletPanel({
   revision,
   blocked,
@@ -35,6 +56,8 @@ export default function WalletPanel({
   const { value, failed, retry } = useFinalized(revision, readWallet);
   const [amount, setAmount] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // The transfer in progress; its button shows the loader beside its label.
+  const [active, setActive] = useState<"deposit" | "withdraw" | null>(null);
   const credits = value?.credits ?? undefined;
   const funds = value?.funds;
   const usdc = (raw: string | undefined) =>
@@ -61,7 +84,10 @@ export default function WalletPanel({
       return;
     }
     setProblem(null);
-    void transfer(kind, units.toString()).then(() => setAmount(""));
+    setActive(kind);
+    void transfer(kind, units.toString())
+      .then(() => setAmount(""))
+      .finally(() => setActive(null));
   }
 
   return (
@@ -78,92 +104,125 @@ export default function WalletPanel({
         </div>
       ) : (
         <>
-          <div className="lobby-columns">
-            <section className="lobby-stats" aria-label="In PURRPS">
-              <h3>In PURRPS</h3>
-              <dl>
-                <div>
-                  <dt>Available</dt>
-                  <dd>
-                    <Amount
-                      value={usdc(credits?.availableBaseUnits)}
-                      unit="USDC"
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt>In play</dt>
-                  <dd>
-                    <Amount
-                      value={usdc(credits?.lockedStakeBaseUnits)}
-                      unit="USDC"
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Pending purchases</dt>
-                  <dd>
-                    <Amount
-                      value={usdc(credits?.purchaseEscrowBaseUnits)}
-                      unit="USDC"
-                    />
-                  </dd>
-                </div>
+          <div className="vault-grid">
+            <section className="vault-card" aria-labelledby="vault-purrps">
+              <h3 id="vault-purrps" className="vault-head">
+                <span className="vault-mark" aria-hidden="true">
+                  <WarriorIcon name="chest" />
+                </span>
+                In PURRPS
+              </h3>
+              <p className="vault-figure">
+                <span>Available</span>
+                <strong>
+                  <Amount
+                    value={usdc(credits?.availableBaseUnits)}
+                    unit="USDC"
+                  />
+                </strong>
+              </p>
+              <dl className="vault-rows">
+                <Row icon="lock" label="In play">
+                  <Amount
+                    value={usdc(credits?.lockedStakeBaseUnits)}
+                    unit="USDC"
+                  />
+                </Row>
+                <Row icon="bag" label="Pending purchases">
+                  <Amount
+                    value={usdc(credits?.purchaseEscrowBaseUnits)}
+                    unit="USDC"
+                  />
+                </Row>
               </dl>
             </section>
-            <section className="lobby-stats" aria-label="Your wallet">
-              <h3>Your wallet</h3>
-              <dl>
-                <div>
-                  <dt>SOL</dt>
-                  <dd>
-                    <Amount
-                      value={funds && displaySol(funds.solLamports)}
-                      unit="SOL"
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt>USDC</dt>
-                  <dd>
-                    <Amount value={usdc(funds?.usdcBaseUnits)} unit="USDC" />
-                  </dd>
-                </div>
+            <section className="vault-card" aria-labelledby="vault-wallet">
+              <h3 id="vault-wallet" className="vault-head">
+                <span className="vault-mark" aria-hidden="true">
+                  <WarriorIcon name="purse" />
+                </span>
+                Your wallet
+              </h3>
+              <p className="vault-figure">
+                <span>USDC</span>
+                <strong>
+                  <Amount value={usdc(funds?.usdcBaseUnits)} unit="USDC" />
+                </strong>
+              </p>
+              <dl className="vault-rows">
+                <Row icon="gem" label="SOL">
+                  <Amount
+                    value={funds && displaySol(funds.solLamports)}
+                    unit="SOL"
+                  />
+                </Row>
               </dl>
             </section>
           </div>
           <form
-            className="lobby-transfer"
+            className="vault-transfer"
             onSubmit={(event) => event.preventDefault()}
           >
-            <label htmlFor="transfer-amount">Amount (Devnet USDC)</label>
-            <div className="lobby-transfer-row">
-              <input
-                id="transfer-amount"
-                inputMode="decimal"
-                autoComplete="off"
-                maxLength={21}
-                value={amount}
-                aria-invalid={problem !== null}
-                aria-describedby={problem ? "transfer-problem" : undefined}
-                onChange={(event) => setAmount(event.target.value)}
-                disabled={blocked}
-              />
+            <label htmlFor="transfer-amount">Amount</label>
+            <div className="vault-transfer-row">
+              <div className="bet-amount">
+                <input
+                  id="transfer-amount"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  autoComplete="off"
+                  maxLength={21}
+                  value={amount}
+                  aria-invalid={problem !== null}
+                  aria-describedby={problem ? "transfer-problem" : undefined}
+                  onChange={(event) => setAmount(event.target.value)}
+                  disabled={blocked}
+                />
+                <span>USDC</span>
+                {/* Fills the most a deposit can take: the wallet's USDC. */}
+                <button
+                  type="button"
+                  className="vault-max"
+                  title="Use your full wallet USDC balance"
+                  disabled={
+                    blocked || !funds || BigInt(funds.usdcBaseUnits) === 0n
+                  }
+                  onClick={() => {
+                    if (!funds) return;
+                    setAmount(displayUsdc(funds.usdcBaseUnits));
+                    setProblem(null);
+                  }}
+                >
+                  Max
+                </button>
+              </div>
               <button
                 type="button"
                 className="pixel-button"
                 data-tone="gold"
+                aria-busy={active === "deposit"}
                 disabled={!amount || blocked || value === null}
                 onClick={() => move("deposit")}
               >
+                {active === "deposit" ? (
+                  <DotsLoader label="Depositing" />
+                ) : (
+                  <WarriorIcon name="deposit" />
+                )}
                 Deposit
               </button>
               <button
                 type="button"
                 className="pixel-button"
+                aria-busy={active === "withdraw"}
                 disabled={!amount || blocked || value === null}
                 onClick={() => move("withdraw")}
               >
+                {active === "withdraw" ? (
+                  <DotsLoader label="Withdrawing" />
+                ) : (
+                  <WarriorIcon name="withdraw" />
+                )}
                 Withdraw
               </button>
             </div>

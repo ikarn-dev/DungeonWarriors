@@ -10,7 +10,8 @@ import CatCollection from "./CatCollection";
 import DungeonEntry from "./DungeonEntry";
 import HistoryTabs from "./HistoryTabs";
 import LeaderboardPanel from "./LeaderboardPanel";
-import { LobbyHero, LobbyMenu, type LobbyTab } from "./LobbyMenu";
+import { LobbyHero } from "./LobbyHero";
+import { LobbyMenu, type LobbyTab } from "./LobbyMenu";
 import WalletPanel from "./WalletPanel";
 
 type Work = (fn: (signal: AbortSignal) => Promise<void>) => Promise<void>;
@@ -67,7 +68,7 @@ export default function LobbySections({
         play: (
           <>
             <header className="lobby-window-head">
-              <h2>Catacomb Quest</h2>
+              <h2>Begin quest</h2>
             </header>
             {selected && <LobbyHero cat={selected} />}
             {selected && (

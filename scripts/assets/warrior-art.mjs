@@ -4,8 +4,8 @@
 // trim, cloth capes and layered fur; a thin dark edge keeps each silhouette
 // readable over the dark catacombs. The weapon is a separate file so the game
 // can swing it. Only the SVG elements check-assets.mjs allows are used.
-const EDGE = "#1b1420";
-const edge = (w = 1.4) =>
+export const EDGE = "#1b1420";
+export const edge = (w = 1.4) =>
   `stroke="${EDGE}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
 
 export const CATS = {
@@ -55,13 +55,13 @@ export const WEAPON_PIVOT = {
 // Where the weapon hand sits on the body canvas.
 export const HAND = { x: 93, y: 86 };
 
-function grad(id, stops, angle = 90) {
+export function grad(id, stops, angle = 90) {
   const turn = angle ? ` gradientTransform="rotate(${angle})"` : "";
   return `<linearGradient id="${id}"${turn}>${stops
     .map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`)
     .join("")}</linearGradient>`;
 }
-const STEEL = [
+export const STEEL = [
   [0, "#5a6170"],
   [0.22, "#c6ccd8"],
   [0.4, "#ffffff"],
@@ -69,14 +69,14 @@ const STEEL = [
   [0.78, "#e4e8ef"],
   [1, "#6a7181"],
 ];
-const GOLD = [
+export const GOLD = [
   [0, "#7a5014"],
   [0.3, "#e9bd55"],
   [0.5, "#fff0b8"],
   [0.72, "#c38a26"],
   [1, "#6d4610"],
 ];
-function defs(cat) {
+export function defs(cat) {
   const [light, mid, dark] = cat.fur;
   return `<defs>${grad("fur", [
     [0, light],
@@ -159,16 +159,16 @@ function pauldrons() {
     `<path d="M${cx - 12 * flip} 70 C${cx - 12 * flip} 62 ${cx + 6 * flip} 60 ${cx + 12 * flip} 68 C${cx + 8 * flip} 72 ${cx - 4 * flip} 74 ${cx - 12 * flip} 70 Z" fill="url(#steelv)" ${edge()}/><path d="M${cx - 10 * flip} 74 C${cx - 8 * flip} 69 ${cx + 6 * flip} 68 ${cx + 11 * flip} 73 C${cx + 7 * flip} 77 ${cx - 4 * flip} 78 ${cx - 10 * flip} 74 Z" fill="url(#steelv)" ${edge(1.1)}/><path d="M${cx - 11 * flip} 69.5 C${cx - 4 * flip} 72.5 ${cx + 7 * flip} 71.5 ${cx + 11 * flip} 67.5" stroke="url(#gold)" stroke-width="1.3" fill="none"/>`;
   return one(39, 1) + one(85, -1);
 }
-function gripHand(paw) {
+export function gripHand(paw, at = HAND) {
   return paw
-    ? `<ellipse cx="${HAND.x}" cy="${HAND.y}" rx="6.2" ry="6.8" fill="${paw}" ${edge()}/><path d="M${HAND.x - 3} ${HAND.y - 4} v3 M${HAND.x} ${HAND.y - 5} v3 M${HAND.x + 3} ${HAND.y - 4} v3" stroke="#00000040" stroke-width="1"/>`
-    : `<rect x="${HAND.x - 6}" y="${HAND.y - 6}" width="12" height="12" rx="4" fill="url(#steelv)" ${edge()}/><path d="M${HAND.x - 5} ${HAND.y - 2} h10 M${HAND.x - 5} ${HAND.y + 1.5} h10" stroke="#6e7686" stroke-width="0.9"/>`;
+    ? `<ellipse cx="${at.x}" cy="${at.y}" rx="6.2" ry="6.8" fill="${paw}" ${edge()}/><path d="M${at.x - 3} ${at.y - 4} v3 M${at.x} ${at.y - 5} v3 M${at.x + 3} ${at.y - 4} v3" stroke="#00000040" stroke-width="1"/>`
+    : `<rect x="${at.x - 6}" y="${at.y - 6}" width="12" height="12" rx="4" fill="url(#steelv)" ${edge()}/><path d="M${at.x - 5} ${at.y - 2} h10 M${at.x - 5} ${at.y + 1.5} h10" stroke="#6e7686" stroke-width="0.9"/>`;
 }
 function weaponArm(paw) {
   const hand = gripHand(paw);
   return `<path d="M84 74 C90 76 93 80 93 85" stroke="${EDGE}" stroke-width="10.4" stroke-linecap="round" fill="none"/><path d="M84 74 C90 76 93 80 93 85" stroke="url(#steelv)" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M88 79.5 l6 -1.4" stroke="url(#gold)" stroke-width="1.4"/>${hand}`;
 }
-function shield(kind) {
+export function shield(kind) {
   if (kind === "oval")
     return `<ellipse cx="27" cy="88" rx="19" ry="25" fill="url(#gold)" ${edge()}/><ellipse cx="27" cy="88" rx="15.5" ry="21.5" fill="url(#steel)"/><path d="M27 67 V109 M12 88 H42" stroke="url(#gold)" stroke-width="2"/><path d="M27 70 l-3 6 h6 z M27 106 l-3 -6 h6 z M14 88 l6 -3 v6 z M40 88 l-6 -3 v6 z" fill="url(#gold)"/><circle cx="27" cy="88" r="5.5" fill="url(#gold)" ${edge(1.1)}/><circle cx="25.6" cy="86.4" r="1.8" fill="#fff6d0" opacity="0.9"/>${[
       [27, 64.5],
@@ -283,7 +283,7 @@ function headgear(id) {
   return `<path d="M80 21 C74 12 66 15 70 22 C65 27 72 31 79 24 C84 32 92 29 88 23 C94 16 86 12 80 21 Z" fill="#e88aa0" ${edge()}/><path d="M71 19 C73 20 76 21 78 22.5 M88 19 C86 20 83 21 81 22.5" stroke="#b9566e" stroke-width="1" fill="none"/><ellipse cx="79.6" cy="22.6" rx="3" ry="2.6" fill="#d06d86" ${edge(1)}/>`;
 }
 
-const LOOK = {
+export const LOOK = {
   collector: {
     mood: "stern",
     torso: "plate",
@@ -317,7 +317,7 @@ const LOOK = {
     tassets: "scale",
   },
 };
-export function catBody(id) {
+function catBody(id) {
   const cat = CATS[id];
   const look = LOOK[id];
   return [

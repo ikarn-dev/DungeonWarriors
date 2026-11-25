@@ -1,9 +1,14 @@
-import Image from "next/image";
 import { WARRIORS } from "../lib/dungeon/warriors";
 import type { CatId } from "../lib/game/catalog";
 import { CAT_NAMES, type LobbyState } from "../lib/game/lobby-state";
 import { warriorAvatar } from "../lib/game/warrior-avatars";
+import { HeroPortrait } from "./HeroPortrait";
+import { UiIcon } from "./UiIcon";
+import { WarriorStats } from "./WarriorStats";
 
+// Collection: one portrait card per owned cat, in the style of a hero
+// roster: rarity gems, a bronze frame with scroll corners, the level and a
+// class emblem on the art, a name plate, then stats and Select.
 export default function CatCollection({
   state,
   blocked,
@@ -18,53 +23,51 @@ export default function CatCollection({
   return (
     <div className="lobby-section">
       <header className="lobby-section-head">
-        <h2>Cats</h2>
+        <h2>Avatars</h2>
       </header>
       {state.cats.length === 0 ? (
         <p>No finalized cats yet.</p>
       ) : (
-        <ul className="lobby-cards">
+        <ul className="hero-cards">
           {state.cats.map((cat) => {
             const warrior = WARRIORS[cat.id];
             const chosen = selected === cat.id;
             return (
               <li
                 key={cat.id}
-                className="lobby-card"
+                className="hero-card"
+                data-rarity={cat.rarity}
                 data-chosen={chosen || undefined}
               >
-                <Image
-                  src={warriorAvatar(cat.id)}
-                  width={96}
-                  height={96}
-                  alt=""
+                <HeroPortrait
+                  name={CAT_NAMES[cat.id]}
+                  image={warriorAvatar(cat.id)}
+                  rarity={cat.rarity}
+                  level={cat.level}
+                  weapon={warrior.weapon}
+                  title={warrior.title}
+                  chosen={chosen}
+                  sizes="12rem"
                 />
-                <h3>{CAT_NAMES[cat.id]}</h3>
-                <p>
-                  <span className="lobby-rarity" data-rarity={cat.rarity}>
-                    {cat.rarity}
-                  </span>{" "}
-                </p>
-                <p className="lobby-card-title">{warrior.title}</p>
-                <p className="lobby-card-stats">
-                  {warrior.hp} HP · {warrior.atk} ATK · {warrior.def} DEF
-                </p>
-                <ul className="lobby-traits">
-                  {warrior.traits.map((t) => (
-                    <li key={t.id} title={t.description}>
-                      {t.name}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  className="pixel-button"
-                  data-tone={chosen ? undefined : "green"}
-                  disabled={blocked || chosen}
-                  onClick={() => onSelect(cat.id)}
-                >
-                  {chosen ? "Selected" : "Select cat"}
-                </button>
+                <div className="hero-body">
+                  <p className="hero-role">
+                    <span className="sr-only">{cat.rarity} · </span>
+                    {warrior.title}
+                  </p>
+                  <WarriorStats cat={cat.id} />
+                  <button
+                    type="button"
+                    className="hero-select"
+                    aria-pressed={chosen}
+                    disabled={blocked || chosen}
+                    onClick={() => onSelect(cat.id)}
+                  >
+                    <span className="hero-select-face">
+                      {chosen && <UiIcon name="check" size={14} />}
+                      {chosen ? "Selected" : "Select"}
+                    </span>
+                  </button>
+                </div>
               </li>
             );
           })}

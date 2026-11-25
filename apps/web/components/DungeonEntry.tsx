@@ -25,13 +25,20 @@ import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
 import type { LobbyState } from "../lib/game/lobby-state";
 import { WebApiError, webErrorMessage } from "../lib/game/web-api";
 import DungeonScreen, { DungeonDialog } from "./DungeonScreen";
+import LobbyToaster from "./LobbyToaster";
+import { QuestLoading, type QuestStep } from "./QuestLoading";
+import { QuestWager } from "./QuestWager";
 import { useDungeonExit } from "./useDungeonExit";
 
-// One toast follows a quest from Play until the game opens: it updates in
-// place and is dismissed when the dungeon appears. In-game messages use the
-// dungeon's own notice, because the modal dialog covers the toaster.
+// From Play until the game opens, the full-screen QuestLoading shows the
+// steps; this toast id carries failures and the exit flow. In-game messages
+// use the dungeon's own notice, because the modal dialog covers the toaster.
 const QUEST_TOAST = "quest";
-const progress = (title: string) => toast.loading(title, { id: QUEST_TOAST });
+// Settlement after a result: a loading toast until finalized, then a short
+// success. It shows in the dungeon's own toaster while the game is open and
+// in the page toaster after it closes, under a separate id for each.
+const DUNGEON_TOASTER = "dungeon";
+const SETTLE_TOAST = { game: "settle-game", lobby: "settle-lobby" } as const;
 const problem = (title: string) =>
   toast.error(title, { id: QUEST_TOAST, duration: 6000 });
 
@@ -65,6 +72,8 @@ export default function DungeonEntry({
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [launch, setLaunch] = useState(false);
+  const [stage, setStage] = useState<QuestStep>("prepare");
+  const [hidden, setHidden] = useState(false);
   const [uncertain, setUncertain] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   let stake: bigint | null = null;
@@ -121,6 +130,10 @@ export default function DungeonEntry({
     setNotice(null);
     showMenu();
   }, [showMenu]);
+  const hideLoading = useCallback(() => {
+    setHidden(true);
+    showMenu();
+  }, [showMenu]);
   const { exit, pending, requested } = useDungeonExit({
     open,
     phase: view?.phase,
@@ -131,6 +144,16 @@ export default function DungeonEntry({
     onMenu: returnToMenu,
     toastId: QUEST_TOAST,
   });
+  const loading: QuestStep | null =
+    open || pending || hidden
+      ? null
+      : busy
+        ? stage
+        : confirming
+          ? "confirm"
+          : funded && view?.phase === "ready"
+            ? "open"
+            : null;
   useEffect(() => {
     const controller = new AbortController();
     const departure = savedDeparture(wallet);
@@ -217,7 +240,6 @@ export default function DungeonEntry({
     }
     const { nonce, cat } = view;
     let cancelled = false;
-    progress("Opening the catacombs…");
     void loadDungeonArtwork(cat).then(
       (artwork) => {
         if (!cancelled) setArt(artwork);
@@ -233,6 +255,23 @@ export default function DungeonEntry({
   useEffect(() => {
     if (open) toast.dismiss(QUEST_TOAST);
   }, [open]);
+  const settling = pendingSettlement && !pending;
+  const settled = view?.settled === true;
+  const settleShown = useRef(false);
+  useEffect(() => {
+    const where = open
+      ? { id: SETTLE_TOAST.game, toasterId: DUNGEON_TOASTER }
+      : { id: SETTLE_TOAST.lobby };
+    toast.dismiss(open ? SETTLE_TOAST.lobby : SETTLE_TOAST.game);
+    if (settling) {
+      settleShown.current = true;
+      toast.loading("Settling your result", where);
+    } else if (settleShown.current) {
+      settleShown.current = false;
+      if (settled) toast.success("Result settled", where);
+      else toast.dismiss(where.id);
+    }
+  }, [open, settling, settled]);
   const interrupt = useCallback(() => {
     const current = latest.current;
     if (current && !current.settled)
@@ -271,8 +310,9 @@ export default function DungeonEntry({
     const { signal } = controller;
     starting.current = controller;
     setBusy(true);
+    setHidden(false);
+    setStage("prepare");
     setNotice(null);
-    progress("Getting your quest ready…");
     logDungeon("play.start", { network: "devnet", saved: expedition !== null });
     let step = "artwork";
     try {
@@ -325,8 +365,7 @@ export default function DungeonEntry({
       if (expedition.preparation) {
         if (!sign) throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
         step = "wallet";
-        if (approved.current?.source !== expedition.preparation.transaction)
-          progress("Approve the wager in your wallet");
+        setStage("wallet");
         approved.current = await approveDungeonReservation(
           wallet,
           expedition,
@@ -335,7 +374,7 @@ export default function DungeonEntry({
         );
         signal.throwIfAborted();
         step = "submit";
-        progress("Confirming your wager…");
+        setStage("confirm");
         expedition = await send(
           {
             kind: "submit",
@@ -367,11 +406,8 @@ export default function DungeonEntry({
         signal,
       ).catch(() => null);
       if (signal.aborted) return;
-      if (step === "submit" && !saved && latest.current?.preparation) {
+      if (step === "submit" && !saved && latest.current?.preparation)
         setUncertain(latest.current.nonce);
-        progress("Confirming your wager…");
-      } else if (saved && !saved.settled && !saved.preparation)
-        progress("Confirming your quest…");
     } finally {
       if (starting.current === controller) {
         starting.current = null;
@@ -393,92 +429,24 @@ export default function DungeonEntry({
                 : "Opening the catacombs…"}
         </output>
       ) : (
-        <div className="bet-card dungeon-bet">
-          <div className="bet-field">
-            <div className="bet-field-head">
-              <label htmlFor={`dungeon-bet-${wallet}`}>Wager</label>
-              <span>
-                Available{" "}
-                <strong className="lobby-figure">
-                  {displayUsdc(state.available)}
-                </strong>{" "}
-                USDC
-              </span>
-            </div>
-            <div className="bet-amount">
-              <input
-                id={`dungeon-bet-${wallet}`}
-                inputMode="decimal"
-                autoComplete="off"
-                value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
-                onChange={(event) => setAmount(event.target.value)}
-                disabled={busy || pendingWager !== null}
-                aria-invalid={
-                  !pendingWager &&
-                  amount !== "" &&
-                  (!stake || stake > BigInt(state.available))
-                }
-              />
-              <span>USDC</span>
-            </div>
-          </div>
-          {pendingWager && busy && (
-            <p className="dungeon-offer">
-              {pendingWager.maxRooms} rooms · Up to{" "}
-              {displayUsdc(pendingWager.maxGross)} USDC
-            </p>
-          )}
-          <button
-            className="pixel-button lobby-play"
-            aria-busy={busy || checking}
-            data-tone="gold"
-            type="button"
-            disabled={
-              blocked ||
-              busy ||
-              !sign ||
-              checking ||
-              (!pendingWager && (!stake || stake > BigInt(state.available)))
-            }
-            onClick={() => void begin()}
-          >
-            Play
-          </button>
-          {!sign && (
-            <output className="lobby-section-note">
-              Reconnect your wallet to approve this wager.
-            </output>
-          )}
-          {blocked && (
-            <output className="lobby-section-note">
-              Finish the pending wallet request before starting an expedition.
-            </output>
-          )}
-          <p className="dungeon-odds-note">
-            Each gate: 2 in 3 treasure. Reach it before time runs out. PURRPS
-            covers Devnet fees.
-          </p>
-          <p className="lobby-section-note">
-            Leaving or refreshing during a room forfeits your wager.
-          </p>
-        </div>
+        <QuestWager
+          id={`dungeon-bet-${wallet}`}
+          available={state.available}
+          value={pendingWager ? displayUsdc(pendingWager.stake) : amount}
+          onChange={setAmount}
+          locked={busy || pendingWager !== null}
+          invalid={!pendingWager && (!stake || stake > BigInt(state.available))}
+          busy={busy}
+          checking={checking}
+          blocked={blocked}
+          canSign={sign !== undefined}
+          onPlay={() => void begin()}
+        />
       )}
+      {loading && <QuestLoading step={loading} onLobby={hideLoading} />}
       {open && view && (
         <DungeonDialog onClose={close} onFailure={interrupt}>
-          <button
-            className="pixel-button dungeon-lobby"
-            aria-keyshortcuts="Escape"
-            type="button"
-            disabled={busy}
-            onClick={close}
-            title={
-              view.phase === "playing"
-                ? "Leaving or refreshing an active room forfeits your wager"
-                : "Back to lobby"
-            }
-          >
-            ← Lobby
-          </button>
+          <LobbyToaster id={DUNGEON_TOASTER} />
           <DungeonScreen
             view={view}
             artwork={art}

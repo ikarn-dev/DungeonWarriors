@@ -184,14 +184,38 @@ export function parseAssetManifest(input: unknown): AssetManifest {
   }
   return manifest;
 }
-export const WARRIOR_SCENE_ASSETS = [
+// Rig parts back to front, as the dungeon renderer layers them.
+export const RIG_PARTS = [
+  "tail",
+  "cape",
+  "arm-far",
+  "leg-far",
+  "leg-near",
+  "torso",
+  "head",
+  "arm-near",
+] as const;
+export type RigPart = (typeof RIG_PARTS)[number];
+// Rigged foes and their parts, back to front (scripts/assets/enemy-art.mjs).
+// The slime stays one piece.
+export const ENEMY_RIG_PARTS = {
+  skeleton: ["leg-back", "leg-front", "torso", "weapon-arm", "head"],
+  bat: ["wing-back", "wing-front", "body"],
+  warden: ["robe", "axe", "leg-back", "leg-front", "body", "arm", "head"],
+} as const;
+export type RiggedEnemy = keyof typeof ENEMY_RIG_PARTS;
+export const ENEMY_PART_IDS = Object.entries(ENEMY_RIG_PARTS).flatMap(
+  ([kind, parts]) => parts.map((part) => `enemy-${kind}-${part}`),
+);
+export const WARRIOR_SCENE_ASSETS: readonly string[] = [
   ...["collector", "acrobat", "guardian", "sprinter"].flatMap((cat) => [
-    `body-${cat}`,
+    ...RIG_PARTS.map((part) => `rig-${cat}-${part}`),
     `warrior-${cat}`,
   ]),
   ...["spear", "longsword", "sword", "axe"].map((weapon) => `weapon-${weapon}`),
   ...["slime", "skeleton", "bat", "warden"].map((enemy) => `enemy-${enemy}`),
-] as const;
+  ...ENEMY_PART_IDS,
+];
 export function requiredSceneAssets(version: number): readonly string[] {
   return version === 3 ? WARRIOR_SCENE_ASSETS : FIRST_SCENE_ASSETS;
 }

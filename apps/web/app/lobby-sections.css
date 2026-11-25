@@ -18,57 +18,7 @@
   margin: 0;
   font-size: 0.8125rem;
 }
-.lobby-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  gap: 1rem;
-}
-.lobby-stats,
-.lobby-banner,
-.lobby-offer {
-  border: 1px solid var(--panel-hi);
-  border-radius: 8px;
-  background: linear-gradient(#152825, var(--panel-lo));
-  box-shadow: inset 0 1px 0 #ffffff12;
-}
-.lobby-stats {
-  display: grid;
-  align-content: start;
-  gap: 0.5rem;
-  padding: 0.875rem 1rem;
-}
-.lobby-stats dl {
-  display: grid;
-  gap: 0.375rem;
-  margin: 0;
-}
-.lobby-stats dl > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 1.5rem;
-}
-.lobby-stats dd,
-.lobby-table [data-number],
-.lobby-price {
-  margin: 0;
-  font-family: var(--font-geist-mono), monospace;
-  font-variant-numeric: tabular-nums;
-}
 
-.lobby-transfer {
-  display: grid;
-  gap: 0.5rem;
-}
-.lobby-transfer label {
-  font-size: 0.875rem;
-}
-.lobby-transfer-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 8rem 8rem;
-  gap: 0.75rem;
-}
 .lobby-problem {
   margin: 0;
   color: #ffb3b3;
@@ -85,6 +35,12 @@
 .lobby-empty p {
   margin: 0;
 }
+/* A section's first load: the gold dots centred where the content will sit. */
+.lobby-loading {
+  display: grid;
+  place-items: center;
+  padding: 3rem 1rem;
+}
 .lobby-skeleton {
   display: inline-block;
   width: 5rem;
@@ -94,147 +50,201 @@
   background: var(--panel-hi);
   opacity: 0.6;
 }
-.lobby-skeleton[data-wide] {
-  width: 100%;
-}
 
+/* History and Leaderboard tables (2026-11-25): each row is a bronze-edged
+   plaque, headed in small gold Cinzel capitals, with figures centred in
+   their columns. Won runs and the player's own row carry a gold edge. Base58
+   addresses stay in mono because Cinzel sets lowercase as small capitals. */
 .lobby-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+  margin-top: -0.375rem;
+  border-collapse: separate;
+  border-spacing: 0 0.375rem;
 }
 .lobby-table th {
-  padding: 0 0.5rem 0.5rem;
-  color: var(--gold-hi);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  padding: 0 0.75rem 0.125rem;
+  color: var(--gold);
+  font:
+    700 0.6875rem / 1.2 var(--font-display),
+    serif;
+  letter-spacing: 0.12em;
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
 }
 .lobby-table td {
   height: 3rem;
-  padding: 0.25rem 0.5rem;
-  border-top: 1px solid var(--panel-hi);
+  padding: 0.25rem 0.75rem;
+  border-block: 1px solid #c9a04e2e;
+  border-top-color: #c9a04e47;
+  background: linear-gradient(180deg, #17302c, #0d1b19);
+  color: var(--cream);
+  font:
+    600 0.875rem / 1.25 var(--font-display),
+    serif;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.lobby-table [data-number] {
-  text-align: right;
+.lobby-table td:first-child {
+  border-left: 1px solid #c9a04e47;
+  border-radius: 7px 0 0 7px;
 }
-.lobby-history .lobby-table :is(td:first-child, th[data-number]) {
+.lobby-table td:last-child {
+  border-right: 1px solid #c9a04e2e;
+  border-radius: 0 7px 7px 0;
+}
+.lobby-table tr:is([data-result="won"], [data-mine]) td {
+  border-color: #e2b04e59;
+  background: linear-gradient(180deg, #2a3324, #141c16);
+}
+.lobby-table tr:is([data-result="won"], [data-mine]) td:first-child {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.lobby-table :is(th, td):is([data-number], [data-center]) {
+  text-align: center;
+}
+.lobby-table td[data-number] {
+  font:
+    700 0.9375rem / 1 var(--font-display),
+    serif;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.04em;
+}
+.lobby-table tr[data-result="lost"] td[data-number]:last-child {
+  color: var(--soft);
+}
+.lobby-table
+  tr:is([data-result="won"], [data-mine])
+  td[data-number]:last-child {
+  color: var(--gold-hi);
+  text-shadow: 0 0 0.5rem #e2b04e66;
+}
+.lobby-history .lobby-table td:first-child {
   white-space: normal;
 }
-.lobby-table tr[data-mine] td {
-  background: #e2b04e1f;
-  color: var(--gold-hi);
+.history-cat {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
 }
-.lobby-table .pixel-button {
-  min-height: 2.25rem;
-  font-size: 0.8125rem;
+.history-art {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 35%, #1f5c52, #071110 75%) padding-box,
+    var(--metal) border-box;
+  box-shadow: 0 2px 6px #00000080;
 }
+.history-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  scale: 1.3;
+}
+.history-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-width: 5.5rem;
+  justify-content: center;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #a9bcb540;
+  border-radius: 999px;
+  background: #0a1413;
+  color: var(--soft);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+tr[data-result="won"] .history-result {
+  border-color: #fbe7a680;
+  background: linear-gradient(180deg, #fbe7a6, #d9a446 55%, #a8741f);
+  color: #2a1a05;
+}
+tr[data-result="lost"] .history-result {
+  border-color: #e0866f59;
+  background: #2a1512;
+  color: #f0a594;
+}
+/* Rank medal: a metal-rimmed disc, gold, silver and bronze for the top
+   three and dark teal with a bronze rim below them. */
 .lobby-rank {
   display: inline-grid;
   place-items: center;
-  min-width: 2rem;
-  padding: 0.125rem 0.5rem;
-  border: 1px solid #c9a04e66;
-  border-radius: 999px;
-  background: #2a3b38;
+  width: 2.125rem;
+  height: 2.125rem;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 30%, #24524a, #0b1816 75%) padding-box,
+    linear-gradient(160deg, #e7c06a, #7d561a 55%, #c9973f) border-box;
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    0 2px 6px #00000080;
   color: var(--cream);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font:
+    700 0.875rem / 1 var(--font-display),
+    serif;
+  font-variant-numeric: lining-nums;
 }
 .lobby-rank[data-rank="1"] {
-  background: linear-gradient(#fff0b8, #e0ac45);
-  color: #2a1a05;
+  background:
+    radial-gradient(circle at 50% 25%, #fff6cf, #f2c45a 45%, #b07a22)
+    padding-box,
+    linear-gradient(160deg, #fff3c4, #8a5a14 55%, #e7c06a) border-box;
+  box-shadow:
+    0 0 0.625rem #f7c84f73,
+    0 2px 6px #00000080;
+  color: #3b2204;
 }
 .lobby-rank[data-rank="2"] {
-  background: linear-gradient(#ffffff, #b9c0cc);
+  background:
+    radial-gradient(circle at 50% 25%, #ffffff, #c9d0da 45%, #7d8794)
+    padding-box,
+    linear-gradient(160deg, #ffffff, #5d6470 55%, #c9d0da) border-box;
   color: #1a1d22;
 }
 .lobby-rank[data-rank="3"] {
-  background: linear-gradient(#f2b98a, #b06a32);
+  background:
+    radial-gradient(circle at 50% 25%, #ffd9b8, #d08a4e 45%, #8a4f22)
+    padding-box,
+    linear-gradient(160deg, #f6c79c, #6e3a14 55%, #d08a4e) border-box;
   color: #2a1405;
 }
-
-.lobby-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-left: 3px solid var(--gold);
-}
-.lobby-banner p {
-  margin: 0;
-}
-
-.lobby-offer {
-  display: grid;
-  grid-template-rows: 4rem auto auto 1fr auto minmax(1.25rem, auto);
-  justify-items: center;
-  gap: 0.5rem;
-  padding: 0.875rem 1rem;
-  text-align: center;
-}
-.lobby-offer-art {
-  position: relative;
-  display: block;
-  width: 4rem;
-  height: 4rem;
-}
-.lobby-offer-art img {
-  position: absolute;
-  inset: 0;
-  image-rendering: pixelated;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .lobby-offer-art[data-opening] {
-    animation: capsule-opening 500ms ease-in-out infinite alternate;
-  }
-}
-@keyframes capsule-opening {
-  from {
-    transform: translateY(0) rotate(-5deg);
-  }
-  to {
-    transform: translateY(-0.25rem) rotate(5deg);
-  }
-}
-.lobby-offer h3,
-.lobby-offer p {
-  margin: 0;
-}
-.lobby-price {
-  color: var(--gold-hi);
-  font-size: 1.125rem;
-}
-.lobby-odds {
-  display: grid;
-  align-content: start;
-  gap: 0.25rem;
-  width: 100%;
-  margin: 0;
-}
-.lobby-odds div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.lobby-odds dd {
-  margin: 0;
+.lobby-table .lobby-player {
+  color: var(--soft);
   font-family: var(--font-geist-mono), monospace;
-  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0;
 }
-.lobby-offer .pixel-button {
-  width: 100%;
+.lobby-table tr[data-mine] .lobby-player {
+  color: var(--gold-hi);
+  font-family: var(--font-display), serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
-.lobby-offer-note {
-  font-size: 0.8125rem;
+/* The player's own rank, a small gold-rimmed plaque beside the title. */
+.lobby-rank-note {
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e2b04e59;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a3324, #141c16);
+  color: var(--soft);
+  font:
+    600 0.75rem / 1 var(--font-display),
+    serif;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
-
+.lobby-rank-note strong {
+  color: var(--gold-hi);
+  font-variant-numeric: lining-nums;
+}
 .lobby-rows {
   display: grid;
   margin: 0;
@@ -259,18 +269,8 @@
 }
 
 @media (max-width: 40rem) {
-  .lobby-transfer-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .lobby-transfer-row input {
-    grid-column: 1 / -1;
-  }
-  .lobby-table {
-    font-size: 0.8125rem;
-  }
-  .lobby-table td,
-  .lobby-table th {
-    padding-inline: 0.25rem;
+  .lobby-table :is(th, td) {
+    padding-inline: 0.375rem;
   }
   .lobby-rows li {
     grid-template-columns: 5rem 2.5rem minmax(0, 1fr);
@@ -278,6 +278,187 @@
   .lobby-rows .pixel-button {
     grid-column: 1 / -1;
   }
+  .history-result {
+    min-width: 0;
+  }
+}
+@media (max-width: 26rem) {
+  .history-art {
+    display: none;
+  }
+}
+
+/* Wallet (2026-11-24): two treasury cards, each with a metal-rimmed icon
+   well, one large figure and ruled rows, then a minimal transfer row. */
+.vault-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+}
+.vault-card {
+  display: grid;
+  align-content: start;
+  gap: 0.875rem;
+  padding: 1rem;
+  border: 1px solid #c9a04e3d;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #16302c, #0c1a18);
+  box-shadow:
+    inset 0 1px 0 #ffffff0f,
+    0 6px 18px #00000059;
+}
+.vault-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--gold-hi);
+  font-family: var(--font-display), serif;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+.vault-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 35%, #24806f, #0d1f1c 75%) padding-box,
+    var(--metal) border-box;
+  box-shadow:
+    inset 0 0 0 2px #050908aa,
+    0 3px 8px #000000aa;
+  color: #e9fff8;
+}
+.vault-mark .warrior-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.vault-figure {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+}
+.vault-figure > span {
+  color: var(--soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.vault-figure strong {
+  color: var(--gold-hi);
+  font:
+    600 1.625rem / 1.15 var(--font-geist-mono),
+    monospace;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.vault-unit {
+  color: var(--soft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.vault-rows {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid #c9a04e24;
+}
+.vault-rows > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid #c9a04e1a;
+}
+.vault-rows dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--soft);
+  font-size: 0.8125rem;
+}
+.vault-rows dt .warrior-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--gold);
+}
+.vault-rows dd {
+  margin: 0;
+  color: var(--cream);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vault-transfer {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+.vault-transfer label {
+  color: var(--cream);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+/* The amount field spans the row; Deposit and Withdraw share the row below. */
+.vault-transfer-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+.vault-transfer-row .bet-amount {
+  grid-column: 1 / -1;
+}
+.vault-transfer .bet-amount > span {
+  padding-right: 0.625rem;
+}
+/* Max: a quiet text key inside the field, after the unit and a divider. */
+.vault-transfer .vault-max {
+  min-width: 0;
+  min-height: 2.75rem;
+  margin-right: 0.125rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-left: 1px solid #c9a04e33;
+  border-radius: 0 5px 5px 0;
+  background: none;
+  box-shadow: none;
+  color: var(--gold-hi);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: none;
+}
+@media (hover: hover) {
+  .vault-transfer .vault-max:not(:disabled):hover {
+    background: #e2b04e14;
+    filter: none;
+  }
+}
+.vault-transfer .vault-max:disabled {
+  color: var(--soft);
+  filter: none;
+  opacity: 0.5;
+}
+.vault-transfer-row .pixel-button {
+  min-height: 3rem;
+  padding-inline: 1rem;
+}
+.vault-transfer-row .warrior-icon {
+  width: 1rem;
+  height: 1rem;
+}
+/* The loader takes the icon's place beside the label. */
+.vault-transfer-row .dots-loader {
+  gap: 0.1875rem;
+  height: 1rem;
+}
+.vault-transfer-row .dots-loader > span[aria-hidden] {
+  width: 0.3125rem;
+  height: 0.3125rem;
 }
 
 .lobby-history-tabs {
