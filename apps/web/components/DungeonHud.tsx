@@ -14,6 +14,7 @@ import { WarriorIcon } from "./WarriorIcon";
 export default function DungeonHud({
   cat,
   frame,
+  down,
   room,
   maxRooms,
   cleared,
@@ -26,6 +27,8 @@ export default function DungeonHud({
 }: {
   readonly cat: CatId;
   readonly frame: DungeonFrame | null;
+  // The warrior has fallen (gas, a trap or a lost run): health reads 0.
+  readonly down: boolean;
   readonly room: number;
   readonly maxRooms: number;
   readonly cleared: number;
@@ -37,7 +40,9 @@ export default function DungeonHud({
   readonly playing: boolean;
 }) {
   const warrior = WARRIORS[cat];
-  const hp = frame?.hp ?? warrior.hp;
+  const hp = down ? 0 : (frame?.hp ?? warrior.hp);
+  // Brief invulnerability after a hit or a respawn, as the simulation counts.
+  const immune = !down && (frame?.invuln ?? 0) > 0;
   const share = Math.max(0, Math.min(1, hp / warrior.hp));
   const wardens = frame?.enemies.filter((e) => e.kind === "warden").length ?? 0;
   const foes = (frame?.enemies.length ?? 0) - wardens;
@@ -49,7 +54,11 @@ export default function DungeonHud({
       : null;
   return (
     <div className="dungeon-hud">
-      <section className="hud-plate hud-hero" aria-label="Your warrior">
+      <section
+        className="hud-plate hud-hero"
+        aria-label="Your warrior"
+        data-down={down || undefined}
+      >
         <span className="hud-portrait">
           <Image
             src={warriorAvatar(cat)}
@@ -64,6 +73,7 @@ export default function DungeonHud({
           <div
             className="hud-health"
             data-low={share <= 0.3 || undefined}
+            data-immune={immune || undefined}
             aria-hidden="true"
           >
             <span
@@ -80,6 +90,7 @@ export default function DungeonHud({
           </div>
           <meter className="sr-only" min={0} max={warrior.hp} value={hp}>
             Health {hp} of {warrior.hp}
+            {down ? ", fallen" : immune ? ", invulnerable" : ""}
           </meter>
           <p className="hud-stats">
             <span title="Attack">

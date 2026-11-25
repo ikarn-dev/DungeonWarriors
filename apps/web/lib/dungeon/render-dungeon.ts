@@ -455,8 +455,9 @@ export function renderDungeon(
         x,
         feet - 76,
         44,
-        frame.hp / warrior.hp,
-        0x7be07a,
+        frame.timedOut || trapped ? 0 : frame.hp / warrior.hp,
+        // Gold while invulnerable after a hit or respawn.
+        frame.invuln > 0 ? 0xfbe7a6 : 0x7be07a,
         time,
         still,
       );

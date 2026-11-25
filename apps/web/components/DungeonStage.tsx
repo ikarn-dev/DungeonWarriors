@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DungeonArtwork } from "../lib/dungeon/artwork";
 import type { DungeonRequest, DungeonView } from "../lib/dungeon/protocol";
+import { TRAP_HIT_MS } from "../lib/dungeon/render-trap";
 import { DungeonRunner } from "../lib/dungeon/replay";
 import { PHYSICS } from "../lib/dungeon/rules";
 import {
@@ -48,6 +49,7 @@ export default function DungeonStage({
       : null;
   const trap = useRef<number | null>(null);
   const [trapShown, setTrapShown] = useState(false);
+  const [trapHit, setTrapHit] = useState(false);
   const [frame, setFrame] = useState<DungeonFrame | null>(null);
   const [ready, setReady] = useState(false),
     [error, setError] = useState<string | null>(null);
@@ -66,11 +68,16 @@ export default function DungeonStage({
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    const instant = reduced || !runner.current;
+    const hit = setTimeout(() => setTrapHit(true), instant ? 0 : TRAP_HIT_MS);
     const timer = setTimeout(
       () => setTrapShown(true),
-      reduced || !runner.current ? 0 : TRAP_CARD_MS,
+      instant ? 0 : TRAP_CARD_MS,
     );
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(hit);
+      clearTimeout(timer);
+    };
   }, [trapGate]);
   useEffect(() => {
     if (
@@ -301,6 +308,11 @@ export default function DungeonStage({
       <DungeonHud
         cat={view.cat}
         frame={frame}
+        down={
+          frame?.timedOut === true ||
+          trapHit ||
+          (view.phase === "lost" && trapGate === null)
+        }
         room={index}
         maxRooms={view.maxRooms}
         cleared={view.cleared}

@@ -128,6 +128,44 @@
 .hud-health[data-low] .hud-health-fill {
   background: linear-gradient(#ff8a7a, #c8323a);
 }
+/* Invulnerable after a hit or respawn: the bar turns pale gold and a light
+   sweeps along it until the simulation's invulnerability ends. */
+.hud-health[data-immune] {
+  border-color: #fbe7a6b3;
+  box-shadow: 0 0 8px #fbe7a659;
+}
+.hud-health[data-immune] .hud-health-fill {
+  background: linear-gradient(#fff3c4, #e2b04e);
+}
+.hud-health[data-immune]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    #ffffff8c 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hud-health[data-immune]::after {
+    animation: hud-immune 700ms linear infinite;
+  }
+}
+@keyframes hud-immune {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* Fallen: the portrait greys out. */
+.hud-hero[data-down] .hud-portrait img {
+  filter: grayscale(1) brightness(0.6);
+}
 .hud-health strong {
   position: relative;
   display: block;
