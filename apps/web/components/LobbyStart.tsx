@@ -2,13 +2,12 @@ import type { useWallet } from "@solana/wallet-adapter-react";
 import { type ReactNode, useSyncExternalStore } from "react";
 import type { LobbyState } from "../lib/game/lobby-state";
 import DotsLoader from "./DotsLoader";
+import { canSignInWallet } from "./wallet-sign-in";
 
 // The single next step before the lobby menu opens: connect (in the wallet
 // pop-up), sign in (prompted automatically), create the player account, then
 // claim the free starter cat.
 const noSubscription = () => () => {};
-// Wallet ready states the provider reconnects automatically.
-const AUTO_CONNECT: ReadonlySet<string> = new Set(["Installed", "Loadable"]);
 
 export default function LobbyStart({
   wallet,
@@ -44,11 +43,7 @@ export default function LobbyStart({
     () => true,
     () => false,
   );
-  const remembered = wallet.wallet;
-  const linking =
-    !hydrated ||
-    wallet.connecting ||
-    (remembered !== null && AUTO_CONNECT.has(remembered.readyState));
+  const linking = !hydrated || wallet.connecting;
   let body: ReactNode;
   // Waiting states show only the loader (and its caption), with no panel.
   const waiting = !wallet.connected
@@ -91,9 +86,7 @@ export default function LobbyStart({
             type="button"
             className="pixel-button"
             data-tone="gold"
-            disabled={
-              busy || (!restoreFailed && wallet.signMessage === undefined)
-            }
+            disabled={busy || (!restoreFailed && !canSignInWallet(wallet))}
             onClick={onSignIn}
           >
             Try again

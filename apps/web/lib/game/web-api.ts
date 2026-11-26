@@ -26,7 +26,13 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   AUTH_REQUIRED: "Please sign in again to continue.",
   ACCOUNT_STATE_UNAVAILABLE: "Couldn't load your account. Please refresh.",
   WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",
-  MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Try another wallet.",
+  MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Choose another wallet.",
+  WALLET_SIGN_IN_UNAUTHORIZED:
+    "Your wallet hasn't authorized this account. Reconnect it and sign in again.",
+  WALLET_SIGN_IN_CANCELLED: "Sign-in was declined. You can try again.",
+  SIGN_IN_ACCOUNT_CHANGED: "Your wallet account changed. Sign in again.",
+  UNEXPECTED_SIGN_IN_MESSAGE:
+    "The wallet sign-in message didn't match. Try again.",
   GAME_DEVICE_UNAVAILABLE:
     "This browser couldn't store a game key. Enable access in another browser to continue.",
   INVALID_GAME_DEVICE:

@@ -45,7 +45,9 @@ type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 export default function StarterPanel() {
   const wallet = useHydratedWallet();
   const router = useRouter();
-  const address = wallet.publicKey?.toBase58() ?? null;
+  const address = wallet.connected
+    ? (wallet.publicKey?.toBase58() ?? null)
+    : null;
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
   const [restoreFailed, setRestoreFailed] = useState(false);
@@ -114,18 +116,11 @@ export default function StarterPanel() {
     ]);
     async function restore(walletAddress: string) {
       try {
-        const session = await webApi<{ wallet: string }>(
+        const session = await webApi<{ wallet: string } | null>(
           "/api/auth/session",
           undefined,
           signal,
-        ).catch((failure: unknown) => {
-          if (
-            failure instanceof WebApiError &&
-            failure.code === "AUTH_REQUIRED"
-          )
-            return null;
-          throw failure;
-        });
+        );
         if (controller.signal.aborted) return;
         if (
           session?.wallet !== walletAddress &&
@@ -201,9 +196,7 @@ export default function StarterPanel() {
     if (address === null) throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
     if (!(await signInGameDevice(address, signal))) {
       if (signal.aborted) return;
-      if (wallet.signMessage === undefined)
-        throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
-      if (!(await signInWallet(address, wallet.signMessage, signal))) return;
+      if (!(await signInWallet(address, wallet, signal))) return;
     }
     setSessionWallet(address);
     await reload(signal);

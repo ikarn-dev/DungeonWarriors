@@ -53,7 +53,9 @@ vi.mock(
 );
 
 import { POST as challengeRoute } from "../../../../../apps/web/app/api/auth/challenge/route";
+import { GET as sessionRoute } from "../../../../../apps/web/app/api/auth/session/route";
 import { POST as verifyRoute } from "../../../../../apps/web/app/api/auth/verify/route";
+import { signInWallet } from "../../../../../apps/web/components/wallet-sign-in";
 import {
   authenticate,
   challengeInput,
@@ -81,8 +83,21 @@ beforeEach(() => {
   store.records.clear();
   vi.clearAllMocks();
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 describe("wallet authentication", () => {
+  it("treats a missing or expired session as signed out", async () => {
+    for (const headers of [{}, { Cookie: cookie("x".repeat(43)) }]) {
+      const response = await sessionRoute(
+        new Request(`${config.APP_ORIGIN}/api/auth/session`, { headers }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toBeNull();
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
+  });
   it("accepts only the configured exact origin, independent of spoofed host or referrer headers", () => {
     expect(() =>
       assertOrigin(request("/api/auth/challenge", {})),
@@ -276,4 +291,107 @@ describe("wallet authentication", () => {
       "no-store",
     );
   });
+});
+
+function browserSignIn() {
+  const location = new URL(config.APP_ORIGIN);
+  vi.stubGlobal("window", { location });
+  const fetch = vi.fn((path: string, init: RequestInit) => {
+    const headers = new Headers(init.headers);
+    headers.set("Origin", location.origin);
+    const req = new Request(new URL(path, location), { ...init, headers });
+    return path === "/api/auth/challenge"
+      ? challengeRoute(req)
+      : verifyRoute(req);
+  });
+  vi.stubGlobal("fetch", fetch);
+  return fetch;
+}
+
+it("signs a first-time wallet in through its native Solana sign-in feature", async () => {
+  const fetch = browserSignIn();
+  const owner = wallet();
+  type SignIn = NonNullable<Parameters<typeof signInWallet>[1]["signIn"]>;
+  const signIn: SignIn = async (input = {}) => {
+    const message = `${input.domain} wants you to sign in with your Solana account:\n${input.address}\n\n${input.statement}\n\nURI: ${input.uri}\nVersion: ${input.version}\nChain ID: ${input.chainId}\nNonce: ${input.nonce}\nIssued At: ${input.issuedAt}\nExpiration Time: ${input.expirationTime}`;
+    const signedMessage = new TextEncoder().encode(message);
+    return {
+      account: {
+        address: owner.address,
+        publicKey: owner.publicKey.toBytes(),
+        chains: ["solana:devnet"],
+        features: [],
+      },
+      signedMessage,
+      signature: owner.sign(signedMessage),
+    };
+  };
+  const signMessage = vi.fn().mockRejectedValue({ code: 4100 });
+  const signers = { signIn, signMessage };
+  await expect(
+    signInWallet(owner.address, signers, new AbortController().signal),
+  ).resolves.toBe(true);
+  expect(signMessage).not.toHaveBeenCalled();
+  const verified = await fetch.mock.results[1]?.value;
+  const sessionCookie = verified?.headers.get("set-cookie") ?? "";
+  expect(sessionCookie).toContain("HttpOnly");
+  const session = await sessionRoute(
+    new Request(`${config.APP_ORIGIN}/api/auth/session`, {
+      headers: { Cookie: sessionCookie.split(";")[0] ?? "" },
+    }),
+  );
+  expect(await session.json()).toMatchObject({ wallet: owner.address });
+});
+
+it("supports legacy message signing for a new wallet", async () => {
+  browserSignIn();
+  const owner = wallet();
+  await expect(
+    signInWallet(
+      owner.address,
+      { signMessage: async (message) => owner.sign(message) },
+      new AbortController().signal,
+    ),
+  ).resolves.toBe(true);
+});
+
+it("requires an explicit retry when the wallet denies authorization", async () => {
+  const fetch = browserSignIn();
+  const { address } = wallet();
+  const signIn = vi.fn().mockRejectedValue({ error: { code: 4100 } });
+  const signMessage = vi.fn();
+  await expect(
+    signInWallet(
+      address,
+      { signMessage, signIn },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("WALLET_SIGN_IN_UNAUTHORIZED");
+  expect(signIn).toHaveBeenCalledTimes(1);
+  expect(signMessage).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("skips verification when the native signer changes the message or account", async () => {
+  const fetch = browserSignIn();
+  const owner = wallet();
+  const other = wallet();
+  for (const address of [owner.address, other.address]) {
+    const signIn = vi.fn().mockResolvedValue({
+      account: { address },
+      signature: new Uint8Array(64),
+      signedMessage: new Uint8Array([1]),
+    });
+    await expect(
+      signInWallet(owner.address, { signIn }, new AbortController().signal),
+    ).rejects.toThrow(
+      address === owner.address
+        ? "UNEXPECTED_SIGN_IN_MESSAGE"
+        : "SIGN_IN_ACCOUNT_CHANGED",
+    );
+  }
+  expect(fetch.mock.calls.map(([path]) => path)).toEqual([
+    "/api/auth/challenge",
+    "/api/auth/challenge",
+  ]);
 });

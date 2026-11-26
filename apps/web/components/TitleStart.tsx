@@ -25,39 +25,43 @@ const ERROR_TOAST = "start-error";
 export default function TitleStart() {
   const wallet = useHydratedWallet();
   const router = useRouter();
-  const address = wallet.publicKey?.toBase58() ?? null;
+  const adapter = wallet.wallet?.adapter;
+  const address = wallet.connected
+    ? (wallet.publicKey?.toBase58() ?? null)
+    : null;
   const [wanted, setWanted] = useState(false);
   const [picking, setPicking] = useState(false);
   const [step, setStep] = useState<Step>("idle");
   const running = useRef<AbortController | null>(null);
-  const { signMessage } = wallet;
+  const { select, signIn, signMessage } = wallet;
 
   const enter = useCallback(
     async (walletAddress: string, signal: AbortSignal) => {
-      const session = await webApi<{ wallet: string }>(
+      const session = await webApi<{ wallet: string } | null>(
         "/api/auth/session",
         undefined,
         signal,
-      ).catch((failure: unknown) => {
-        if (failure instanceof WebApiError && failure.code === "AUTH_REQUIRED")
-          return null;
-        throw failure;
-      });
+      );
       if (signal.aborted) return;
       if (
         session?.wallet !== walletAddress &&
         !(await signInGameDevice(walletAddress, signal))
       ) {
         signal.throwIfAborted();
-        if (signMessage === undefined)
-          throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
+        if (adapter?.publicKey?.toBase58() !== walletAddress)
+          throw new WebApiError("SIGN_IN_ACCOUNT_CHANGED");
         setStep("signing");
-        if (!(await signInWallet(walletAddress, signMessage, signal))) return;
+        if (
+          !(await signInWallet(walletAddress, { signIn, signMessage }, signal))
+        )
+          return;
       }
+      if (adapter?.publicKey?.toBase58() !== walletAddress)
+        throw new WebApiError("SIGN_IN_ACCOUNT_CHANGED");
       setStep("entering");
       router.push("/starter");
     },
-    [router, signMessage],
+    [router, adapter, signIn, signMessage],
   );
 
   // Continue once Start was pressed and a wallet is connected.
@@ -71,6 +75,12 @@ export default function TitleStart() {
         if (controller.signal.aborted) return;
         setWanted(false);
         setStep("idle");
+        if (
+          failure instanceof WebApiError &&
+          (failure.code === "WALLET_SIGN_IN_UNAUTHORIZED" ||
+            failure.code === "MESSAGE_SIGNING_REQUIRED")
+        )
+          select(null);
         toast.error(
           failure instanceof WebApiError
             ? webErrorMessage(failure.code)
@@ -81,7 +91,7 @@ export default function TitleStart() {
       .finally(() => {
         if (running.current === controller) running.current = null;
       });
-  }, [wanted, address, enter]);
+  }, [wanted, address, enter, select]);
   useEffect(() => () => running.current?.abort(), []);
   // A silent reconnect that was still running when Start was pressed failed:
   // fall back to the wallet pop-up.

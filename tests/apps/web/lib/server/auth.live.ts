@@ -106,15 +106,13 @@ describe("configured Upstash authentication integration", () => {
         (await logoutRoute(request("/api/auth/logout", {}, sessionCookie)))
           .status,
       ).toBe(200);
-      expect(
-        (
-          await sessionRoute(
-            new Request(`${origin}/api/auth/session`, {
-              headers: { Cookie: sessionCookie },
-            }),
-          )
-        ).status,
-      ).toBe(401);
+      const signedOut = await sessionRoute(
+        new Request(`${origin}/api/auth/session`, {
+          headers: { Cookie: sessionCookie },
+        }),
+      );
+      expect(signedOut.status).toBe(200);
+      expect(await signedOut.json()).toBeNull();
     } catch {
       throw new Error("LIVE_AUTH_ROUTES_CHECK_FAILED");
     } finally {

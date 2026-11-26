@@ -1,6 +1,7 @@
 "use client";
 import type { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useRef, useState } from "react";
+import { canSignInWallet } from "./wallet-sign-in";
 
 // Lobby entry without separate pages: the wallet pop-up opens by itself when
 // no wallet is remembered for this browser, and a connected wallet without a
@@ -31,7 +32,7 @@ export function useWalletEntry(
     if (wallet.connected) setPicking(false);
   }, [wallet.connected]);
   const { address, restoring, authenticated, restoreFailed } = session;
-  const canSign = wallet.signMessage !== undefined;
+  const canSign = canSignInWallet(wallet);
   useEffect(() => {
     if (
       address === null ||

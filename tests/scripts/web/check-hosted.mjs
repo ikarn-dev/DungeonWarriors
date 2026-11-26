@@ -165,6 +165,11 @@ async function call(path, body, expected, origin = target) {
   return { value, headers: response.headers };
 }
 
+async function verifySignedOut() {
+  if ((await call("/api/auth/session", undefined, 200)).value !== null)
+    throw new Error("Expected a signed-out session.");
+}
+
 async function verify() {
   const url = new URL(target);
   if (url.protocol !== "https:" || url.origin !== target)
@@ -189,7 +194,7 @@ async function verify() {
   );
   const wallet = owner.toBase58();
   await call("/api/auth/challenge", { wallet }, 403, "https://example.invalid");
-  await call("/api/auth/session", undefined, 401);
+  await verifySignedOut();
   const { value: c } = await call("/api/auth/challenge", { wallet }, 200);
   if (!/^[0-9a-f]{64}$/.test(c?.challengeId) || typeof c.message !== "string")
     throw new Error("Invalid challenge.");
@@ -294,7 +299,7 @@ async function verify() {
   } finally {
     if (cookie) {
       await call("/api/auth/logout", {}, 200);
-      await call("/api/auth/session", undefined, 401);
+      await verifySignedOut();
     }
   }
 }
