@@ -3,15 +3,16 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseAssetManifest } from "../../apps/web/lib/game/assets.ts";
 import { ENEMIES, ENEMY_RIG, ENEMY_TOP, enemyPart } from "./enemy-art.mjs";
-import { CATS, catPortrait, WEAPON_PIVOT, weapon } from "./warrior-art.mjs";
+import { CATS, WEAPON_PIVOT, weapon } from "./warrior-art.mjs";
 import { RIG, RIG_HAND, rigPart } from "./warrior-rig.mjs";
 
 // Version 3 smooth vector set (2026-11-24): rigged side-view warrior cats,
-// front-facing portraits, their weapons and catacomb foes (whole, for
+// their weapons and catacomb foes (whole, for
 // silhouettes, and as rig parts). Run with --check to confirm the committed files match.
 const VERSION = 3;
+// Every asset the app uses sits in one folder (2026-11-26).
 const directory = fileURLToPath(
-  new URL(`../../apps/web/public/game-assets/v${VERSION}/`, import.meta.url),
+  new URL("../../apps/web/public/game-assets/", import.meta.url),
 );
 const check = process.argv.includes("--check");
 if (!check) mkdirSync(directory, { recursive: true });
@@ -24,10 +25,10 @@ function emit(id, size, content, anchor) {
     if (readFileSync(target, "utf8") !== svg)
       throw new Error(`Stale artwork: ${id}`);
   } else writeFileSync(target, svg);
-  if (!id.startsWith("warrior-")) images[id] = svg;
+  images[id] = svg;
   assets.push({
     id,
-    path: `/game-assets/v${VERSION}/${id}.svg`,
+    path: `/game-assets/${id}.svg`,
     sha256: createHash("sha256").update(svg).digest("hex"),
     bytes: Buffer.byteLength(svg),
     width: size,
@@ -44,7 +45,6 @@ function emit(id, size, content, anchor) {
 for (const id of Object.keys(CATS)) {
   for (const [part, pivot] of RIG)
     emit(`rig-${id}-${part}`, 128, rigPart(id, part), pivot);
-  emit(`warrior-${id}`, 128, catPortrait(id), { x: 61, y: 120 });
 }
 for (const [kind, pivot] of Object.entries(WEAPON_PIVOT))
   emit(`weapon-${kind}`, 96, weapon(kind), pivot);

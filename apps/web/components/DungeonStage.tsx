@@ -11,6 +11,7 @@ import {
   type DungeonFrame,
   nearbyGate,
   roomBudgetMs,
+  roomOver,
 } from "../lib/dungeon/simulation";
 import { WARRIORS } from "../lib/dungeon/warriors";
 import DungeonControls from "./DungeonControls";
@@ -165,7 +166,7 @@ export default function DungeonStage({
     return () =>
       document.removeEventListener("visibilitychange", startWhenVisible);
   }, [action, client, ready, view.phase]);
-  const timeout = useCallback(() => {
+  const roomEnded = useCallback(() => {
     if (notified.current) return;
     notified.current = true;
     void action({ kind: "exit", nonce: current.current.nonce, client });
@@ -202,7 +203,7 @@ export default function DungeonStage({
             if (!failed) setReady(true);
           },
           onError: report,
-          onTimeout: timeout,
+          onRoomOver: roomEnded,
           trap: () => trap.current,
           preloaded: artwork.images,
         },
@@ -216,7 +217,7 @@ export default function DungeonStage({
       parent.removeEventListener("webglcontextlost", report, true);
       destroy?.();
     };
-  }, [artwork, timeout, onFailure]);
+  }, [artwork, roomEnded, onFailure]);
   useEffect(() => {
     if (view.phase !== "playing") return;
     const timer = setInterval(() => {
@@ -245,9 +246,8 @@ export default function DungeonStage({
       inputs: active.inputs.filter((input) => input.tick <= f.tick),
     });
   }, [action, client]);
-  const waitingAfterTimeout = Boolean(
-    frame?.timedOut && view.phase === "playing",
-  );
+  const over = frame ? roomOver(frame) : false;
+  const waitingAfterTimeout = over && view.phase === "playing";
   useEffect(() => {
     if (!waitingAfterTimeout) return;
     const timer = setInterval(
@@ -257,7 +257,7 @@ export default function DungeonStage({
     );
     return () => clearInterval(timer);
   }, [waitingAfterTimeout, action, client]);
-  const active = view.phase === "playing" && !frame?.timedOut;
+  const active = view.phase === "playing" && !over;
   const finished = ["won", "lost", "refunded", "cancelled"].includes(
     view.phase,
   );
@@ -284,19 +284,21 @@ export default function DungeonStage({
     frame && runner.current ? nearbyGate(frame, runner.current.room) : null;
   const title = frame?.timedOut
     ? "The gas caught you"
-    : view.phase === "ready"
-      ? "Opening the catacombs…"
-      : view.phase === "intermission"
-        ? "Treasure found"
-        : view.phase === "won"
-          ? "Treasure secured"
-          : view.phase === "lost"
-            ? trapGate === null
-              ? "Expedition ended"
-              : "The gate was trapped"
-            : view.phase === "refunded"
-              ? "Wager returned"
-              : "Expedition cancelled";
+    : frame?.fallen
+      ? "You fell in battle"
+      : view.phase === "ready"
+        ? "Opening the catacombs…"
+        : view.phase === "intermission"
+          ? "Treasure found"
+          : view.phase === "won"
+            ? "Treasure secured"
+            : view.phase === "lost"
+              ? trapGate === null
+                ? "Expedition ended"
+                : "The gate was trapped"
+              : view.phase === "refunded"
+                ? "Wager returned"
+                : "Expedition cancelled";
   return (
     <section className="dungeon-stage" aria-label="Catacomb Quest">
       <div
@@ -308,11 +310,7 @@ export default function DungeonStage({
       <DungeonHud
         cat={view.cat}
         frame={frame}
-        down={
-          frame?.timedOut === true ||
-          trapHit ||
-          (view.phase === "lost" && trapGate === null)
-        }
+        down={over || trapHit || (view.phase === "lost" && trapGate === null)}
         room={index}
         maxRooms={view.maxRooms}
         cleared={view.cleared}
@@ -333,7 +331,7 @@ export default function DungeonStage({
           <DungeonResult
             view={view}
             title={title}
-            timedOut={frame?.timedOut === true}
+            downed={over}
             finished={finished}
             error={error}
             busy={busy}

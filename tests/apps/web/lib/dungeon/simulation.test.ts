@@ -142,15 +142,18 @@ describe("warrior combat", () => {
     expect(hit.hp).toBe(f.hp);
     expect(hit.shield).toBe(false);
   });
-  it("respawns a knocked-out cat at its checkpoint with full health while time runs on", () => {
+  it("ends the room when a cat loses all its health", () => {
     const f = besideWarden("acrobat");
     const touching = { ...f, x: warden(f).x, hp: 1 };
     const out = run(room, "acrobat", touching, 1);
+    expect(out.fallen).toBe(true);
     expect(out.knockouts).toBe(1);
-    expect(out.hp).toBe(90);
-    expect(out.x).toBe(out.checkpointX);
-    expect(out.y).toBe(out.checkpointY);
-    expect(out.tick).toBe(1);
+    expect(out.hp).toBe(0);
+    expect(out.resets).toBe(f.resets);
+    expect(out.timedOut).toBe(false);
+    // Nothing moves afterwards and no gate can be entered.
+    expect(run(room, "acrobat", out, 30)).toBe(out);
+    expect(nearbyGate(out, room)).toBeNull();
   });
 });
 
@@ -182,6 +185,7 @@ describe("base-control routes", () => {
     });
     expect(nearbyGate(frame, room), detail).toBe(2);
     expect(frame.timedOut, detail).toBe(false);
+    expect(frame.fallen, detail).toBe(false);
     // The autopilot stops to fight every foe, so it is slower than a player
     // who jumps past optional ones; it must still finish with time left.
     expect(used, detail).toBeLessThan(budget * 0.97);

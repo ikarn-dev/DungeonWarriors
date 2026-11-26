@@ -45,7 +45,9 @@ export const DUNGEON_V2: DungeonRules = {
   vrfTimeoutSeconds: 300,
 };
 // Engine v2 (2026-11-24): generated rooms, enemies and warrior combat.
-export const ENGINE = "purrps-dungeon-v2";
+// v3 (2026-11-26): losing all health ends the room as a loss. The rules
+// envelope stays version 2; the engine hash identifies the engine.
+export const ENGINE = "purrps-dungeon-v3";
 // Positions are 1/256 px; velocities per tick. Jump rises 100 px and travels
 // 120 px on flat ground at base speed.
 export const PHYSICS = {

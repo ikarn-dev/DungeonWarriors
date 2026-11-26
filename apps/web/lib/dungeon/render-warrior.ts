@@ -20,6 +20,8 @@ export type RigPose = {
   readonly feet: number;
   readonly dir: -1 | 1;
   readonly grounded: boolean;
+  // The player is steering; carried by a lift alone is not walking.
+  readonly stepping: boolean;
   readonly vy: number;
   // 0 at the start of a swing, 1 at its end; null between swings.
   readonly swing: number | null;
@@ -43,7 +45,8 @@ export class WarriorRig {
   private phase = 0;
   private move = 0;
   private air = 0;
-  private face = 1;
+  // Body turn about the vertical axis: 0 faces right, π faces left.
+  private turn = 0;
   private lastX: number | null = null;
   private lastTime: number | null = null;
   private landedAt = -Infinity;
@@ -95,19 +98,21 @@ export class WarriorRig {
     const travelled =
       this.lastX === null ? 0 : Math.abs(pose.x - this.lastX) / BODY_SCALE;
     this.lastX = pose.x;
-    const walking = pose.grounded && travelled > 0.05 && !pose.down;
+    const walking =
+      pose.grounded && pose.stepping && travelled > 0.05 && !pose.down;
     if (pose.grounded && !this.wasGrounded) this.landedAt = time;
     this.wasGrounded = pose.grounded;
     if (pose.hurt) this.hurtAt = time;
     if (still) {
       this.move = 0;
       this.air = pose.grounded ? 0 : 1;
-      this.face = pose.dir;
+      this.turn = pose.dir > 0 ? 0 : Math.PI;
     } else {
       this.move = approach(this.move, walking ? 1 : 0, 12, dt);
       this.air = approach(this.air, pose.grounded ? 0 : 1, 14, dt);
-      this.face = approach(this.face, pose.dir, 18, dt);
-      if (pose.grounded) this.phase += (travelled / STRIDE) * Math.PI * 2;
+      this.turn = approach(this.turn, pose.dir > 0 ? 0 : Math.PI, 16, dt);
+      if (pose.grounded && pose.stepping)
+        this.phase += (travelled / STRIDE) * Math.PI * 2;
     }
     const s = Math.sin(this.phase);
     const breath = still ? 0 : Math.sin(time / 650);
@@ -162,26 +167,37 @@ export class WarriorRig {
     const sx = 1 / Math.sqrt(sy);
 
     this.lean = lean;
-    this.set("leg-near", legNear, 0, false);
-    this.set("leg-far", legFar, 0, false);
+    // Mid-turn the near and far sides slide past each other, so the body
+    // reads as rotating rather than a flat image flipping.
+    const depth = Math.sin(this.turn);
+    this.set("leg-near", legNear, 0, false, 6 * depth);
+    this.set("leg-far", legFar, 0, false, -6 * depth);
     this.set("torso", lean, bob, false);
-    this.set("arm-far", armFar + lean, bob);
-    this.set("arm-near", armNear + lean * 0.5, bob);
+    this.set("arm-far", armFar + lean, bob, true, -8 * depth);
+    this.set("arm-near", armNear + lean * 0.5, bob, true, 8 * depth);
     this.set(
       "head",
       lean * 0.6 + 0.035 * Math.sin(this.phase * 2 + 0.6) * this.move,
       bob * 1.15 - 0.8 * breath * idle,
+      true,
+      3 * depth,
     );
     const flutter = still ? 0 : 0.05 * Math.sin(time / 280);
     this.set(
       "cape",
       0.16 * this.move + 0.22 * this.air * rising + flutter,
       bob,
+      true,
+      -5 * depth,
     );
     this.set(
       "tail",
-      (still ? 0 : 0.12 * Math.sin(time / 420)) + 0.1 * s * this.move,
+      (still ? 0 : 0.12 * Math.sin(time / 420)) +
+        0.1 * s * this.move +
+        0.5 * depth,
       bob,
+      true,
+      -9 * depth,
     );
     const arm = this.parts.get("arm-near");
     const turn = arm?.rotation ?? 0;
@@ -196,9 +212,9 @@ export class WarriorRig {
       )
       .setRotation(weapon + lean * 0.5);
 
-    // Turning narrows the cat through its side instead of snapping.
-    const facing =
-      Math.sign(this.face || pose.dir) * Math.max(0.15, Math.abs(this.face));
+    // The width follows the turn's cosine, never collapsing to a sliver.
+    const cos = Math.cos(this.turn);
+    const facing = (Math.sign(cos) || pose.dir) * Math.max(0.22, Math.abs(cos));
     this.container
       .setPosition(
         pose.x + (lunge - 2.5 * hurt) * BODY_SCALE * Math.sign(facing),
@@ -219,7 +235,13 @@ export class WarriorRig {
 
   // Parts above the hips ride on the torso: its lean carries their pivots
   // round the hip, so the neck and shoulders stay joined.
-  private set(part: RigPart, rotation: number, lift: number, follow = true) {
+  private set(
+    part: RigPart,
+    rotation: number,
+    lift: number,
+    follow = true,
+    shift = 0,
+  ) {
     const image = this.parts.get(part);
     const pivot = this.pivots.get(part);
     const hip = this.pivots.get("torso");
@@ -228,7 +250,7 @@ export class WarriorRig {
     image
       .setRotation(rotation)
       .setPosition(
-        pivot.x - ROOT.x + rise * Math.sin(this.lean),
+        pivot.x - ROOT.x + shift + rise * Math.sin(this.lean),
         pivot.y - ROOT.y + lift + rise * (1 - Math.cos(this.lean)),
       );
   }

@@ -45,7 +45,6 @@ const HURT_TICKS = 60;
 // Health restored for each defeated foe.
 export const DEFEAT_HEAL = 6;
 const KNOCK_TICKS = 8;
-const RESPAWN_TICKS = 90;
 export type DungeonFrame = {
   tick: number;
   x: number;
@@ -63,6 +62,8 @@ export type DungeonFrame = {
   checkpointY: number;
   resets: number;
   timedOut: boolean;
+  // Lost all health (2026-11-26): the room is over, as with the gas.
+  fallen: boolean;
   hp: number;
   invuln: number;
   knock: number;
@@ -99,6 +100,7 @@ export function initialFrame(room: DungeonRoom, cat: CatId): DungeonFrame {
     checkpointY: y,
     resets: 0,
     timedOut: false,
+    fallen: false,
     hp: WARRIORS[cat].hp,
     invuln: 0,
     knock: 0,
@@ -134,6 +136,10 @@ export function roomBudgetMs(
     roomTimeMs(room, rules) + (cat === "collector" ? rules.collectorBonusMs : 0)
   );
 }
+// The gas or a fall in battle ends the room; nothing moves afterwards.
+export function roomOver(frame: DungeonFrame): boolean {
+  return frame.timedOut || frame.fallen;
+}
 export function wardensLeft(frame: DungeonFrame): number {
   return frame.enemies.filter((e) => e.kind === "warden").length;
 }
@@ -144,7 +150,7 @@ export function stepRoom(
   rules: DungeonRules,
   controls: readonly Control[],
 ): DungeonFrame {
-  if (previous.timedOut) return previous;
+  if (roomOver(previous)) return previous;
   const warrior = WARRIORS[cat];
   const f: DungeonFrame = {
     ...previous,
@@ -176,7 +182,7 @@ export function stepRoom(
   }
   move(f, previous, room, cat, rules);
   combat(f, previous, room, cat);
-  if (f.y > (room.height + 64) * 256) respawn(f, false);
+  if (f.y > (room.height + 64) * 256) respawn(f);
   const hx = room.hourglass.x * 256;
   const hy = room.hourglass.y * 256;
   if (
@@ -186,6 +192,7 @@ export function stepRoom(
   )
     f.hourglass = true;
   f.timedOut =
+    !f.fallen &&
     (f.tick * 1000) / PHYSICS.ticksPerSecond >= budgetMs(f, room, cat, rules);
   return f;
 }
@@ -455,10 +462,19 @@ function hurt(f: DungeonFrame, cat: CatId, raw: number, fromX: number) {
   }
   f.hp -= Math.max(1, raw - WARRIORS[cat].def);
   f.invuln = HURT_TICKS;
-  if (f.hp <= 0) respawn(f, true, WARRIORS[cat].hp);
+  // Losing all health ends the room as a loss (2026-11-26; superseded the
+  // knockout that returned the cat to its checkpoint with full health).
+  if (f.hp <= 0) {
+    f.hp = 0;
+    f.fallen = true;
+    f.knockouts++;
+    f.knock = 0;
+    f.vx = 0;
+    f.swing = 0;
+  }
 }
-// A fall or a knockout returns the cat to its checkpoint; the timer runs on.
-function respawn(f: DungeonFrame, knockedOut: boolean, hp = f.hp) {
+// A fall into a pit returns the cat to its checkpoint; the timer runs on.
+function respawn(f: DungeonFrame) {
   f.x = f.checkpointX;
   f.y = f.checkpointY;
   f.vx = 0;
@@ -470,17 +486,12 @@ function respawn(f: DungeonFrame, knockedOut: boolean, hp = f.hp) {
   f.knock = 0;
   f.swing = 0;
   f.resets++;
-  if (knockedOut) {
-    f.hp = hp;
-    f.knockouts++;
-    f.invuln = RESPAWN_TICKS;
-  }
 }
 export function nearbyGate(
   frame: DungeonFrame,
   room: DungeonRoom,
 ): number | null {
-  if (!frame.grounded || frame.timedOut || wardensLeft(frame) > 0) return null;
+  if (!frame.grounded || roomOver(frame) || wardensLeft(frame) > 0) return null;
   return (
     room.gates.find(
       (g) =>

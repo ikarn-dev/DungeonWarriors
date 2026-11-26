@@ -12,7 +12,10 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { checkGameAssets } from "../../../scripts/assets/check-assets.mjs";
+import {
+  catalogManifestBinding,
+  checkGameAssets,
+} from "../../../scripts/assets/check-assets.mjs";
 
 const webRequire = createRequire(
   new URL("../../../apps/web/package.json", import.meta.url),
@@ -23,7 +26,7 @@ mkdirSync(parent, { recursive: true });
 async function fixture(work) {
   const root = mkdtempSync(join(parent, "asset-check-"));
   try {
-    const folder = join(root, "game-assets/v1");
+    const folder = join(root, "game-assets");
     mkdirSync(folder, { recursive: true });
     const data = await sharp({
       create: {
@@ -37,7 +40,7 @@ async function fixture(work) {
       .toBuffer();
     const image = {
       id: "sample",
-      path: "/game-assets/v1/sample.png",
+      path: "/game-assets/sample.png",
       sha256: createHash("sha256").update(data).digest("hex"),
       bytes: data.length,
       width: 2,
@@ -54,7 +57,7 @@ async function fixture(work) {
       writeFileSync(join(folder, "sample.png"), data);
       writeFileSync(
         join(folder, "manifest.json"),
-        JSON.stringify({ schemaVersion: 1, version: 1, assets: [image] }),
+        JSON.stringify({ schemaVersion: 1, version: 3, assets: [image] }),
       );
     };
     save();
@@ -63,39 +66,42 @@ async function fixture(work) {
     rmSync(root, { recursive: true, force: true });
   }
 }
-test("a version without a manifest leaves the scene pending", async () => {
-  const result = await checkGameAssets(
-    fileURLToPath(new URL("../../../apps/web/public", import.meta.url)),
-    4,
-  );
-  assert.equal(result.ready, false);
-  assert.equal(result.reason, "USER_ASSETS_PENDING");
-  assert.ok(result.missing.includes("coin-spin"));
+test("a folder without a manifest leaves the scene pending", async () => {
+  const root = mkdtempSync(join(parent, "asset-empty-"));
+  try {
+    const result = await checkGameAssets(root);
+    assert.equal(result.ready, false);
+    assert.equal(result.reason, "USER_ASSETS_PENDING");
+    assert.ok(result.missing.includes("enemy-warden-axe"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
-test("all first scene SVGs are valid and bound by the bundled manifest", async () => {
+test("the retained catalog manifest keeps the hash the Devnet catalog binds", () => {
   const publicDirectory = fileURLToPath(
     new URL("../../../apps/web/public", import.meta.url),
   );
-  for (const version of [1, 2]) {
-    const result = await checkGameAssets(publicDirectory, version);
-    assert.equal(result.ready, true);
-    assert.equal(result.checkedFiles, 37);
-  }
+  assert.deepEqual(catalogManifestBinding(publicDirectory, 2), {
+    version: 2,
+    contentHash:
+      "de6abd09a8057b1f768cc361aae2e7287f23f8026e00f56d1a4bf87e22f4fb9b",
+  });
+  assert.throws(() => catalogManifestBinding(publicDirectory, 1));
 });
 test("active SVG content is rejected even when its digest matches", async () =>
   fixture(async ({ root, folder, image, save }) => {
     const vector =
       '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" onload="alert(1)"><rect width="2" height="2"/></svg>';
-    image.path = "/game-assets/v1/sample.svg";
+    image.path = "/game-assets/sample.svg";
     image.bytes = Buffer.byteLength(vector);
     image.sha256 = createHash("sha256").update(vector).digest("hex");
     save();
     writeFileSync(join(folder, "sample.svg"), vector);
-    await assert.rejects(checkGameAssets(root, 1), /UNSAFE_ASSET_SVG/);
+    await assert.rejects(checkGameAssets(root), /UNSAFE_ASSET_SVG/);
   }));
 test("decodes real PNG bytes and returns a bound partial manifest without claiming ready", async () =>
   fixture(async ({ root }) => {
-    const result = await checkGameAssets(root, 1);
+    const result = await checkGameAssets(root);
     assert.equal(result.ready, false);
     assert.equal(result.checkedFiles, 1);
     assert.match(result.binding.contentHash, /^[0-9a-f]{64}$/);
@@ -105,20 +111,20 @@ test("rejects changed bytes, wrong dimensions and corrupt PNG with a matching ha
     image.width = 4;
     image.frameWidth = 4;
     save();
-    await assert.rejects(checkGameAssets(root, 1), /ASSET_IMAGE_MISMATCH/);
+    await assert.rejects(checkGameAssets(root), /ASSET_IMAGE_MISMATCH/);
     image.width = 2;
     image.frameWidth = 2;
     writeFileSync(join(folder, "sample.png"), "broken");
-    await assert.rejects(checkGameAssets(root, 1), /ASSET_SIZE_MISMATCH/);
+    await assert.rejects(checkGameAssets(root), /ASSET_SIZE_MISMATCH/);
     save();
     image.sha256 = "0".repeat(64);
     save();
-    await assert.rejects(checkGameAssets(root, 1), /ASSET_HASH_MISMATCH/);
+    await assert.rejects(checkGameAssets(root), /ASSET_HASH_MISMATCH/);
     image.bytes = 4;
     image.sha256 = createHash("sha256").update("oops").digest("hex");
     save();
     writeFileSync(join(folder, "sample.png"), "oops");
-    await assert.rejects(checkGameAssets(root, 1));
+    await assert.rejects(checkGameAssets(root));
   }));
 test("rejects files symlinked outside the public root", async () =>
   fixture(async ({ root, folder, data }) => {
@@ -127,7 +133,7 @@ test("rejects files symlinked outside the public root", async () =>
     try {
       rmSync(join(folder, "sample.png"));
       symlinkSync(outside, join(folder, "sample.png"));
-      await assert.rejects(checkGameAssets(root, 1), /ASSET_PATH_ESCAPE/);
+      await assert.rejects(checkGameAssets(root), /ASSET_PATH_ESCAPE/);
     } finally {
       rmSync(outside);
     }
@@ -137,10 +143,10 @@ test("the complete warrior pack is ready without legacy runner dependencies", as
   const root = fileURLToPath(
     new URL("../../../apps/web/public/", import.meta.url),
   );
-  const result = await checkGameAssets(root, 3);
+  const result = await checkGameAssets(root);
   assert.equal(result.ready, true);
   const manifest = JSON.parse(
-    readFileSync(join(root, "game-assets/v3/manifest.json"), "utf8"),
+    readFileSync(join(root, "game-assets/manifest.json"), "utf8"),
   );
   assert.equal(result.checkedFiles, manifest.assets.length);
   assert.deepEqual(result.missing, []);

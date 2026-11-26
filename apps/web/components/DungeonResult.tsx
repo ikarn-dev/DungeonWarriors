@@ -9,7 +9,7 @@ import { TreasureChest } from "./TreasureChest";
 export function DungeonResult({
   view,
   title,
-  timedOut,
+  downed,
   finished,
   error,
   busy,
@@ -20,7 +20,8 @@ export function DungeonResult({
 }: {
   readonly view: DungeonView;
   readonly title: string;
-  readonly timedOut: boolean;
+  // The gas or a fall in battle ended the room.
+  readonly downed: boolean;
   readonly finished: boolean;
   readonly error: string | null;
   readonly busy: boolean;
@@ -30,9 +31,9 @@ export function DungeonResult({
   readonly onDone: () => void;
 }) {
   const treasure =
-    !timedOut && (view.phase === "intermission" || view.phase === "won");
-  const lost = timedOut || view.phase === "lost";
-  const ended = finished || timedOut;
+    !downed && (view.phase === "intermission" || view.phase === "won");
+  const lost = downed || view.phase === "lost";
+  const ended = finished || downed;
   const result = treasure || lost || view.phase === "refunded";
   const payout = lost ? 0n : BigInt(view.payout);
   const net = payout - BigInt(view.stake);
@@ -60,7 +61,7 @@ export function DungeonResult({
       {error && <output>{error}</output>}
       {(view.phase === "intermission" || ended) && (
         <div className="dungeon-result-actions">
-          {view.phase === "intermission" && !timedOut ? (
+          {view.phase === "intermission" && !downed ? (
             <>
               <button
                 className="metal-key"

@@ -3,7 +3,7 @@ import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { verifyManifestBinding } from "../lib/game/assets";
+import { catalogManifestPath, verifyManifestBinding } from "../lib/game/assets";
 import {
   type PlayerIntent,
   validatePreparedPlayerAction,
@@ -265,7 +265,7 @@ export default function StarterPanel() {
       if (state?.assetBinding == null)
         throw new WebApiError("ASSETS_NOT_READY");
       const response = await fetch(
-        `/game-assets/v${state.assetBinding.version}/manifest.json`,
+        catalogManifestPath(state.assetBinding.version),
         { cache: "no-store", signal },
       );
       if (

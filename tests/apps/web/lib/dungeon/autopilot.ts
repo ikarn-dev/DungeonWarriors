@@ -14,6 +14,7 @@ import {
   type DungeonInput,
   initialFrame,
   nearbyGate,
+  roomOver,
   stepRoom,
 } from "../../../../../apps/web/lib/dungeon/simulation";
 import { WARRIORS } from "../../../../../apps/web/lib/dungeon/warriors";
@@ -38,7 +39,7 @@ export function autopilot(
   const reach = WARRIORS[cat].reach;
   while (
     f.tick < PHYSICS.maxRoomTicks &&
-    !f.timedOut &&
+    !roomOver(f) &&
     nearbyGate(f, room) !== gate
   ) {
     const controls: Control[] = [];

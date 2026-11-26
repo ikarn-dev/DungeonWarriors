@@ -4,8 +4,9 @@ import { DUSK } from "./render-scenery";
 import { type DungeonRoom, moverSurface } from "./rooms";
 import type { DungeonFrame } from "./simulation";
 
-// Moving parts of a room drawn every frame: lifts, the hourglass pickup and
-// ambush warnings.
+// Moving parts of a room drawn every frame: lifts (2026-11-26: stone slabs
+// on iron carriages, matching the ledges), the hourglass pickup and ambush
+// warnings.
 export function drawMovers(
   g: Phaser.GameObjects.Graphics,
   room: DungeonRoom,
@@ -13,17 +14,29 @@ export function drawMovers(
 ) {
   for (const m of room.movers) {
     const s = moverSurface(m, frame.tick);
-    g.fillStyle(DUSK.ink);
-    g.fillRoundedRect(s.x - 2, s.y - 9, s.width + 4, 29, 5);
+    // A cut-stone slab like the ledges, riding an iron carriage on the rail.
+    g.fillStyle(0x24212d);
+    g.fillRect(s.x + 6, s.y + 12, 6, 12);
+    g.fillRect(s.x + s.width - 12, s.y + 12, 6, 12);
     g.fillStyle(DUSK.floorTop);
-    g.fillRoundedRect(s.x, s.y - 7, s.width, 9, 3);
-    g.fillStyle(DUSK.gate);
-    g.fillRect(s.x, s.y, s.width, 18);
-    g.fillStyle(DUSK.lip);
-    g.fillRect(s.x + 2, s.y, s.width - 4, 2);
-    g.fillStyle(DUSK.gold);
-    g.fillCircle(s.x + 10, s.y + 10, 3);
-    g.fillCircle(s.x + s.width - 10, s.y + 10, 3);
+    g.fillRect(s.x, s.y - 8, s.width, 8);
+    g.fillStyle(0xffffff, 0.08);
+    g.fillRect(s.x, s.y - 8, s.width, 1.5);
+    g.fillStyle(0x857ea3);
+    g.fillRect(s.x, s.y, s.width, 8);
+    g.fillStyle(DUSK.lip, 0.85);
+    g.fillRect(s.x, s.y, s.width, 1.5);
+    g.fillStyle(DUSK.floor);
+    g.fillRect(s.x, s.y + 8, s.width, 8);
+    g.fillStyle(0x000000, 0.3);
+    g.fillRect(s.x, s.y + 8, s.width, 2);
+    g.fillRect(s.x, s.y + 14, s.width, 2);
+    g.fillStyle(DUSK.mortar, 0.8);
+    for (let x = s.x + 24; x < s.x + s.width - 4; x += 24)
+      g.fillRect(x, s.y - 8, 1.5, 24);
+    g.fillStyle(0x9a94ad);
+    g.fillCircle(s.x + 9, s.y + 20, 1.5);
+    g.fillCircle(s.x + s.width - 9, s.y + 20, 1.5);
   }
 }
 export function drawHourglass(

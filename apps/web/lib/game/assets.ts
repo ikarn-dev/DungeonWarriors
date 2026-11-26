@@ -1,8 +1,13 @@
 import { z } from "zod";
 
-// Lobby and dungeon cat art is bundled and hash-checked locally.
-// Legacy runner recovery retains its published manifest bindings.
-export const MEDIA_ROOT = "/game-assets/v2";
+// Every asset the app uses sits in one folder (2026-11-26): the dungeon art
+// manifest, its SVGs and the capsule upgrade item. The onchain catalog still
+// binds media version 2 by manifest hash, so that manifest is kept, unchanged,
+// as catalog-manifest-v2.json; its runner art files are retired.
+export const MEDIA_ROOT = "/game-assets";
+export const MEDIA_VERSION = 3;
+export const catalogManifestPath = (version: number) =>
+  `${MEDIA_ROOT}/catalog-manifest-v${version}.json`;
 
 export const FIRST_SCENE_ASSETS = [
   "background-forest-far",
@@ -59,7 +64,7 @@ export const imageAssetSchema = z
       .string()
       .max(200)
       .regex(
-        /^\/game-assets\/v[1-9][0-9]*\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.(?:png|svg)$/,
+        /^\/game-assets\/(?:v[1-9][0-9]*\/)?[a-z0-9]+(?:-[a-z0-9]+)*\.(?:png|svg)$/,
       ),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     bytes: positive.max(8 * 1024 * 1024),
@@ -92,7 +97,10 @@ export function parseAssetManifest(input: unknown): AssetManifest {
     if (
       a.id <= previous ||
       paths.has(a.path) ||
-      !a.path.startsWith(`/game-assets/v${manifest.version}/`) ||
+      // Retained catalog manifests name their old version folder; it must
+      // match their version. Current assets sit in the folder itself.
+      (/^\/game-assets\/v[0-9]/.test(a.path) &&
+        !a.path.startsWith(`/game-assets/v${manifest.version}/`)) ||
       a.width % a.frameWidth !== 0 ||
       a.height % a.frameHeight !== 0 ||
       a.frames > (a.width / a.frameWidth) * (a.height / a.frameHeight) ||
@@ -210,7 +218,6 @@ export const ENEMY_PART_IDS = Object.entries(ENEMY_RIG_PARTS).flatMap(
 export const WARRIOR_SCENE_ASSETS: readonly string[] = [
   ...["collector", "acrobat", "guardian", "sprinter"].flatMap((cat) => [
     ...RIG_PARTS.map((part) => `rig-${cat}-${part}`),
-    `warrior-${cat}`,
   ]),
   ...["spear", "longsword", "sword", "axe"].map((weapon) => `weapon-${weapon}`),
   ...["slime", "skeleton", "bat", "warden"].map((enemy) => `enemy-${enemy}`),

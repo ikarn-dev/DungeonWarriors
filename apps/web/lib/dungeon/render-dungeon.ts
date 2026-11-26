@@ -5,14 +5,21 @@ import { type Enemy, enemyStats } from "./enemies";
 import { EnemyRig } from "./render-enemy";
 import { CombatFeedback, uiFont } from "./render-feedback";
 import { GasSmog } from "./render-gas";
+import { GATE } from "./render-gates";
 import { drawHourglass, drawMovers, drawWarnings } from "./render-props";
 import { DUSK, drawScenery } from "./render-scenery";
+import { Torches } from "./render-torch";
 import { GateTrap, TRAP_HIT_MS } from "./render-trap";
 import { WarriorRig } from "./render-warrior";
 import type { DungeonRunner } from "./replay";
 import type { DungeonRoom, EnemyKind } from "./rooms";
 import { PHYSICS } from "./rules";
-import { type DungeonFrame, SWING_TICKS, wardensLeft } from "./simulation";
+import {
+  type DungeonFrame,
+  roomOver,
+  SWING_TICKS,
+  wardensLeft,
+} from "./simulation";
 import { WARRIORS } from "./warriors";
 
 type Options = {
@@ -22,7 +29,8 @@ type Options = {
   reduced: () => boolean;
   onReady: () => void;
   onError: () => void;
-  onTimeout: () => void;
+  // The gas or a fall in battle ended the room.
+  onRoomOver: () => void;
   // The gate the server reported as the trap, once it has.
   trap: () => number | null;
   preloaded: ReadonlyMap<string, Blob>;
@@ -62,6 +70,7 @@ export function renderDungeon(
     private rig?: WarriorRig;
     private feedback?: CombatFeedback;
     private gas?: GasSmog;
+    private torches?: Torches;
     private trap?: GateTrap;
     private trapHurt = false;
     private foes: EnemyRig[] = [];
@@ -130,8 +139,9 @@ export function renderDungeon(
         .setOrigin(0.5, 1)
         .setDepth(13)
         .setVisible(false);
+      this.torches = new Torches(this, engine, 1);
       this.gas = new GasSmog(this, engine, 15);
-      this.trap = new GateTrap(this, engine, 13);
+      this.trap = new GateTrap(this, engine, 13, 2.5);
       this.fit();
       options.onReady();
     }
@@ -143,16 +153,16 @@ export function renderDungeon(
     }
     private build(room: DungeonRoom) {
       if (this.scenery) drawScenery(this.scenery, room);
+      this.torches?.build(room);
       for (const label of this.labels) label.destroy();
       this.labels = room.gates.map((gate) =>
         this.add
-          .text(gate.x, gate.y - 118, String(gate.id + 1), {
+          // On the keystone's plate (render-gates.ts).
+          .text(gate.x, gate.y - GATE.plate, String(gate.id + 1), {
             fontFamily: font,
-            fontSize: "18px",
+            fontSize: "14px",
             fontStyle: "700",
             color: "#fbe7a6",
-            backgroundColor: "#0b1716",
-            padding: { x: 8, y: 3 },
           })
           .setOrigin(0.5)
           .setDepth(5),
@@ -212,6 +222,7 @@ export function renderDungeon(
       this.shadows.clear();
       this.feedback.begin();
       drawMovers(this.props, room, frame);
+      this.torches?.update(time, still, this.cameras.main.worldView);
       drawHourglass(g, room, frame, time, still);
       const cat = runner.position(now);
       this.trap?.spring(time, room, options.trap(), cat, still);
@@ -238,23 +249,25 @@ export function renderDungeon(
         );
         this.sealed
           .setPosition(x, first.y - 150)
-          .setVisible(!open && !frame.timedOut);
+          .setVisible(!open && !roomOver(frame));
       }
+      // Sealed gates: two glowing red bars across each door, behind the cat.
       if (!open)
         for (const gate of room.gates) {
-          g.fillStyle(
+          this.props.fillStyle(
             DUSK.danger,
-            still ? 0.5 : 0.35 + Math.sin(time / 260) * 0.15,
+            still ? 0.55 : 0.4 + Math.sin(time / 260) * 0.15,
           );
-          g.fillRect(gate.x - 26, gate.y - 60, 52, 6);
-          g.fillRect(gate.x - 26, gate.y - 30, 52, 6);
+          const w = GATE.half - 3;
+          this.props.fillRect(gate.x - w, gate.y - 64, w * 2, 5);
+          this.props.fillRect(gate.x - w, gate.y - 34, w * 2, 5);
         }
       if (frame.timedOut)
-        this.gas?.start(time, this.cameras.main.worldView, still);
-      this.gas?.update(time, this.scale.width / (this.scale.height / 600));
-      if (frame.timedOut && !this.notified) {
+        this.gas?.start(time, () => this.cameras.main.worldView, still);
+      this.gas?.update(time, this.cameras.main);
+      if (roomOver(frame) && !this.notified) {
         this.notified = true;
-        options.onTimeout();
+        options.onRoomOver();
       }
     }
     // Foe positions between ticks, so they glide instead of stepping.
@@ -440,11 +453,13 @@ export function renderDungeon(
           feet,
           dir: frame.facing,
           grounded: frame.grounded,
+          // Walking means the player is steering; riding a lift is not.
+          stepping: frame.axis !== 0 && frame.knock === 0,
           vy: frame.vy,
           swing,
           hurt,
           blink: frame.invuln > 0 && !still && Math.floor(time / 60) % 2 === 0,
-          down: frame.timedOut || trapped,
+          down: roomOver(frame) || trapped,
         },
         time,
         still,
@@ -455,7 +470,7 @@ export function renderDungeon(
         x,
         feet - 76,
         44,
-        frame.timedOut || trapped ? 0 : frame.hp / warrior.hp,
+        roomOver(frame) || trapped ? 0 : frame.hp / warrior.hp,
         // Gold while invulnerable after a hit or respawn.
         frame.invuln > 0 ? 0xfbe7a6 : 0x7be07a,
         time,

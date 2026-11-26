@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { assetManifestBytes } from "../../apps/web/lib/game/assets.ts";
+import {
+  assetManifestBytes,
+  catalogManifestPath,
+} from "../../apps/web/lib/game/assets.ts";
 import { CATALOG_V1 } from "../../apps/web/lib/game/catalog.ts";
 import { rpcConfigSchema } from "../../apps/web/lib/providers/config.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
 import { DUNGEON_WARRIORS_IDL } from "../../apps/web/lib/solana/dungeon-warriors.ts";
-import { checkGameAssets } from "../assets/check-assets.mjs";
+import { catalogManifestBinding } from "../assets/check-assets.mjs";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
 
 // Catalog v2 (2026-11-22) republishes the unchanged v1 values with media v2.
@@ -82,7 +85,7 @@ function catalogData(contentHash) {
 
 // The live site must already serve the exact manifest the catalog will bind.
 async function hostedMediaMatches(origin, contentHash) {
-  const url = new URL(`/game-assets/v${MEDIA_VERSION}/manifest.json`, origin);
+  const url = new URL(catalogManifestPath(MEDIA_VERSION), origin);
   const response = await fetch(url, {
     signal: AbortSignal.timeout(8000),
     redirect: "error",
@@ -96,8 +99,9 @@ async function hostedMediaMatches(origin, contentHash) {
 }
 
 async function inspectCatalog(env, adminPath) {
-  const media = await checkGameAssets(publicDir, MEDIA_VERSION);
-  check(media.ready, "ASSETS_NOT_READY");
+  const media = {
+    binding: catalogManifestBinding(publicDir, MEDIA_VERSION),
+  };
   const { HELIUS_DEVNET_RPC_URL } = rpcConfigSchema.parse(env);
   const rpc = new Connection(HELIUS_DEVNET_RPC_URL, {
     commitment: "finalized",

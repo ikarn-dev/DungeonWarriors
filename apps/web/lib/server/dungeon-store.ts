@@ -41,6 +41,7 @@ export const dungeonRecordSchema = dungeonViewSchema
         "banked",
         "trap",
         "gas",
+        "fallen",
         "abandoned",
         "unstarted",
         "vrfTimeout",

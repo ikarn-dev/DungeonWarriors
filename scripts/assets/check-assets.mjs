@@ -5,6 +5,8 @@ import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assetManifestBytes,
+  catalogManifestPath,
+  MEDIA_VERSION,
   missingSceneAssets,
   parseAssetManifest,
   requiredSceneAssets,
@@ -16,26 +18,39 @@ const webRequire = createRequire(
 // Reuse Next's installed image decoder; no extra package or local server.
 const sharp = createRequire(webRequire.resolve("next"))("sharp");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-export async function checkGameAssets(publicDirectory, version) {
-  if (!Number.isInteger(version) || version < 1 || version > 0xffffffff)
-    throw new Error("INVALID_ASSET_VERSION");
+const insideOf = (root) => (path) => {
+  const actual = realpathSync(path);
+  if (!actual.startsWith(root + sep)) throw new Error("ASSET_PATH_ESCAPE");
+  return actual;
+};
+function readManifest(file) {
+  if (statSync(file).size > 256 * 1024) throw new Error("MANIFEST_TOO_LARGE");
+  return parseAssetManifest(JSON.parse(readFileSync(file, "utf8")));
+}
+// The manifest the onchain catalog binds for a media version. Only the
+// manifest document is kept (2026-11-26); its retired runner art files are
+// not checked.
+export function catalogManifestBinding(publicDirectory, version) {
   const root = realpathSync(publicDirectory);
-  const candidate = join(root, `game-assets/v${version}/manifest.json`);
+  const manifest = readManifest(
+    insideOf(root)(join(root, catalogManifestPath(version).slice(1))),
+  );
+  if (manifest.version !== version) throw new Error("ASSET_VERSION_MISMATCH");
+  return { version, contentHash: hash(assetManifestBytes(manifest)) };
+}
+// Every file in the single game-assets folder's manifest: size, hash, safe
+// SVG content and decoded dimensions.
+export async function checkGameAssets(publicDirectory) {
+  const root = realpathSync(publicDirectory);
+  const candidate = join(root, "game-assets/manifest.json");
   if (!existsSync(candidate))
     return {
       ready: false,
       reason: "USER_ASSETS_PENDING",
-      missing: [...requiredSceneAssets(version)],
+      missing: [...requiredSceneAssets(MEDIA_VERSION)],
     };
-  const inside = (path) => {
-    const actual = realpathSync(path);
-    if (!actual.startsWith(root + sep)) throw new Error("ASSET_PATH_ESCAPE");
-    return actual;
-  };
-  const file = inside(candidate);
-  if (statSync(file).size > 256 * 1024) throw new Error("MANIFEST_TOO_LARGE");
-  const manifest = parseAssetManifest(JSON.parse(readFileSync(file, "utf8")));
-  if (manifest.version !== version) throw new Error("ASSET_VERSION_MISMATCH");
+  const inside = insideOf(root);
+  const manifest = readManifest(inside(candidate));
   for (const asset of manifest.assets) {
     const path = inside(join(root, asset.path.slice(1)));
     const stat = statSync(path);
@@ -96,7 +111,6 @@ if (import.meta.main) {
   try {
     const result = await checkGameAssets(
       fileURLToPath(new URL("../../apps/web/public", import.meta.url)),
-      Number(process.argv[2] ?? 1),
     );
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (!result.ready) process.exitCode = 1;

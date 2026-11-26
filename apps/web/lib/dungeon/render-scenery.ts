@@ -1,5 +1,7 @@
 import type Phaser from "phaser";
-import type { DungeonRoom } from "./rooms";
+import { drawGates } from "./render-gates";
+import { drawWalls, noise } from "./render-walls";
+import type { DungeonRoom, Surface } from "./rooms";
 
 // "Catacomb dusk" palette (2026-11-24): dark plum stone that never reaches
 // black, warm torchlight and readable walkable edges.
@@ -29,72 +31,23 @@ export const DUSK = {
 // Static room art, drawn once per room. Moving parts are drawn per frame.
 export function drawScenery(g: Phaser.GameObjects.Graphics, room: DungeonRoom) {
   g.clear();
-  g.fillStyle(DUSK.mortar);
-  g.fillRect(0, 0, room.width, room.height);
-  for (let row = 0; row < Math.ceil(room.height / 32); row++)
-    for (let col = -1; col < Math.ceil(room.width / 64) + 1; col++) {
-      const x = col * 64 + (row % 2) * 32;
-      const y = row * 32;
-      g.fillStyle((row * 7 + col * 3) % 5 === 0 ? DUSK.wallLit : DUSK.wall);
-      g.fillRect(x + 2, y + 2, 60, 28);
-      g.fillStyle(DUSK.wallLit, 0.7);
-      g.fillRect(x + 2, y + 2, 60, 2);
-    }
-  for (let x = 120; x < room.width - 200; x += 320) {
-    g.fillStyle(DUSK.recess);
-    g.fillRect(x, 150, 96, 190);
-    g.fillCircle(x + 48, 150, 48);
-    g.fillStyle(DUSK.floor);
-    g.fillRect(x - 8, 336, 112, 10);
-    const tx = x + 200;
-    g.fillStyle(DUSK.halo, 0.08);
-    g.fillCircle(tx, 190, 56);
-    g.fillStyle(DUSK.halo, 0.12);
-    g.fillCircle(tx, 190, 32);
-    g.fillStyle(DUSK.door);
-    g.fillRect(tx - 4, 200, 8, 38);
-    g.fillStyle(DUSK.flameOuter);
-    g.fillEllipse(tx, 186, 16, 24);
-    g.fillStyle(DUSK.flame);
-    g.fillEllipse(tx, 188, 8, 16);
-  }
+  drawWalls(g, room);
+  // Lift rails: a dark iron track with bolted end brackets.
   for (const m of room.movers) {
-    g.fillStyle(DUSK.iron);
-    g.fillRect(m.x, m.y + 24, m.width + m.span, 4);
-    g.fillStyle(DUSK.gold);
-    g.fillCircle(m.x + 4, m.y + 26, 4);
-    g.fillCircle(m.x + m.width + m.span - 4, m.y + 26, 4);
-  }
-  for (const s of room.surfaces) {
-    const bottom = s.floating ? Math.max(s.y, s.y + s.rise) + 22 : room.height;
-    for (let x = 0; x < s.width; x += 8) {
-      const top = Math.round(s.y + (s.rise * (x + 4)) / s.width);
-      g.fillStyle(DUSK.floor);
-      g.fillRect(s.x + x, top, 8, bottom - top);
-      for (let y = top + 14; y < bottom; y += 22) {
-        g.fillStyle(
-          (Math.floor(x / 32) + Math.floor(y / 22)) % 2
-            ? DUSK.floorShade
-            : DUSK.mortar,
-        );
-        g.fillRect(s.x + x, y, 8, 3);
-      }
-      // Top plane behind the walkable edge: feet stand on its front edge.
-      g.fillStyle(DUSK.floorTop);
-      g.fillRect(s.x + x, top - 8, 8, 8);
-      g.fillStyle(DUSK.lip, 0.45);
-      g.fillRect(s.x + x, top - 8, 8, 1.5);
-      g.fillStyle(DUSK.edge);
-      g.fillRect(s.x + x, top, 8, 6);
-      g.fillStyle(DUSK.lip);
-      g.fillRect(s.x + x, top, 8, 2);
-    }
-    if (!s.floating) {
-      g.fillStyle(DUSK.ink, 0.6);
-      g.fillRect(s.x, s.y, 3, bottom - s.y);
-      g.fillRect(s.x + s.width - 3, s.y + s.rise, 3, bottom - s.y - s.rise);
+    const left = m.x;
+    const right = m.x + m.width + m.span;
+    g.fillStyle(0x1b1822);
+    g.fillRect(left, m.y + 23, right - left, 5);
+    g.fillStyle(0xffffff, 0.1);
+    g.fillRect(left, m.y + 23, right - left, 1);
+    for (const end of [left, right - 10]) {
+      g.fillStyle(0x24212d);
+      g.fillRect(end, m.y + 18, 10, 14);
+      g.fillStyle(0x8f8aa3, 0.8);
+      g.fillCircle(end + 5, m.y + 25, 1.5);
     }
   }
+  for (const s of room.surfaces) drawSurface(g, room, s);
   for (const s of room.spikes) {
     g.fillStyle(DUSK.danger);
     g.fillRect(s.x, s.y - 3, s.width, 3);
@@ -120,22 +73,74 @@ export function drawScenery(g: Phaser.GameObjects.Graphics, room: DungeonRoom) {
     g.fillStyle(DUSK.gold);
     g.fillRect(s.x - 2, y - 12, 4, 10);
   }
-  for (const gate of room.gates) {
-    const x = gate.x;
-    const y = gate.y;
-    g.fillStyle(DUSK.ink);
-    g.fillRect(x - 34, y - 92, 68, 92);
-    g.fillCircle(x, y - 92, 34);
-    g.fillStyle(DUSK.gate);
-    g.fillRect(x - 30, y - 90, 60, 90);
-    g.fillCircle(x, y - 90, 30);
-    g.fillStyle(DUSK.door);
-    g.fillRect(x - 22, y - 84, 44, 84);
-    g.fillCircle(x, y - 84, 22);
-    g.fillStyle(DUSK.iron);
-    for (const dx of [-14, -2, 10]) g.fillRect(x + dx, y - 100, 4, 100);
-    g.fillRect(x - 22, y - 54, 44, 4);
-    g.fillStyle(DUSK.gold);
-    g.fillRect(x - 4, y - 126, 8, 8);
+  drawGates(g, room);
+}
+
+// Stone ramps and ledges (2026-11-26): a cut-stone cap seen slightly from
+// above (the walkable top plane, then a lit front lip where the feet stand),
+// over coursed blocks that follow the slope and darken with depth. Drawn in
+// 4 px columns so slopes stay smooth.
+const COL = 4;
+const COURSE = 24;
+const BLOCK = 48;
+function drawSurface(
+  g: Phaser.GameObjects.Graphics,
+  room: DungeonRoom,
+  s: Surface,
+) {
+  const bottom = s.floating ? Math.max(s.y, s.y + s.rise) + 22 : room.height;
+  for (let x = 0; x < s.width; x += COL) {
+    const top = s.y + (s.rise * (x + COL / 2)) / s.width;
+    const wx = s.x + x;
+    g.fillStyle(DUSK.floor);
+    g.fillRect(wx, top, COL, bottom - top);
+    for (let y = top + 10, course = 0; y < bottom; y += COURSE, course++) {
+      const h = Math.min(COURSE, bottom - y);
+      const shift = (course % 2) * (BLOCK / 2);
+      const block = Math.floor((x + shift) / BLOCK);
+      // Per-block tone, then a vertical joint at each block's left edge.
+      const tone = noise(s.x, course, block);
+      g.fillStyle(
+        tone > 0.5 ? 0xffffff : 0x000000,
+        0.03 + Math.abs(tone - 0.5) * 0.08,
+      );
+      g.fillRect(wx, y, COL, h);
+      g.fillStyle(DUSK.mortar);
+      g.fillRect(wx, y, COL, 2);
+      if ((x + shift) % BLOCK < COL) g.fillRect(wx, y, 2, h);
+      // Deeper courses fall into shadow.
+      g.fillStyle(0x0b0912, Math.min(0.45, course * 0.07));
+      g.fillRect(wx, y + 2, COL, h - 2);
+    }
+    // Cap: top plane, lit front lip, then the shadow under the cap.
+    g.fillStyle(DUSK.floorTop);
+    g.fillRect(wx, top - 8, COL, 8);
+    g.fillStyle(0xffffff, 0.08);
+    g.fillRect(wx, top - 8, COL, 1.5);
+    g.fillStyle(0x857ea3);
+    g.fillRect(wx, top, COL, 8);
+    g.fillStyle(DUSK.lip, 0.85);
+    g.fillRect(wx, top, COL, 1.5);
+    g.fillStyle(0x000000, 0.3);
+    g.fillRect(wx, top + 8, COL, 2);
+  }
+  // Slab joints across the cap.
+  for (let x = BLOCK; x < s.width; x += BLOCK) {
+    const top = s.y + (s.rise * x) / s.width;
+    g.fillStyle(DUSK.mortar, 0.8);
+    g.fillRect(s.x + x, top - 8, 1.5, 16);
+  }
+  if (s.floating) {
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(s.x, bottom - 3, s.width, 3);
+  } else {
+    g.fillStyle(DUSK.ink, 0.6);
+    g.fillRect(s.x, s.y - 8, 3, bottom - s.y + 8);
+    g.fillRect(
+      s.x + s.width - 3,
+      s.y + s.rise - 8,
+      3,
+      bottom - s.y - s.rise + 8,
+    );
   }
 }

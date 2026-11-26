@@ -128,6 +128,8 @@ export async function updateDungeon(owner: string, input: DungeonRequest) {
         elapsed >= budgetMs(frame, room, record.cat, record.rules)
       ) {
         finishDungeon(record, 1, "gas");
+      } else if (frame.fallen) {
+        finishDungeon(record, 1, "fallen");
       } else {
         if (nearbyGate(frame, room) !== input.gate)
           throw new ApiError("DUNGEON_GATE_OUT_OF_RANGE", 409);

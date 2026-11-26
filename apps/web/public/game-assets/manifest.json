@@ -4,7 +4,7 @@
   "assets": [
     {
       "id": "enemy-bat",
-      "path": "/game-assets/v3/enemy-bat.svg",
+      "path": "/game-assets/enemy-bat.svg",
       "sha256": "3423e74e79fc4b0642f107aa6cbcea92a23b2bbedbaf68b25482d90a5b98ad75",
       "bytes": 1909,
       "width": 128,
@@ -22,7 +22,7 @@
     },
     {
       "id": "enemy-bat-body",
-      "path": "/game-assets/v3/enemy-bat-body.svg",
+      "path": "/game-assets/enemy-bat-body.svg",
       "sha256": "2050f01b7fcfc7ad30b6f5a14df43c5c4464fe3db3db3b484419f22efb1d60fb",
       "bytes": 1366,
       "width": 128,
@@ -40,7 +40,7 @@
     },
     {
       "id": "enemy-bat-wing-back",
-      "path": "/game-assets/v3/enemy-bat-wing-back.svg",
+      "path": "/game-assets/enemy-bat-wing-back.svg",
       "sha256": "4fb95a974ed2ba47b9a5eb0d821174635fa37520ed03dca0d4d440c553f27ed3",
       "bytes": 681,
       "width": 128,
@@ -58,7 +58,7 @@
     },
     {
       "id": "enemy-bat-wing-front",
-      "path": "/game-assets/v3/enemy-bat-wing-front.svg",
+      "path": "/game-assets/enemy-bat-wing-front.svg",
       "sha256": "0b316236bb94042a36800dd9022897ea1c1e22a0372d1f5fe82bcd6651f512ba",
       "bytes": 690,
       "width": 128,
@@ -76,7 +76,7 @@
     },
     {
       "id": "enemy-skeleton",
-      "path": "/game-assets/v3/enemy-skeleton.svg",
+      "path": "/game-assets/enemy-skeleton.svg",
       "sha256": "2c12c42c4d9662ec5f449dc6848d037d1860a25a13421ed8db712e14234cc868",
       "bytes": 3093,
       "width": 128,
@@ -94,7 +94,7 @@
     },
     {
       "id": "enemy-skeleton-head",
-      "path": "/game-assets/v3/enemy-skeleton-head.svg",
+      "path": "/game-assets/enemy-skeleton-head.svg",
       "sha256": "d4502f2d1bddab97395a9b6e81cf1949f538285a6c3d5ea14a552c64fe94bc8e",
       "bytes": 1373,
       "width": 128,
@@ -112,7 +112,7 @@
     },
     {
       "id": "enemy-skeleton-leg-back",
-      "path": "/game-assets/v3/enemy-skeleton-leg-back.svg",
+      "path": "/game-assets/enemy-skeleton-leg-back.svg",
       "sha256": "e2b29f073659cdea89cf353eca5ea381f5bc9a2efcd007a6c934bc6526389ef2",
       "bytes": 581,
       "width": 128,
@@ -130,7 +130,7 @@
     },
     {
       "id": "enemy-skeleton-leg-front",
-      "path": "/game-assets/v3/enemy-skeleton-leg-front.svg",
+      "path": "/game-assets/enemy-skeleton-leg-front.svg",
       "sha256": "17de6e08ccd3784e2cc20952ae91eef34a5ff49ebaa2df9140150a80bfea343e",
       "bytes": 581,
       "width": 128,
@@ -148,7 +148,7 @@
     },
     {
       "id": "enemy-skeleton-torso",
-      "path": "/game-assets/v3/enemy-skeleton-torso.svg",
+      "path": "/game-assets/enemy-skeleton-torso.svg",
       "sha256": "33c2f1d3f3d106cf63035a6a52d1baccba1480d91502aad724089b740e3ebca7",
       "bytes": 902,
       "width": 128,
@@ -166,7 +166,7 @@
     },
     {
       "id": "enemy-skeleton-weapon-arm",
-      "path": "/game-assets/v3/enemy-skeleton-weapon-arm.svg",
+      "path": "/game-assets/enemy-skeleton-weapon-arm.svg",
       "sha256": "b6942cf686eb42d549503fdd3089153d50b1245752e599919f24f347abdbdc96",
       "bytes": 1231,
       "width": 128,
@@ -184,7 +184,7 @@
     },
     {
       "id": "enemy-slime",
-      "path": "/game-assets/v3/enemy-slime.svg",
+      "path": "/game-assets/enemy-slime.svg",
       "sha256": "57ad568777aff9b7a11d796289889ecd7bca3d4b4504583564de3c1911b824de",
       "bytes": 1142,
       "width": 128,
@@ -202,7 +202,7 @@
     },
     {
       "id": "enemy-warden",
-      "path": "/game-assets/v3/enemy-warden.svg",
+      "path": "/game-assets/enemy-warden.svg",
       "sha256": "47ae2f4178972808ee3fdd0fe079d44ef36f6f6b68a3eac8b87475487e079dd3",
       "bytes": 4062,
       "width": 128,
@@ -220,7 +220,7 @@
     },
     {
       "id": "enemy-warden-arm",
-      "path": "/game-assets/v3/enemy-warden-arm.svg",
+      "path": "/game-assets/enemy-warden-arm.svg",
       "sha256": "230e661d8eabdc37b0778ce89befaaed46e3ba49581bdbcc1733e5eac9f47d64",
       "bytes": 906,
       "width": 128,
@@ -238,7 +238,7 @@
     },
     {
       "id": "enemy-warden-axe",
-      "path": "/game-assets/v3/enemy-warden-axe.svg",
+      "path": "/game-assets/enemy-warden-axe.svg",
       "sha256": "acef406d7c8845468a0099f8fd428b8bb3a4fce89557b47a8c7edf6af27d8355",
       "bytes": 996,
       "width": 128,
@@ -256,7 +256,7 @@
     },
     {
       "id": "enemy-warden-body",
-      "path": "/game-assets/v3/enemy-warden-body.svg",
+      "path": "/game-assets/enemy-warden-body.svg",
       "sha256": "be6ccb3168b666276692f2c0f0abf447a819094f6740c221ea9079b99e55cc19",
       "bytes": 1496,
       "width": 128,
@@ -274,7 +274,7 @@
     },
     {
       "id": "enemy-warden-head",
-      "path": "/game-assets/v3/enemy-warden-head.svg",
+      "path": "/game-assets/enemy-warden-head.svg",
       "sha256": "22e1f8919ef2ac08f48ca9fcd4663b1f899c57f2dad1aff347682efb0d4112b7",
       "bytes": 1819,
       "width": 128,
@@ -292,7 +292,7 @@
     },
     {
       "id": "enemy-warden-leg-back",
-      "path": "/game-assets/v3/enemy-warden-leg-back.svg",
+      "path": "/game-assets/enemy-warden-leg-back.svg",
       "sha256": "c0a88aa6a255acddb2b6d69f85b1de562aa0cd1e201139331902a77dc30b0069",
       "bytes": 755,
       "width": 128,
@@ -310,7 +310,7 @@
     },
     {
       "id": "enemy-warden-leg-front",
-      "path": "/game-assets/v3/enemy-warden-leg-front.svg",
+      "path": "/game-assets/enemy-warden-leg-front.svg",
       "sha256": "31675bc36a5270cf65d3f67cf22ef3897637bee84bec490b2c4f078ec4ce263d",
       "bytes": 755,
       "width": 128,
@@ -328,7 +328,7 @@
     },
     {
       "id": "enemy-warden-robe",
-      "path": "/game-assets/v3/enemy-warden-robe.svg",
+      "path": "/game-assets/enemy-warden-robe.svg",
       "sha256": "8ddb846bcdbcc68e4dd13914f613c4b92c1f27dbab8a48c89112850dc876a377",
       "bytes": 891,
       "width": 128,
@@ -346,7 +346,7 @@
     },
     {
       "id": "rig-acrobat-arm-far",
-      "path": "/game-assets/v3/rig-acrobat-arm-far.svg",
+      "path": "/game-assets/rig-acrobat-arm-far.svg",
       "sha256": "15c46bbe01038d2050d7def29ac035f7e2507bbb3cbc2ff2fbdbdc11e46fded0",
       "bytes": 3061,
       "width": 128,
@@ -364,7 +364,7 @@
     },
     {
       "id": "rig-acrobat-arm-near",
-      "path": "/game-assets/v3/rig-acrobat-arm-near.svg",
+      "path": "/game-assets/rig-acrobat-arm-near.svg",
       "sha256": "1bc3e4461e57cdbc3a6fabc56242f04c84b701ac925437fa5ddb5fd5c3709022",
       "bytes": 2809,
       "width": 128,
@@ -382,7 +382,7 @@
     },
     {
       "id": "rig-acrobat-cape",
-      "path": "/game-assets/v3/rig-acrobat-cape.svg",
+      "path": "/game-assets/rig-acrobat-cape.svg",
       "sha256": "8a535653fca086bb3a6c88e102115956450ff23ca057270c0597387fdc0438ed",
       "bytes": 2712,
       "width": 128,
@@ -400,7 +400,7 @@
     },
     {
       "id": "rig-acrobat-head",
-      "path": "/game-assets/v3/rig-acrobat-head.svg",
+      "path": "/game-assets/rig-acrobat-head.svg",
       "sha256": "c63b7618aed72df2597bce1febdc6f4913fe734df8fdec733b80b95045a363ab",
       "bytes": 4816,
       "width": 128,
@@ -418,7 +418,7 @@
     },
     {
       "id": "rig-acrobat-leg-far",
-      "path": "/game-assets/v3/rig-acrobat-leg-far.svg",
+      "path": "/game-assets/rig-acrobat-leg-far.svg",
       "sha256": "50bca39e6b005e1b96db1be3b017aa6f4cd0ed044c1621d3380126ab7de99d61",
       "bytes": 3598,
       "width": 128,
@@ -436,7 +436,7 @@
     },
     {
       "id": "rig-acrobat-leg-near",
-      "path": "/game-assets/v3/rig-acrobat-leg-near.svg",
+      "path": "/game-assets/rig-acrobat-leg-near.svg",
       "sha256": "c88786a114a4902807c90c32ad6667b12fec9e6322c8c7a584a0e159b7dbe5ca",
       "bytes": 2945,
       "width": 128,
@@ -454,7 +454,7 @@
     },
     {
       "id": "rig-acrobat-tail",
-      "path": "/game-assets/v3/rig-acrobat-tail.svg",
+      "path": "/game-assets/rig-acrobat-tail.svg",
       "sha256": "bf52c80ccdb59ba720ba449d9257c4377254a7e241652e61a704d32c784a5843",
       "bytes": 2603,
       "width": 128,
@@ -472,7 +472,7 @@
     },
     {
       "id": "rig-acrobat-torso",
-      "path": "/game-assets/v3/rig-acrobat-torso.svg",
+      "path": "/game-assets/rig-acrobat-torso.svg",
       "sha256": "3505fe7734a1b6b9cf8f92724cfb332a834fb362722a4a0586c95b6f13ed926b",
       "bytes": 4467,
       "width": 128,
@@ -490,7 +490,7 @@
     },
     {
       "id": "rig-collector-arm-far",
-      "path": "/game-assets/v3/rig-collector-arm-far.svg",
+      "path": "/game-assets/rig-collector-arm-far.svg",
       "sha256": "0419b5283dbbd0397aa4ba02e2492f018670514b4619b626856b50e55a65cf7f",
       "bytes": 3901,
       "width": 128,
@@ -508,7 +508,7 @@
     },
     {
       "id": "rig-collector-arm-near",
-      "path": "/game-assets/v3/rig-collector-arm-near.svg",
+      "path": "/game-assets/rig-collector-arm-near.svg",
       "sha256": "2171e7d09be075aeef1c2bc99b55491f3bb76721782df467e5e63a6ff8e3e8c1",
       "bytes": 2809,
       "width": 128,
@@ -526,7 +526,7 @@
     },
     {
       "id": "rig-collector-cape",
-      "path": "/game-assets/v3/rig-collector-cape.svg",
+      "path": "/game-assets/rig-collector-cape.svg",
       "sha256": "9a074bd45771463c03e303e05f1f0a98c71cf114ee4bb3da5e94836899794728",
       "bytes": 2712,
       "width": 128,
@@ -544,7 +544,7 @@
     },
     {
       "id": "rig-collector-head",
-      "path": "/game-assets/v3/rig-collector-head.svg",
+      "path": "/game-assets/rig-collector-head.svg",
       "sha256": "033f4e2ec2be88aa61fec449713b54aa217edcdd3fd1000e58d15992b5f013c4",
       "bytes": 5670,
       "width": 128,
@@ -562,7 +562,7 @@
     },
     {
       "id": "rig-collector-leg-far",
-      "path": "/game-assets/v3/rig-collector-leg-far.svg",
+      "path": "/game-assets/rig-collector-leg-far.svg",
       "sha256": "33a587c1db7cce7ae453548414e9a2188435a963d9b1d75f2cc86670582cdf1b",
       "bytes": 3598,
       "width": 128,
@@ -580,7 +580,7 @@
     },
     {
       "id": "rig-collector-leg-near",
-      "path": "/game-assets/v3/rig-collector-leg-near.svg",
+      "path": "/game-assets/rig-collector-leg-near.svg",
       "sha256": "138748322736a75044e4c0306c8bd2e5f24f9bbe7b8ba258e69ce5b074c89000",
       "bytes": 2945,
       "width": 128,
@@ -598,7 +598,7 @@
     },
     {
       "id": "rig-collector-tail",
-      "path": "/game-assets/v3/rig-collector-tail.svg",
+      "path": "/game-assets/rig-collector-tail.svg",
       "sha256": "bba12e27fc9d233cf48be304aba273d195f9f84c852e6c915de164dc67d2f83e",
       "bytes": 2716,
       "width": 128,
@@ -616,7 +616,7 @@
     },
     {
       "id": "rig-collector-torso",
-      "path": "/game-assets/v3/rig-collector-torso.svg",
+      "path": "/game-assets/rig-collector-torso.svg",
       "sha256": "a94edeed4e9ebe1133d9af19699065334c40976e9c942319bb3eb699b5ee5e67",
       "bytes": 4482,
       "width": 128,
@@ -634,7 +634,7 @@
     },
     {
       "id": "rig-guardian-arm-far",
-      "path": "/game-assets/v3/rig-guardian-arm-far.svg",
+      "path": "/game-assets/rig-guardian-arm-far.svg",
       "sha256": "2fe16b11733e9bbf733c8941ee2b2be71813414d5c57630b9a3a364991a67521",
       "bytes": 3902,
       "width": 128,
@@ -652,7 +652,7 @@
     },
     {
       "id": "rig-guardian-arm-near",
-      "path": "/game-assets/v3/rig-guardian-arm-near.svg",
+      "path": "/game-assets/rig-guardian-arm-near.svg",
       "sha256": "00c023b06311e504e814145bcb248a0a7a7f1087bad20514bf5d1f395d973230",
       "bytes": 2803,
       "width": 128,
@@ -670,7 +670,7 @@
     },
     {
       "id": "rig-guardian-cape",
-      "path": "/game-assets/v3/rig-guardian-cape.svg",
+      "path": "/game-assets/rig-guardian-cape.svg",
       "sha256": "0efe639b81ebd28503f384f4cc57afd3d3fd833e73113f4fd256d33f68038bb6",
       "bytes": 2712,
       "width": 128,
@@ -688,7 +688,7 @@
     },
     {
       "id": "rig-guardian-head",
-      "path": "/game-assets/v3/rig-guardian-head.svg",
+      "path": "/game-assets/rig-guardian-head.svg",
       "sha256": "28b9545dc9dd3b68139dd303a6dbac557cecb572f7f5faa9dfe190bc9ace2f17",
       "bytes": 6302,
       "width": 128,
@@ -706,7 +706,7 @@
     },
     {
       "id": "rig-guardian-leg-far",
-      "path": "/game-assets/v3/rig-guardian-leg-far.svg",
+      "path": "/game-assets/rig-guardian-leg-far.svg",
       "sha256": "57497719d0d3d2f4e8dd3c50f604f69528b0cdc2d06368715a3727a81bfc1e0e",
       "bytes": 3598,
       "width": 128,
@@ -724,7 +724,7 @@
     },
     {
       "id": "rig-guardian-leg-near",
-      "path": "/game-assets/v3/rig-guardian-leg-near.svg",
+      "path": "/game-assets/rig-guardian-leg-near.svg",
       "sha256": "a01358c3e5919c793a655650d34be2e7f6aea7db427f673278990ca73b4db6e2",
       "bytes": 2945,
       "width": 128,
@@ -742,7 +742,7 @@
     },
     {
       "id": "rig-guardian-tail",
-      "path": "/game-assets/v3/rig-guardian-tail.svg",
+      "path": "/game-assets/rig-guardian-tail.svg",
       "sha256": "e6f168923c47cc8f8f9bede31d626b01b55e9311ad226ea96be2b19d5695527a",
       "bytes": 2716,
       "width": 128,
@@ -760,7 +760,7 @@
     },
     {
       "id": "rig-guardian-torso",
-      "path": "/game-assets/v3/rig-guardian-torso.svg",
+      "path": "/game-assets/rig-guardian-torso.svg",
       "sha256": "4d72be02c9f06bbb7830dda129499815903fbaa0a002519eb7acb2273c6e2432",
       "bytes": 4334,
       "width": 128,
@@ -778,7 +778,7 @@
     },
     {
       "id": "rig-sprinter-arm-far",
-      "path": "/game-assets/v3/rig-sprinter-arm-far.svg",
+      "path": "/game-assets/rig-sprinter-arm-far.svg",
       "sha256": "22bab92ca7219f4f2f08e2743ef1ccd00aaba7db8d2110908a13d69eaec42a8b",
       "bytes": 3855,
       "width": 128,
@@ -796,7 +796,7 @@
     },
     {
       "id": "rig-sprinter-arm-near",
-      "path": "/game-assets/v3/rig-sprinter-arm-near.svg",
+      "path": "/game-assets/rig-sprinter-arm-near.svg",
       "sha256": "61ae8b78b003fe645bcf023942af55b2db51b0c37de5082cd0a3e0a08b350f7d",
       "bytes": 2803,
       "width": 128,
@@ -814,7 +814,7 @@
     },
     {
       "id": "rig-sprinter-cape",
-      "path": "/game-assets/v3/rig-sprinter-cape.svg",
+      "path": "/game-assets/rig-sprinter-cape.svg",
       "sha256": "7982e9cf35c49e8f96960c1855b178b78e4aa123c6660d085e0120f7816b74ec",
       "bytes": 2620,
       "width": 128,
@@ -832,7 +832,7 @@
     },
     {
       "id": "rig-sprinter-head",
-      "path": "/game-assets/v3/rig-sprinter-head.svg",
+      "path": "/game-assets/rig-sprinter-head.svg",
       "sha256": "ef762276e4f954aa35d2c0dc1a8d541f88d053d0ae693cfbe05e0a580ce90472",
       "bytes": 6019,
       "width": 128,
@@ -850,7 +850,7 @@
     },
     {
       "id": "rig-sprinter-leg-far",
-      "path": "/game-assets/v3/rig-sprinter-leg-far.svg",
+      "path": "/game-assets/rig-sprinter-leg-far.svg",
       "sha256": "73e9dfb6eede85b010e522d09125880ac53ba8742cce48eac8ba8cfb708a1162",
       "bytes": 3469,
       "width": 128,
@@ -868,7 +868,7 @@
     },
     {
       "id": "rig-sprinter-leg-near",
-      "path": "/game-assets/v3/rig-sprinter-leg-near.svg",
+      "path": "/game-assets/rig-sprinter-leg-near.svg",
       "sha256": "16135f0a1cb8f8c105c67fca2edc7a011ed0b4e13812907905f266ce8d976f06",
       "bytes": 2879,
       "width": 128,
@@ -886,7 +886,7 @@
     },
     {
       "id": "rig-sprinter-tail",
-      "path": "/game-assets/v3/rig-sprinter-tail.svg",
+      "path": "/game-assets/rig-sprinter-tail.svg",
       "sha256": "f367662926db5c6f8dd9b1e27a38d50c3196beb9305f7c6a2a7daee180687e97",
       "bytes": 2716,
       "width": 128,
@@ -904,7 +904,7 @@
     },
     {
       "id": "rig-sprinter-torso",
-      "path": "/game-assets/v3/rig-sprinter-torso.svg",
+      "path": "/game-assets/rig-sprinter-torso.svg",
       "sha256": "2914fc53eb9dc800928ba3a12f37c2a90770577515a5d97e1885f6df6ef6d09c",
       "bytes": 4837,
       "width": 128,
@@ -921,80 +921,8 @@
       "clips": []
     },
     {
-      "id": "warrior-acrobat",
-      "path": "/game-assets/v3/warrior-acrobat.svg",
-      "sha256": "d008c3458271c257feaa7e1764b05356a35e3874aab57cdf5a33b06be7c6d18e",
-      "bytes": 13219,
-      "width": 128,
-      "height": 128,
-      "frameWidth": 128,
-      "frameHeight": 128,
-      "frames": 1,
-      "anchor": {
-        "x": 61,
-        "y": 120
-      },
-      "repeat": "none",
-      "reducedMotionFrame": 0,
-      "clips": []
-    },
-    {
-      "id": "warrior-collector",
-      "path": "/game-assets/v3/warrior-collector.svg",
-      "sha256": "3179b61810237fb3b5e0ec1034cd500dc61b16ee4ec7f01305b24051cbc8167c",
-      "bytes": 14652,
-      "width": 128,
-      "height": 128,
-      "frameWidth": 128,
-      "frameHeight": 128,
-      "frames": 1,
-      "anchor": {
-        "x": 61,
-        "y": 120
-      },
-      "repeat": "none",
-      "reducedMotionFrame": 0,
-      "clips": []
-    },
-    {
-      "id": "warrior-guardian",
-      "path": "/game-assets/v3/warrior-guardian.svg",
-      "sha256": "e03a5327c2d48c77df974b645727f168966a986af82451135b545d1b398f138c",
-      "bytes": 14592,
-      "width": 128,
-      "height": 128,
-      "frameWidth": 128,
-      "frameHeight": 128,
-      "frames": 1,
-      "anchor": {
-        "x": 61,
-        "y": 120
-      },
-      "repeat": "none",
-      "reducedMotionFrame": 0,
-      "clips": []
-    },
-    {
-      "id": "warrior-sprinter",
-      "path": "/game-assets/v3/warrior-sprinter.svg",
-      "sha256": "97ccd455fa0e83354208ac72f7a5209e946b27acc2413e552aea4aa3b6d03a1b",
-      "bytes": 15073,
-      "width": 128,
-      "height": 128,
-      "frameWidth": 128,
-      "frameHeight": 128,
-      "frames": 1,
-      "anchor": {
-        "x": 61,
-        "y": 120
-      },
-      "repeat": "none",
-      "reducedMotionFrame": 0,
-      "clips": []
-    },
-    {
       "id": "weapon-axe",
-      "path": "/game-assets/v3/weapon-axe.svg",
+      "path": "/game-assets/weapon-axe.svg",
       "sha256": "62920875c8e5a5f0ab8cc2b1ab9fefe9cb553d6ee4a460f13d4a9ae271c82076",
       "bytes": 2131,
       "width": 96,
@@ -1012,7 +940,7 @@
     },
     {
       "id": "weapon-longsword",
-      "path": "/game-assets/v3/weapon-longsword.svg",
+      "path": "/game-assets/weapon-longsword.svg",
       "sha256": "1af1c49dcdcf48b2b16290dbd139af65096036b0d869c38379b281bd52a0ae93",
       "bytes": 2350,
       "width": 96,
@@ -1030,7 +958,7 @@
     },
     {
       "id": "weapon-spear",
-      "path": "/game-assets/v3/weapon-spear.svg",
+      "path": "/game-assets/weapon-spear.svg",
       "sha256": "5ae1e3d61e3509e080dc5f0fed448f00726d5d13117356a73f84425c211eb699",
       "bytes": 2266,
       "width": 96,
@@ -1048,7 +976,7 @@
     },
     {
       "id": "weapon-sword",
-      "path": "/game-assets/v3/weapon-sword.svg",
+      "path": "/game-assets/weapon-sword.svg",
       "sha256": "462acb9a91d4bb0b545291bf460fee3c20d2b19aec63ebc95cc95b55a0ea813a",
       "bytes": 1726,
       "width": 96,

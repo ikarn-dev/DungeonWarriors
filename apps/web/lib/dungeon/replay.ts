@@ -8,6 +8,7 @@ import {
   type DungeonInput,
   initialFrame,
   inputsSchema,
+  roomOver,
   stepRoom,
 } from "./simulation";
 
@@ -39,7 +40,7 @@ export function replayRoom(
   }
   let frame = initialFrame(room, cat),
     head = 0;
-  for (let tick = 1; tick <= through && !frame.timedOut; tick++) {
+  for (let tick = 1; tick <= through && !roomOver(frame); tick++) {
     const actions: Control[] = [];
     while (inputs[head]?.tick === tick) {
       const input = inputs[head++];
@@ -68,7 +69,7 @@ export class DungeonRunner {
     this.previous = this.frame;
   }
   position(now: number) {
-    if (this.previous.resets !== this.frame.resets || this.frame.timedOut)
+    if (this.previous.resets !== this.frame.resets || roomOver(this.frame))
       return this.frame;
     const fraction = Math.max(
       0,
@@ -86,7 +87,7 @@ export class DungeonRunner {
   // Inputs over the server's per-second limit are dropped locally, so a held
   // attack key cannot make the replay invalid.
   input(action: Control) {
-    if (this.frame.timedOut || this.inputs.length >= PHYSICS.maxInputs) return;
+    if (roomOver(this.frame) || this.inputs.length >= PHYSICS.maxInputs) return;
     const tick = this.frame.tick + 1;
     const second = Math.floor((tick - 1) / PHYSICS.ticksPerSecond);
     const count = this.perSecond.get(second) ?? 0;
@@ -102,7 +103,7 @@ export class DungeonRunner {
         Math.floor(((now - this.startedAt) * PHYSICS.ticksPerSecond) / 1000),
       ),
     );
-    while (this.frame.tick < through && !this.frame.timedOut) {
+    while (this.frame.tick < through && !roomOver(this.frame)) {
       const next = this.frame.tick + 1;
       const actions: Control[] = [];
       while (this.inputs[this.head]?.tick === next) {

@@ -13,15 +13,23 @@ const HAZE_ALPHA = 0.38;
 const HAZE_RISE_MS = 2400;
 
 type View = { x: number; y: number; width: number; height: number };
+// The haze is a screen layer; it is drawn larger than the screen so its
+// edges never show while the camera zooms or moves (2026-11-26).
+const HAZE_OVERSCAN = 1.4;
 
-// A random-point zone over a world rectangle.
-function area(x: number, y: number, width: number, height: number) {
+// A random-point zone over a world band that follows the camera: each new
+// puff is placed around the current view plus a margin, while puffs already
+// in the air stay where they formed. So the smog has no edge however the
+// camera moves.
+const MARGIN = 220;
+function band(view: () => View, top: number, height: number) {
   return {
     type: "random",
     source: {
       getRandomPoint: (point: Phaser.Types.Math.Vector2Like) => {
-        point.x = x + Math.random() * width;
-        point.y = y + Math.random() * height;
+        const v = view();
+        point.x = v.x - MARGIN + Math.random() * (v.width + MARGIN * 2);
+        point.y = top + Math.random() * height;
       },
     },
   };
@@ -94,7 +102,7 @@ export class GasSmog {
     hazeTexture(scene);
     this.haze = scene.add
       .image(0, 0, HAZE)
-      .setOrigin(0)
+      .setOrigin(0.5)
       .setTint(0x5ea83a)
       .setScrollFactor(0)
       .setDepth(depth)
@@ -102,25 +110,25 @@ export class GasSmog {
       .setVisible(false);
   }
 
-  start(time: number, view: View, still: boolean) {
+  start(time: number, view: () => View, still: boolean) {
     if (this.startedAt !== null) return;
     this.startedAt = time;
     this.still = still;
     this.haze.setVisible(true);
     if (still) return;
-    const floor = area(
-      view.x - 60,
-      view.y + view.height * 0.62,
-      view.width + 120,
-      view.height * 0.4,
-    );
-    const room = area(view.x - 60, view.y, view.width + 120, view.height);
-    const behind = area(
-      view.x - 140,
-      view.y + view.height * 0.15,
-      80,
-      view.height * 0.85,
-    );
+    const floor = band(view, 600 * 0.6, 600 * 0.42);
+    const air = band(view, 0, 600);
+    // The first wave rolls in from just off the left of the view.
+    const start = view();
+    const behind = {
+      type: "random",
+      source: {
+        getRandomPoint: (point: Phaser.Types.Math.Vector2Like) => {
+          point.x = start.x - 160 + Math.random() * 100;
+          point.y = 90 + Math.random() * 510;
+        },
+      },
+    };
     const common = {
       tint: TINTS,
       rotate: drift,
@@ -156,7 +164,7 @@ export class GasSmog {
       // Slow billows that hang across the whole room.
       this.scene.add.particles(0, 0, PUFF, {
         ...common,
-        emitZone: room,
+        emitZone: air,
         frequency: 140,
         maxAliveParticles: 45,
         lifespan: { min: 4200, max: 6000 },
@@ -167,7 +175,7 @@ export class GasSmog {
       }),
       // Pale swirls that brighten what lies under them, so the gas glows.
       this.scene.add.particles(0, 0, PUFF, {
-        emitZone: room,
+        emitZone: air,
         frequency: 220,
         maxAliveParticles: 24,
         lifespan: { min: 3000, max: 4600 },
@@ -185,17 +193,22 @@ export class GasSmog {
     });
   }
 
-  // Keeps the haze over the screen (world units; the camera height is 600).
-  update(time: number, visibleWidth: number) {
+  // Keeps the haze centred on the screen. Screen layers (scroll factor 0)
+  // still zoom about the camera centre, so the haze sits there and is sized
+  // in world units with an overscan margin.
+  update(time: number, camera: Phaser.Cameras.Scene2D.Camera) {
     if (this.startedAt === null) return;
     const rise = this.still
       ? 1
       : Math.min(1, (time - this.startedAt) / HAZE_RISE_MS);
     this.haze
-      .setDisplaySize(visibleWidth, 600)
+      .setPosition(camera.width / 2, camera.height / 2)
+      .setDisplaySize(
+        (camera.width / camera.zoom) * HAZE_OVERSCAN,
+        (camera.height / camera.zoom) * HAZE_OVERSCAN,
+      )
       .setAlpha(HAZE_ALPHA * rise * (2 - rise));
   }
-
   reset() {
     this.startedAt = null;
     for (const emitter of this.emitters) emitter.destroy();
