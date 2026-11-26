@@ -4,7 +4,7 @@
 <h1 align="center">Dungeon Warriors</h1>
 <p align="center">
   <a href="https://www.dungeonwarriors.xyz"><img src="https://img.shields.io/badge/Play_Live-145F52?style=for-the-badge" alt="Play Dungeon Warriors live"></a>
-  <a href="#devnet-playthrough"><img src="https://img.shields.io/badge/Demo-8A560B?style=for-the-badge" alt="Dungeon Warriors demo"></a>
+  <a href="#how-to-play"><img src="https://img.shields.io/badge/How_to_Play-8A560B?style=for-the-badge" alt="How to play Dungeon Warriors"></a>
 </p>
 
 ## About
@@ -35,7 +35,7 @@ flowchart TD
 | Technology | Role |
 | --- | --- |
 | <a href="https://solana.com/"><img src="apps/web/public/brand_logos/solanaLogo.svg" width="116" alt="Solana"></a> | Anchor program for cat ownership, USDC custody, wagers, and payouts. |
-| <a href="https://www.magicblock.xyz/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://www.magicblock.xyz/assets/magicblock-logotype-white.png"><img src="apps/web/public/brand_logos/MagicBlock-Logo-Black.svg" width="116" alt="MagicBlock"></picture></a> | VRF supplies randomness for runs and capsule draws. Ephemeral Rollups record terminal results, and Hydra triggers settlement. |
+| <a href="https://www.magicblock.xyz/"><img src="apps/web/public/brand_logos/MagicBlock-Logo-Black.svg" width="116" alt=""><br><strong>MagicBlock</strong></a> | VRF supplies randomness for runs and capsule draws. Ephemeral Rollups record terminal results, and Hydra triggers settlement. |
 | **Next.js and Phaser** | The browser runs movement and combat. The server replays submitted inputs before signing the result. |
 
 ### Wager and settlement
@@ -62,15 +62,15 @@ sequenceDiagram
 
 ## Devnet programs and treasury
 
+### Dungeon Warriors program
+
+The Anchor program records cat ownership, manages the USDC vault, reserves wagers, and settles payouts.
+
 | Program | Address |
 | --- | --- |
 | Dungeon Warriors | [`F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx`](https://explorer.solana.com/address/F1cmavHq4562uJ8JmRPM5oFk8q28GW5hadXnZfVCCcUx?cluster=devnet) |
-| MagicBlock VRF | [`Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz`](https://explorer.solana.com/address/Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz?cluster=devnet) |
-| MagicBlock Delegation | [`DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh`](https://explorer.solana.com/address/DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh?cluster=devnet) |
-| MagicBlock Magic Program (ER) | `Magic11111111111111111111111111111111111111` |
-| MagicBlock Hydra | [`Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea`](https://explorer.solana.com/address/Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea?cluster=devnet) |
-| SPL Token | [`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`](https://explorer.solana.com/address/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA?cluster=devnet) |
-| Associated Token Account | [`ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL`](https://explorer.solana.com/address/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL?cluster=devnet) |
+
+### Treasury
 
 | Treasury account | Address |
 | --- | --- |
@@ -78,21 +78,29 @@ sequenceDiagram
 | USDC vault | [`G68pmVi6n7cA1LPFvtP3JfCqJc7MAZzsiyuoCrGodLNh`](https://explorer.solana.com/address/G68pmVi6n7cA1LPFvtP3JfCqJc7MAZzsiyuoCrGodLNh?cluster=devnet) |
 | Devnet USDC mint | [`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`](https://explorer.solana.com/address/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU?cluster=devnet) |
 
-## Devnet playthrough
+### Programs used
 
-A live test run cleared room 1 and paid **0.001425 USDC** on a **0.001 USDC** wager.
+| Program | Role | Address |
+| --- | --- | --- |
+| MagicBlock VRF | Randomness for runs and capsule draws | [`Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz`](https://explorer.solana.com/address/Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz?cluster=devnet) |
+| MagicBlock Delegation | Delegates the result account to the rollup | [`DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh`](https://explorer.solana.com/address/DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh?cluster=devnet) |
+| MagicBlock Magic Program (ER) | Commits the rollup receipt to Solana | `Magic11111111111111111111111111111111111111` |
+| MagicBlock Hydra | Schedules settlement on Solana | [`Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea`](https://explorer.solana.com/address/Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea?cluster=devnet) |
+| SPL Token | Transfers Devnet USDC | [`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`](https://explorer.solana.com/address/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA?cluster=devnet) |
+| Associated Token Account | Creates standard USDC token accounts | [`ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL`](https://explorer.solana.com/address/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL?cluster=devnet) |
 
-[Wager reservation](https://explorer.solana.com/tx/4C2FJBcgLQ1z8z9KBvfibFhtBHD3TeuP1sY8N7XumkKwToWofozKL548sCWrZZtdYqtUVisxPyCMrew1nMCV9ews?cluster=devnet) · [Hydra settlement](https://explorer.solana.com/tx/4kgG1euS3aJJfXZD7gTxR8RZsGr7osADyhjQTCi1hjLM6mDYR7kLBDBWotKNFRJ911HZJZcd4kj6R7rQFyrx9QeL?cluster=devnet) · [Browser-signed withdrawal](https://explorer.solana.com/tx/3Sf2JYsBGt8jRqGe3LBxpiQhgM8i2vfHEfQw7jLzx2M18WTZwQUJJkjSs5U8pT8oQBnp54s8hAxFX8PpHFbAKUhJ?cluster=devnet)
+## Project structure
 
-## Repository
-
-- [Web app and dungeon engine](apps/web)
-- [Solana program](apps/dungeon-warriors-program)
-
-Use Node.js 26 and the pnpm version pinned in [package.json](package.json).
-
-```sh
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm test:web --maxWorkers=2 --testTimeout=30000
+```text
+apps/
+├── web/                            Next.js web app
+│   ├── app/                        Pages and API routes
+│   ├── components/                 Game and lobby UI
+│   ├── lib/                        Dungeon engine and server logic
+│   └── public/                     Game assets and logos
+└── dungeon-warriors-program/       Solana Anchor workspace
+    └── programs/dungeon-warriors/  Onchain game program
+packages/config/                    Shared TypeScript and Biome configuration
+scripts/                            Asset, program, and provider tools
+tests/                              Web and program tests
 ```
