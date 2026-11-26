@@ -7,6 +7,8 @@ export class WebApiError extends Error {
 }
 // Player-facing copy for expected failures; anything else stays generic.
 const FRIENDLY: Readonly<Record<string, string>> = {
+  DUNGEON_ENGINE_MISMATCH:
+    "The dungeon update is awaiting activation. Your wager has not been taken.",
   DUNGEON_NOT_PUBLISHED:
     "The dungeon update is awaiting activation. Your wager has not been taken.",
   DUNGEON_COLLATERAL_UNAVAILABLE:

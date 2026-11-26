@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { CatId } from "../game/catalog";
 import {
   type Enemy,
@@ -16,28 +15,10 @@ import {
   solidsAt,
   surfaceAt,
 } from "./rooms";
-import { type DungeonRules, PHYSICS } from "./rules";
+import { type Control, type DungeonRules, PHYSICS } from "./rules";
 import { hasTrait, WARRIORS } from "./warriors";
 
-export const controlSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("move"),
-      axis: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
-    })
-    .strict(),
-  z.object({ kind: z.literal("jump") }).strict(),
-  z.object({ kind: z.literal("attack") }).strict(),
-]);
-export type Control = z.infer<typeof controlSchema>;
-export const inputSchema = z
-  .object({
-    tick: z.number().int().min(1).max(PHYSICS.maxRoomTicks),
-    action: controlSchema,
-  })
-  .strict();
-export const inputsSchema = z.array(inputSchema).max(PHYSICS.maxInputs);
-export type DungeonInput = z.infer<typeof inputSchema>;
+export type { Control, DungeonInput } from "./rules";
 export const SWING_TICKS = 16;
 // The blade connects on the fourth tick of a swing.
 export const SWING_HIT = SWING_TICKS - 4;
@@ -45,6 +26,7 @@ const HURT_TICKS = 60;
 // Health restored for each defeated foe.
 export const DEFEAT_HEAL = 6;
 const KNOCK_TICKS = 8;
+const LEGACY_RESPAWN_TICKS = 90;
 export type DungeonFrame = {
   tick: number;
   x: number;
@@ -181,7 +163,7 @@ export function stepRoom(
     }
   }
   move(f, previous, room, cat, rules);
-  combat(f, previous, room, cat);
+  combat(f, previous, room, cat, rules.version);
   if (f.y > (room.height + 64) * 256) respawn(f);
   const hx = room.hourglass.x * 256;
   const hy = room.hourglass.y * 256;
@@ -292,6 +274,7 @@ function combat(
   previous: DungeonFrame,
   room: DungeonRoom,
   cat: CatId,
+  version: DungeonRules["version"],
 ) {
   const warrior = WARRIORS[cat];
   const center = { x: f.x + PHYSICS.width / 2, y: f.y + PHYSICS.height / 2 };
@@ -417,7 +400,7 @@ function combat(
       )
     ) {
       const from = e.x + (s.width * 256) / 2;
-      hurt(f, cat, s.atk, from);
+      hurt(f, cat, s.atk, from, version);
       // A foe that lands a hit recoils, so it cannot pin the cat in place.
       enemies[i] = knockEnemy(e, room, (from < center.x ? -20 : 20) * 256);
       return;
@@ -438,13 +421,19 @@ function combat(
         1,
       )
     ) {
-      hurt(f, cat, 12 + 4 * (room.level - 1), center.x);
+      hurt(f, cat, 12 + 4 * (room.level - 1), center.x, version);
       f.vy = Math.trunc((PHYSICS.jump * 7) / 10);
       return;
     }
   }
 }
-function hurt(f: DungeonFrame, cat: CatId, raw: number, fromX: number) {
+function hurt(
+  f: DungeonFrame,
+  cat: CatId,
+  raw: number,
+  fromX: number,
+  version: DungeonRules["version"],
+) {
   const center = f.x + PHYSICS.width / 2;
   f.knockDir = center < fromX ? -1 : 1;
   // A cat riding a platform flinches in place instead of being thrown off.
@@ -462,16 +451,19 @@ function hurt(f: DungeonFrame, cat: CatId, raw: number, fromX: number) {
   }
   f.hp -= Math.max(1, raw - WARRIORS[cat].def);
   f.invuln = HURT_TICKS;
-  // Losing all health ends the room as a loss (2026-11-26; superseded the
-  // knockout that returned the cat to its checkpoint with full health).
-  if (f.hp <= 0) {
-    f.hp = 0;
-    f.fallen = true;
-    f.knockouts++;
-    f.knock = 0;
-    f.vx = 0;
-    f.swing = 0;
+  if (f.hp > 0) return;
+  f.knockouts++;
+  if (version === 2) {
+    respawn(f);
+    f.hp = WARRIORS[cat].hp;
+    f.invuln = LEGACY_RESPAWN_TICKS;
+    return;
   }
+  f.hp = 0;
+  f.fallen = true;
+  f.knock = 0;
+  f.vx = 0;
+  f.swing = 0;
 }
 // A fall into a pit returns the cat to its checkpoint; the timer runs on.
 function respawn(f: DungeonFrame) {

@@ -9,7 +9,7 @@ import {
 } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dungeonPrepareSchema } from "../../../../../apps/web/lib/dungeon/request";
-import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
+import { DUNGEON_V3 } from "../../../../../apps/web/lib/dungeon/rules";
 import {
   approveDungeonReservation,
   hasDungeonReservationFee,
@@ -93,7 +93,7 @@ beforeEach(() => {
       nextRunNonce: new BN(0),
     },
     collection: { ownedMask: 1, cats: [{}] },
-    rules: DUNGEON_V2,
+    rules: DUNGEON_V3,
     ruleHash: "00".repeat(32),
     free: 100000000n,
   });

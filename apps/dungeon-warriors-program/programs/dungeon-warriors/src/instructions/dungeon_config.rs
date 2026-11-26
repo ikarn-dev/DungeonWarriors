@@ -23,22 +23,25 @@ pub fn handle_configure_dungeon(
     verifier: Pubkey,
     enabled: bool,
 ) -> Result<()> {
+    let record = &mut ctx.accounts.dungeon;
+    let hash = rules.content_hash()?;
+    let same_rules = rules.version == record.rules.version && hash == record.rules_hash;
+    // Allow pausing the exact published rules while an engine upgrade is pending.
+    if !enabled && same_rules && verifier == record.verifier {
+        record.enabled = false;
+        return Ok(());
+    }
     rules.validate()?;
     require!(
         verifier != Pubkey::default() && verifier != ctx.accounts.admin.key(),
         ErrorCode::InvalidConfiguration
     );
-    let record = &mut ctx.accounts.dungeon;
-    let hash = rules.content_hash()?;
     require!(
         record.rules.version == 0
-            || rules.version
-                == record
-                    .rules
-                    .version
-                    .checked_add(1)
-                    .ok_or(ErrorCode::ArithmeticOverflow)?
-            || (rules.version == record.rules.version && hash == record.rules_hash),
+            || same_rules
+            || (!record.enabled
+                && !enabled
+                && Some(rules.version) == record.rules.version.checked_add(1)),
         ErrorCode::StaleVersion
     );
     record.set_inner(DungeonConfig {

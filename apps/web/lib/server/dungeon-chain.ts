@@ -2,7 +2,12 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { IdlAccounts } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
-import { affordableDepth, dungeonRulesSchema, payout } from "../dungeon/rules";
+import {
+  affordableDepth,
+  DUNGEON_RULES_VERSION,
+  dungeonRulesSchema,
+  payout,
+} from "../dungeon/rules";
 import { dungeonAccounts, expeditionAddress } from "../dungeon/transactions";
 import { deviceAddress } from "../game/device-intents";
 import { requiredVaultBalance } from "../game/economy";
@@ -72,7 +77,10 @@ export async function dungeonSetup(owner: string) {
     config.vrfQueue.toBase58() !== DEVNET.vrfQueue
   )
     throw new ApiError("VRF_SCOPE_MISMATCH", 503);
-  const rules = dungeonRulesSchema.parse(dungeon.rules);
+  const parsed = dungeonRulesSchema.safeParse(dungeon.rules);
+  if (!parsed.success || parsed.data.version !== DUNGEON_RULES_VERSION)
+    throw new ApiError("DUNGEON_ENGINE_MISMATCH", 503);
+  const rules = parsed.data;
   const ruleHash = createHash("sha256")
     .update("purrps:dungeon-rules:v1")
     .update(coder.types.encode("dungeonRules", dungeon.rules))

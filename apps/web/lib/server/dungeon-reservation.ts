@@ -7,7 +7,7 @@ import {
   dungeonOfferSchema,
 } from "../dungeon/protocol";
 import type { DungeonPrepare } from "../dungeon/request";
-import { payout } from "../dungeon/rules";
+import { DUNGEON_RULES_VERSION, payout } from "../dungeon/rules";
 import {
   hasDungeonReservationFee,
   reservationMessage,
@@ -192,6 +192,8 @@ export async function submitDungeon(
     if (record.reserve.signature !== null) return { record, value: record };
     if (record.phase !== "preparing" || record.settled)
       throw new ApiError("DUNGEON_STATE_CHANGED", 409);
+    if (record.rules.version !== DUNGEON_RULES_VERSION)
+      throw new ApiError("DUNGEON_ENGINE_MISMATCH", 503);
     let tx: VersionedTransaction;
     try {
       tx = VersionedTransaction.deserialize(Buffer.from(bytes, "base64"));

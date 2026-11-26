@@ -1,8 +1,12 @@
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { Keypair, PublicKey, TransactionMessage } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { LEGACY_DUNGEON_ENGINE_HASH } from "../../../../../apps/web/lib/dungeon/rules";
 import { expeditionAddress } from "../../../../../apps/web/lib/dungeon/transactions";
-import { deliverDungeon } from "../../../../../apps/web/lib/server/dungeon-delivery";
+import {
+  deliverDungeon,
+  refreshDungeon,
+} from "../../../../../apps/web/lib/server/dungeon-delivery";
 import { settlementAddress } from "../../../../../apps/web/lib/server/dungeon-settlement-instructions";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
 import { coder, program } from "../../../../../apps/web/lib/solana/program";
@@ -89,6 +93,28 @@ beforeEach(async () => {
   mocks.send.mockResolvedValue(undefined);
 });
 afterEach(() => vi.unstubAllEnvs());
+it("cancels only unsigned stale reservations during an engine upgrade", async () => {
+  const old = record();
+  old.rules = {
+    ...old.rules,
+    version: 2,
+    engineHash: [...Buffer.from(LEGACY_DUNGEON_ENGINE_HASH, "hex")],
+  };
+  old.phase = "preparing";
+  old.reserve.signature = null;
+  mocks.read.mockResolvedValue(null);
+  const submitted = structuredClone(old);
+  submitted.reserve.signature = "saved-signature";
+  await refreshDungeon(submitted);
+  expect(submitted).toMatchObject({ phase: "preparing", settled: false });
+  await refreshDungeon(old);
+  expect(old).toMatchObject({
+    phase: "cancelled",
+    reason: "cancelled",
+    settled: true,
+  });
+});
+
 it("persists fully signed delivery before spending or broadcast and reuses it after a lost response", async () => {
   mocks.send.mockRejectedValueOnce(new Error("network timeout"));
   await expect(deliverDungeon(owner, "0")).rejects.toThrow("network timeout");

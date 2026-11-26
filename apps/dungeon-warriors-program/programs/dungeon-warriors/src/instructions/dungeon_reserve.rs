@@ -67,6 +67,7 @@ pub fn handle_reserve_dungeon(
         a.dungeon.enabled && a.config.allow_reservations,
         ErrorCode::AdmissionClosed
     );
+    a.dungeon.rules.validate()?;
     require!(
         a.dungeon.rules.version == args.rules_version
             && a.dungeon.rules.content_hash()? == a.dungeon.rules_hash,

@@ -27,7 +27,7 @@ test("the admin publication rules import directly in Node without a server or cu
     [
       "--input-type=module",
       "-e",
-      'import {DUNGEON_V2} from "./apps/web/lib/dungeon/rules.ts"; if(DUNGEON_V2.version!==2 || DUNGEON_V2.engineHash.length!==32)process.exit(1);',
+      'import {DUNGEON_V3} from "./apps/web/lib/dungeon/rules.ts"; if(DUNGEON_V3.version!==3 || DUNGEON_V3.engineHash.length!==32)process.exit(1);',
     ],
     { cwd: new URL("../../../", import.meta.url), encoding: "utf8" },
   );

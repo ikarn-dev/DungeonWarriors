@@ -2,6 +2,7 @@ import "server-only";
 import { utils } from "@anchor-lang/core";
 import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import { DUNGEON_RULES_VERSION } from "../dungeon/rules";
 import { pause } from "../game/web-api";
 import { program } from "../solana/program";
 import { browserVerifierKey } from "./browser-config";
@@ -34,7 +35,10 @@ export async function refreshDungeon(record: DungeonRecord) {
           })
         ).value[0]
       : null;
-    if (status?.err && status.confirmationStatus === "finalized") {
+    if (
+      (!signature && record.rules.version !== DUNGEON_RULES_VERSION) ||
+      (status?.err && status.confirmationStatus === "finalized")
+    ) {
       record.phase = "cancelled";
       record.settled = true;
       record.reason = "cancelled";

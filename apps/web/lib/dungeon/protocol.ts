@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { publicKeySchema } from "../solana/addresses";
 import { u64Input } from "../solana/program";
-import { dungeonRulesSchema, PHYSICS } from "./rules";
-import { inputsSchema } from "./simulation";
+import { dungeonRulesSchema, inputsSchema, PHYSICS } from "./rules";
 
 export const catSchema = z.enum([
   "collector",

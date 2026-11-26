@@ -1,5 +1,8 @@
 use super::{ix, pda, rejected, setup, Play, NOW};
-use anchor_lang::{prelude::*, solana_program::system_program};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{instruction::AccountMeta, system_program},
+};
 use dungeon_warriors::{
     accounts,
     catalog::CatId,
@@ -14,6 +17,7 @@ use dungeon_warriors::{
         records::Leaderboard,
     },
 };
+use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
@@ -32,7 +36,7 @@ fn configure(p: &mut Play) {
     p.h.send(
         ix(
             instruction::ConfigureDungeon {
-                rules: DUNGEON_V2,
+                rules: DUNGEON_V3,
                 verifier: p.key.pubkey(),
                 enabled: true,
             },
@@ -66,8 +70,8 @@ fn fixture(p: &mut Play, ready: bool) -> Pubkey {
         nonce: 0,
         cat: CatId::Collector,
         verifier: p.key.pubkey(),
-        rules: DUNGEON_V2,
-        rules_hash: DUNGEON_V2.content_hash().unwrap(),
+        rules: DUNGEON_V3,
+        rules_hash: DUNGEON_V3.content_hash().unwrap(),
         stake: 1_000_000,
         max_rooms: 5,
         max_gross: 7_214_062,
@@ -147,18 +151,18 @@ fn published_rules_are_admin_controlled_and_version_content_is_immutable() {
     let mut p = Play::new();
     configure(&mut p);
     let before: DungeonConfig = p.h.read(config(&p));
-    assert_eq!(before.rules, DUNGEON_V2);
-    let mut changed = DUNGEON_V2;
+    assert_eq!(before.rules, DUNGEON_V3);
+    let mut changed = DUNGEON_V3;
     changed.engine_hash[0] ^= 1;
     assert!(changed.validate().is_err());
-    changed = DUNGEON_V2;
+    changed = DUNGEON_V3;
     changed.version = 1;
     assert!(changed.validate().is_err());
 
     let admin = setup::admin(&p.h);
     for rogue in [true, false] {
         let signer = if rogue { &p.owner } else { &admin };
-        let mut rules = DUNGEON_V2;
+        let mut rules = DUNGEON_V3;
         if !rogue {
             rules.return_bps = 9600;
         }
@@ -182,13 +186,14 @@ fn published_rules_are_admin_controlled_and_version_content_is_immutable() {
             )
             .is_err());
     }
-    assert_eq!(p.h.read::<DungeonConfig>(config(&p)).rules, DUNGEON_V2);
+    assert_eq!(p.h.read::<DungeonConfig>(config(&p)).rules, DUNGEON_V3);
     assert_eq!(
-        dungeon_payout(1_000_000, 5, &DUNGEON_V2).unwrap(),
+        dungeon_payout(1_000_000, 5, &DUNGEON_V3).unwrap(),
         7_214_062
     );
-    assert!(dungeon_payout(u64::MAX, 5, &DUNGEON_V2).is_err());
+    assert!(dungeon_payout(u64::MAX, 5, &DUNGEON_V3).is_err());
 }
+
 #[test]
 fn settlement_checks_authority_secret_path_cap_and_pays_exactly_once() {
     let mut p = Play::new();
@@ -370,13 +375,31 @@ fn real_provider_reservation_is_sponsored_atomic_and_nonce_bound() {
     let cfg: GameConfig = p.h.read(p.h.config);
     super::paid_capsules::install_vrf_fixture(&mut p, &cfg, &provider, &queue);
     let owner = p.owner.pubkey();
+    let device = Keypair::new();
+    let access =
+        Pubkey::find_program_address(&[b"game-device", owner.as_ref()], &dungeon_warriors::ID).0;
+    p.h.send(
+        ix(
+            instruction::SetGameDevice {
+                device: device.pubkey(),
+            },
+            accounts::SetGameDevice {
+                owner,
+                player: p.player,
+                access,
+                system_program: system_program::ID,
+            },
+        ),
+        &p.owner,
+    )
+    .unwrap();
     let key = pda(EXPEDITION_SEED, owner, 0);
     let make = |cap, cat, stake| {
         let mut request = ix(
             instruction::ReserveDungeon {
                 args: ReserveDungeonArgs {
                     nonce: 0,
-                    rules_version: 2,
+                    rules_version: DUNGEON_V3.version,
                     cat,
                     stake,
                     max_rooms: 5,
@@ -405,7 +428,10 @@ fn real_provider_reservation_is_sponsored_atomic_and_nonce_bound() {
                 system_program: system_program::ID,
             },
         );
-        request.accounts[2].is_signer = true;
+        request.accounts.extend([
+            AccountMeta::new_readonly(device.pubkey(), true),
+            AccountMeta::new_readonly(access, false),
+        ]);
         request
     };
     let requests = [
@@ -424,7 +450,7 @@ fn real_provider_reservation_is_sponsored_atomic_and_nonce_bound() {
         );
         let tx = VersionedTransaction::try_new(
             VersionedMessage::Legacy(message),
-            &[&p.sponsor, &p.owner],
+            &[&p.sponsor, &device],
         )
         .unwrap();
         let result = p.h.svm.send_transaction(tx);

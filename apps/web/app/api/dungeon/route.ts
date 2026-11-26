@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { dungeonRequestSchema } from "../../../lib/dungeon/protocol";
 import { dungeonPrepareSchema } from "../../../lib/dungeon/request";
-import { DUNGEON_V2, ENGINE } from "../../../lib/dungeon/rules";
+import { DUNGEON_V3, ENGINE } from "../../../lib/dungeon/rules";
 import { authenticate } from "../../../lib/server/auth";
 import { browserVerifierAddress } from "../../../lib/server/browser-config";
 import {
@@ -31,8 +31,8 @@ export const maxDuration = 60;
 
 export function GET() {
   return json({
-    version: DUNGEON_V2.version,
-    engineHash: DUNGEON_V2.engineHash
+    version: DUNGEON_V3.version,
+    engineHash: DUNGEON_V3.engineHash
       .map((b) => b.toString(16).padStart(2, "0"))
       .join(""),
     engine: ENGINE,

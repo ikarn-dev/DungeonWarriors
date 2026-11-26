@@ -1,13 +1,12 @@
 import type { CatId } from "../game/catalog";
 import { generateRoom } from "./generate";
 import type { DungeonRoom } from "./rooms";
-import { type DungeonRules, PHYSICS } from "./rules";
+import { type DungeonRules, inputsSchema, PHYSICS } from "./rules";
 import {
   type Control,
   type DungeonFrame,
   type DungeonInput,
   initialFrame,
-  inputsSchema,
   roomOver,
   stepRoom,
 } from "./simulation";

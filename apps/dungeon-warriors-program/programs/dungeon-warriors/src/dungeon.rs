@@ -19,8 +19,8 @@ pub struct DungeonRules {
     pub sprint_bps: u16,
     pub vrf_timeout_seconds: u16,
 }
-pub const DUNGEON_V2: DungeonRules = DungeonRules {
-    version: 2,
+pub const DUNGEON_V3: DungeonRules = DungeonRules {
+    version: 3,
     engine_hash: crate::dungeon_engine::DUNGEON_ENGINE_HASH,
     rooms: 5,
     return_bps: 9500,
@@ -34,7 +34,7 @@ pub const DUNGEON_V2: DungeonRules = DungeonRules {
 impl DungeonRules {
     pub fn validate(&self) -> Result<()> {
         require!(
-            self.version == 2
+            self.version == DUNGEON_V3.version
                 && self.engine_hash == crate::dungeon_engine::DUNGEON_ENGINE_HASH
                 && self.rooms > 0
                 && usize::from(self.rooms) <= MAX_ROOMS

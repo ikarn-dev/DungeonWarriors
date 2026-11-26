@@ -22,6 +22,56 @@ solana_program_runtime::declare_process_instruction!(DungeonCommitFixture, 100, 
 });
 
 #[test]
+fn rules_upgrade_requires_pausing_and_preserves_existing_settlement() {
+    let mut p = Play::new();
+    let expedition = fixture(&mut p, true);
+    let dungeon = config(&p);
+    let mut published: DungeonConfig = p.h.read(dungeon);
+    published.rules.version = 2;
+    published.rules.engine_hash = [
+        135, 80, 124, 74, 139, 104, 93, 110, 217, 56, 128, 139, 140, 194, 180, 78, 24, 148, 75,
+        201, 11, 94, 214, 39, 122, 237, 168, 3, 101, 218, 244, 121,
+    ];
+    published.rules_hash = published.rules.content_hash().unwrap();
+    setup::put(&mut p.h, dungeon, &published);
+    let mut previous: DungeonExpedition = p.h.read(expedition);
+    previous.rules = published.rules;
+    previous.rules_hash = published.rules_hash;
+    setup::put(&mut p.h, expedition, &previous);
+
+    let admin = setup::admin(&p.h);
+    let config = p.h.config;
+    let update = |rules, enabled| {
+        ix(
+            instruction::ConfigureDungeon {
+                rules,
+                enabled,
+                verifier: published.verifier,
+            },
+            accounts::ConfigureDungeon {
+                config,
+                admin: admin.pubkey(),
+                dungeon,
+                system_program: system_program::ID,
+            },
+        )
+    };
+    rejected(p.h.send(update(DUNGEON_V3, false), &admin), "StaleVersion");
+    p.h.send(update(published.rules, false), &admin).unwrap();
+    rejected(p.h.send(update(DUNGEON_V3, true), &admin), "StaleVersion");
+    p.h.send(update(DUNGEON_V3, false), &admin).unwrap();
+    p.h.send(update(DUNGEON_V3, true), &admin).unwrap();
+
+    let trap = trap_gate(&expedition, &RANDOM, &SECRET, 0).unwrap();
+    p.h.send(settle(&p, result(trap, 1), p.key.pubkey()), &p.key)
+        .unwrap();
+    let settled: DungeonExpedition = p.h.read(expedition);
+    assert_eq!(settled.status, DungeonStatus::Lost);
+    assert_eq!(settled.rules_hash, previous.rules_hash);
+    assert_eq!(p.h.read::<DungeonConfig>(dungeon).rules, DUNGEON_V3);
+}
+
+#[test]
 #[ignore = "requires public Devnet Hydra, Delegation Program and validator fee-vault snapshots"]
 fn deployed_providers_return_a_dungeon_receipt_and_crank_exactly_one_payout() {
     use ephemeral_rollups_sdk::{
