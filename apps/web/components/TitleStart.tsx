@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
 import WalletDialog from "./WalletDialog";
 import { useHydratedWallet } from "./WalletProviders";
-import { signInWallet } from "./wallet-sign-in";
+import { signInGameDevice, signInWallet } from "./wallet-sign-in";
 
 type Step = "idle" | "connecting" | "signing" | "entering";
 const LABELS: Record<Step, string> = {
@@ -40,7 +40,11 @@ export default function TitleStart() {
         throw failure;
       });
       if (signal.aborted) return;
-      if (session?.wallet !== walletAddress) {
+      if (
+        session?.wallet !== walletAddress &&
+        !(await signInGameDevice(walletAddress, signal))
+      ) {
+        signal.throwIfAborted();
         if (signMessage === undefined)
           throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
         setStep("signing");

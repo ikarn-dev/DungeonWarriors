@@ -64,7 +64,7 @@ export async function quoteDungeon(
   input: QuoteRequest | DungeonPrepare,
 ) {
   const active = await activeDungeon(owner);
-  if (active !== null && input.kind !== "quote")
+  if (active !== null && input.kind !== "quote" && !input.device)
     throw new ApiError("DUNGEON_ACTIVE", 409);
   const setup = await dungeonSetup(owner),
     stake = BigInt(input.stake);
@@ -83,18 +83,33 @@ export async function quoteDungeon(
   if (active !== null && active !== nonce)
     throw new ApiError("DUNGEON_ACTIVE", 409);
   return withDungeon(owner, nonce, async (existing) => {
-    // Upgrade only old unsigned preparations, with their quoted terms intact.
+    const device =
+      input.kind === "prepare" ? input.device : existing?.reserve.device;
+    if (
+      device &&
+      (setup.grant?.owner.toBase58() !== owner ||
+        setup.grant.device.toBase58() !== device ||
+        device === sponsorshipConfig().SPONSOR_PUBLIC_KEY)
+    )
+      throw new ApiError("INVALID_GAME_DEVICE", 409);
+    const reviewed = input.kind === "quote" ? input : input.review;
+    // A browser can replace only an unsigned preparation with the same wager.
     const sameUnsigned =
-      input.kind === "quote" &&
       existing?.phase === "preparing" &&
       !existing.settled &&
       existing.reserve.signature === null &&
       existing.stake === input.stake &&
       existing.cat === input.cat &&
-      existing.maxRooms === input.maxRooms &&
-      existing.maxGross === input.maxGross &&
-      existing.rulesHash === input.rulesHash;
-    if (sameUnsigned && hasDungeonReservationFee(existing.reserve.transaction))
+      (reviewed
+        ? existing.maxRooms === reviewed.maxRooms &&
+          existing.maxGross === reviewed.maxGross &&
+          existing.rulesHash === reviewed.rulesHash
+        : !!device);
+    if (
+      sameUnsigned &&
+      existing.reserve.device === device &&
+      hasDungeonReservationFee(existing.reserve.transaction)
+    )
       return { record: existing, value: dungeonView(existing) };
     if (
       existing &&
@@ -104,10 +119,10 @@ export async function quoteDungeon(
       throw new ApiError("DUNGEON_ACTIVE", 409);
     const maxRooms = quoteDepth(stake, setup.free, setup.rules);
     if (
-      input.kind === "quote" &&
-      (input.maxRooms !== maxRooms ||
-        input.maxGross !== payout(stake, maxRooms, setup.rules).toString() ||
-        input.rulesHash !== setup.ruleHash)
+      reviewed &&
+      (reviewed.maxRooms !== maxRooms ||
+        reviewed.maxGross !== payout(stake, maxRooms, setup.rules).toString() ||
+        reviewed.rulesHash !== setup.ruleHash)
     )
       throw new ApiError("DUNGEON_QUOTE_CHANGED", 409);
     const sponsor = await dedicatedSponsor(setup.rpc),
@@ -143,6 +158,7 @@ export async function quoteDungeon(
         messageHash: "0".repeat(64),
         signature: null,
         cost: "0",
+        ...(device ? { device } : {}),
       },
       delivery: null,
       outcome: null,
@@ -154,6 +170,8 @@ export async function quoteDungeon(
         record.reserve.sponsor,
         maxPayerDebit,
         block.blockhash,
+        true,
+        device,
       ),
     );
     await checkPlaySpend(setup.rpc, tx, sponsor.publicKey, "base", false);
@@ -186,19 +204,25 @@ export async function submitDungeon(
     )
       throw new ApiError("TRANSACTION_REJECTED", 400);
     try {
-      validateDungeonReservation(tx, owner, dungeonView(record));
+      validateDungeonReservation(
+        tx,
+        owner,
+        dungeonView(record),
+        record.reserve.device,
+      );
     } catch {
       throw new ApiError("TRANSACTION_REJECTED", 400);
     }
+    const authority = record.reserve.device ?? owner;
     const signer = tx.message.staticAccountKeys.findIndex(
-      (key) => key.toBase58() === owner,
+      (key) => key.toBase58() === authority,
     );
     const signature = tx.signatures[signer];
     if (
       signer < 0 ||
       signer >= tx.message.header.numRequiredSignatures ||
       !signature ||
-      !verifyWalletSignature(owner, tx.message.serialize(), signature)
+      !verifyWalletSignature(authority, tx.message.serialize(), signature)
     )
       throw new ApiError("INVALID_SIGNATURE", 400);
     const rpc = await checkedConnection("base");

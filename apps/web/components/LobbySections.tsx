@@ -1,10 +1,12 @@
-import type { VersionedTransaction } from "@solana/web3.js";
 import type { ComponentProps } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CatId } from "../lib/game/catalog";
 import type { PlayerIntent } from "../lib/game/custody-client";
+import type { DeviceIntent } from "../lib/game/device-intents";
+import { gameDeviceKey } from "../lib/game/device-key";
 import type { LobbyState } from "../lib/game/lobby-state";
 import type { LobbyIntent } from "../lib/game/transaction-intents";
+import { WebApiError } from "../lib/game/web-api";
 import CapsuleShop from "./CapsuleShop";
 import CatCollection from "./CatCollection";
 import DungeonEntry from "./DungeonEntry";
@@ -20,7 +22,6 @@ type Work = (fn: (signal: AbortSignal) => Promise<void>) => Promise<void>;
 export default function LobbySections({
   state,
   address,
-  sign,
   blocked,
   accountRevision,
   shopDraw,
@@ -32,9 +33,6 @@ export default function LobbySections({
 }: {
   readonly state: LobbyState;
   readonly address: string;
-  readonly sign:
-    | ((tx: VersionedTransaction) => Promise<VersionedTransaction>)
-    | undefined;
   readonly blocked: boolean;
   readonly accountRevision: number | undefined;
   readonly shopDraw: Pick<
@@ -45,12 +43,55 @@ export default function LobbySections({
   readonly setTab: (tab: LobbyTab | null) => void;
   readonly perform: Work;
   readonly transact: (
-    intent: LobbyIntent | PlayerIntent,
+    intent: LobbyIntent | PlayerIntent | DeviceIntent,
     signal: AbortSignal,
   ) => Promise<void>;
   readonly reload: (signal: AbortSignal) => Promise<void>;
 }) {
   const showMenu = useCallback(() => setTab(null), [setTab]);
+  const access = state.gameDevice;
+  const [local, setLocal] = useState<{
+    owner: string;
+    device: string | undefined;
+  } | null>(null);
+  const checkedDevice = local?.owner === address;
+  const device =
+    checkedDevice && local.device === access?.address
+      ? local.device
+      : undefined;
+  const authorizedDevice = access?.address;
+  useEffect(() => {
+    let current = true;
+    void (
+      authorizedDevice ? gameDeviceKey(address) : Promise.resolve(undefined)
+    ).then((key) => {
+      if (current) setLocal({ owner: address, device: key?.address });
+    });
+    return () => {
+      current = false;
+    };
+  }, [address, authorizedDevice]);
+  const enable = () =>
+    void perform(async (signal) => {
+      const key = await gameDeviceKey(address, true);
+      if (!key) throw new WebApiError("GAME_DEVICE_UNAVAILABLE");
+      await transact(
+        { operation: "setGameDevice", sponsored: false, device: key.address },
+        signal,
+      );
+    });
+  const revoke = () => {
+    if (
+      !window.confirm("Revoke browser access to your Dungeon Warriors balance?")
+    )
+      return;
+    void perform((signal) =>
+      transact(
+        { operation: "setGameDevice", sponsored: false, device: null },
+        signal,
+      ),
+    );
+  };
   const [preferred, setPreferred] = useState<CatId | null>(null);
   const selected =
     state.cats.find(({ id }) => id === (preferred ?? state.selected)) ??
@@ -77,8 +118,10 @@ export default function LobbySections({
                 state={state}
                 cat={selected.id}
                 wallet={address}
-                blocked={blocked}
-                sign={sign}
+                device={device}
+                onEnable={enable}
+                onDeposit={() => setTab("wallet")}
+                blocked={blocked || !checkedDevice}
                 refresh={reload}
                 showMenu={showMenu}
               />
@@ -109,17 +152,39 @@ export default function LobbySections({
             key={`wallet:${address}`}
             revision={tab === "wallet" ? accountRevision : undefined}
             blocked={blocked}
+            deviceReady={device !== undefined}
+            hasGrant={access !== null}
+            onEnable={enable}
+            onRevoke={revoke}
             transfer={(kind, amount) =>
-              perform((signal) =>
-                transact(
-                  {
-                    operation: "game",
-                    sponsored: false,
-                    action: { kind, amount },
-                  },
-                  signal,
-                ),
-              )
+              perform(async (signal) => {
+                if (kind === "deposit") {
+                  const key = await gameDeviceKey(address, true);
+                  if (!key) throw new WebApiError("GAME_DEVICE_UNAVAILABLE");
+                  await transact(
+                    {
+                      operation: "depositWithDevice",
+                      sponsored: false,
+                      device: key.address,
+                      amount,
+                    },
+                    signal,
+                  );
+                } else {
+                  if (!device || !access)
+                    throw new WebApiError("INVALID_GAME_DEVICE");
+                  await transact(
+                    {
+                      operation: "withdrawWithDevice",
+                      sponsored: true,
+                      device,
+                      amount,
+                      nonce: access.nextWithdrawal,
+                    },
+                    signal,
+                  );
+                }
+              })
             }
           />
         ),

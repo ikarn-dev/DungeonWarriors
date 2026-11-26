@@ -15,6 +15,8 @@ export function QuestWager({
   blocked,
   canSign,
   onPlay,
+  onEnable,
+  onDeposit,
 }: {
   readonly id: string;
   readonly available: string;
@@ -26,8 +28,11 @@ export function QuestWager({
   readonly checking: boolean;
   readonly blocked: boolean;
   readonly canSign: boolean;
+  readonly onEnable: () => void;
+  readonly onDeposit: () => void;
   readonly onPlay: () => void;
 }) {
+  const funded = BigInt(available) > 0n;
   return (
     <div className="bet-card dungeon-bet">
       <div className="bet-field">
@@ -58,9 +63,8 @@ export function QuestWager({
         aria-busy={busy || checking}
         data-tone="gold"
         type="button"
-        disabled={blocked || !canSign || busy || checking || invalid}
-        title={canSign ? undefined : "Reconnect your wallet to play"}
-        onClick={onPlay}
+        disabled={blocked || busy || checking || (canSign && invalid)}
+        onClick={canSign ? onPlay : funded ? onEnable : onDeposit}
       >
         {busy || checking ? (
           <DotsLoader
@@ -68,10 +72,19 @@ export function QuestWager({
               checking ? "Checking your last quest" : "Starting your quest"
             }
           />
-        ) : (
+        ) : canSign ? (
           "Play"
+        ) : funded ? (
+          "Enable this browser"
+        ) : (
+          "Deposit USDC"
         )}
       </button>
+      {!canSign && funded && (
+        <p className="lobby-section-note">
+          Funded already? Approve browser access once to play.
+        </p>
+      )}
       <p className="quest-note">
         <span className="quest-note-mark" aria-hidden="true">
           <UiIcon name="alert" size={12} />

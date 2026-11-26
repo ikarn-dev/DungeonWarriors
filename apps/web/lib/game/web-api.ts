@@ -25,6 +25,10 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   ACCOUNT_STATE_UNAVAILABLE: "Couldn't load your account. Please refresh.",
   WALLET_OR_ACCOUNT_REQUEST_FAILED: "Your wallet didn't finish the request.",
   MESSAGE_SIGNING_REQUIRED: "This wallet can't sign in. Try another wallet.",
+  GAME_DEVICE_UNAVAILABLE:
+    "This browser couldn't store a game key. Enable access in another browser to continue.",
+  INVALID_GAME_DEVICE:
+    "Enable this browser in Wallet before playing or withdrawing.",
   TRANSACTION_SIGNING_REQUIRED: "This wallet can't approve transactions.",
   DUNGEON_WALLET_DECLINED: "Wallet approval was declined.",
   DUNGEON_WALLET_FAILED:

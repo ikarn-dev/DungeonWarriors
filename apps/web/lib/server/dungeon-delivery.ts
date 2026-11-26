@@ -107,16 +107,13 @@ function prepareDelivery(owner: string, nonce: string) {
     await refreshDungeon(record);
     if (record.settled) return { record, value: null };
     const base = await checkedConnection("base");
-    const { DUNGEON_ER_SETTLEMENT_ENABLED } = process.env;
-    const rollup = DUNGEON_ER_SETTLEMENT_ENABLED === "true";
-    const receipt = rollup
+    const receipt = record.randomness
       ? await base.getAccountInfo(settlementAddress(owner, nonce), "confirmed")
       : null;
     const returned = receipt?.owner.equals(program);
     if (
-      (record.delivery?.stage === "schedule" &&
-        (returned || receipt?.owner.equals(DELEGATION_PROGRAM_ID))) ||
-      (!rollup && record.delivery?.stage === "commit")
+      record.delivery?.stage === "schedule" &&
+      (returned || receipt?.owner.equals(DELEGATION_PROGRAM_ID))
     )
       record.delivery = null;
     if (record.delivery?.stage === "commit" && returned) {

@@ -2,14 +2,18 @@ import "server-only";
 import { createPublicKey, randomBytes, verify } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+import { deviceAddress } from "../game/device-intents";
 import { publicKeySchema } from "../solana/addresses.ts";
+import { account, uninitialized } from "./chain-account";
 import { ApiError, digest, runtime } from "./runtime";
+import { checkedConnection } from "./transaction-network";
 
 export const challengeInput = z.object({ wallet: publicKeySchema }).strict();
 export const verifyInput = z
   .object({
     challengeId: z.string().regex(/^[0-9a-f]{64}$/),
     signature: z.string().length(88),
+    device: publicKeySchema.optional(),
   })
   .strict();
 const challengeSchema = z
@@ -64,7 +68,11 @@ export async function createChallenge(wallet: string) {
   if (stored !== "OK") throw new ApiError("CHALLENGE_STORAGE_FAILED", 503);
   return { challengeId, message, expiresAt: new Date(expiresAt).toISOString() };
 }
-export async function verifyChallenge(challengeId: string, encoded: string) {
+export async function verifyChallenge(
+  challengeId: string,
+  encoded: string,
+  device?: string,
+) {
   const r = runtime();
   const key = `${r.prefix}:challenge:${challengeId}`;
   const parsed = challengeSchema.safeParse(await r.redis.get(key));
@@ -74,12 +82,22 @@ export async function verifyChallenge(challengeId: string, encoded: string) {
   if (
     signature.toString("base64") !== encoded ||
     !verifyWalletSignature(
-      parsed.data.wallet,
+      device ?? parsed.data.wallet,
       new TextEncoder().encode(parsed.data.message),
       signature,
     )
   )
     throw new ApiError("INVALID_SIGNATURE", 401);
+  if (device) {
+    const owner = new PublicKey(parsed.data.wallet);
+    const rpc = await checkedConnection("base");
+    const info = await rpc.getAccountInfo(deviceAddress(owner), "finalized");
+    const grant = uninitialized(info)
+      ? null
+      : account<{ owner: PublicKey; device: PublicKey }>("gameDevice", info);
+    if (!grant?.owner.equals(owner) || grant.device.toBase58() !== device)
+      throw new ApiError("INVALID_GAME_DEVICE", 401);
+  }
   const consumed = challengeSchema.safeParse(await r.redis.getdel(key));
   if (
     !consumed.success ||

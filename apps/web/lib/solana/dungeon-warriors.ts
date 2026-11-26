@@ -905,7 +905,6 @@ export type DungeonWarriors = {
         },
         {
           name: "owner";
-          signer: true;
           relations: ["player"];
         },
         {
@@ -3098,7 +3097,6 @@ export type DungeonWarriors = {
         },
         {
           name: "owner";
-          signer: true;
           relations: ["player", "collection"];
         },
         {
@@ -3901,6 +3899,59 @@ export type DungeonWarriors = {
       ];
     },
     {
+      name: "setGameDevice";
+      discriminator: [157, 162, 57, 171, 67, 34, 142, 180];
+      accounts: [
+        {
+          name: "owner";
+          writable: true;
+          signer: true;
+          relations: ["player"];
+        },
+        {
+          name: "player";
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [112, 108, 97, 121, 101, 114];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "access";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 100, 101, 118, 105, 99, 101];
+              },
+              {
+                kind: "account";
+                path: "owner";
+              },
+            ];
+          };
+        },
+        {
+          name: "systemProgram";
+          address: "11111111111111111111111111111111";
+        },
+      ];
+      args: [
+        {
+          name: "device";
+          type: "pubkey";
+        },
+      ];
+    },
+    {
       name: "setHouseBuffer";
       discriminator: [134, 174, 158, 200, 163, 103, 85, 79];
       accounts: [
@@ -4460,7 +4511,6 @@ export type DungeonWarriors = {
         },
         {
           name: "owner";
-          signer: true;
           relations: ["player"];
         },
         {
@@ -4580,6 +4630,113 @@ export type DungeonWarriors = {
         },
       ];
     },
+    {
+      name: "withdrawWithDevice";
+      discriminator: [235, 230, 185, 213, 128, 163, 235, 137];
+      accounts: [
+        {
+          name: "credit";
+          accounts: [
+            {
+              name: "config";
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103];
+                  },
+                ];
+              };
+              relations: ["house"];
+            },
+            {
+              name: "owner";
+              relations: ["player"];
+            },
+            {
+              name: "player";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [112, 108, 97, 121, 101, 114];
+                  },
+                  {
+                    kind: "account";
+                    path: "owner";
+                  },
+                ];
+              };
+            },
+            {
+              name: "house";
+              writable: true;
+              pda: {
+                seeds: [
+                  {
+                    kind: "const";
+                    value: [104, 111, 117, 115, 101];
+                  },
+                ];
+              };
+            },
+            {
+              name: "vault";
+              writable: true;
+            },
+            {
+              name: "ownerTokens";
+              writable: true;
+            },
+            {
+              name: "usdcMint";
+              address: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+            },
+            {
+              name: "tokenProgram";
+              address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+            },
+          ];
+        },
+        {
+          name: "device";
+          signer: true;
+          relations: ["access"];
+        },
+        {
+          name: "access";
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: "const";
+                value: [103, 97, 109, 101, 45, 100, 101, 118, 105, 99, 101];
+              },
+              {
+                kind: "account";
+                path: "credit.owner";
+                account: "transferCredit";
+              },
+            ];
+          };
+        },
+      ];
+      args: [
+        {
+          name: "args";
+          type: {
+            defined: {
+              name: "amountArgs";
+            };
+          };
+        },
+        {
+          name: "nonce";
+          type: "u64";
+        },
+      ];
+    },
   ];
   accounts: [
     {
@@ -4617,6 +4774,10 @@ export type DungeonWarriors = {
     {
       name: "gameConfig";
       discriminator: [45, 146, 146, 33, 170, 69, 96, 133];
+    },
+    {
+      name: "gameDevice";
+      discriminator: [6, 154, 55, 78, 131, 235, 1, 248];
     },
     {
       name: "gameRulesVersion";
@@ -6115,6 +6276,26 @@ export type DungeonWarriors = {
           {
             name: "allowReservations";
             type: "bool";
+          },
+        ];
+      };
+    },
+    {
+      name: "gameDevice";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "owner";
+            type: "pubkey";
+          },
+          {
+            name: "device";
+            type: "pubkey";
+          },
+          {
+            name: "nextWithdrawal";
+            type: "u64";
           },
         ];
       };
@@ -9199,7 +9380,6 @@ export const DUNGEON_WARRIORS_IDL = {
         },
         {
           name: "owner",
-          signer: true,
           relations: ["player"],
         },
         {
@@ -11267,7 +11447,6 @@ export const DUNGEON_WARRIORS_IDL = {
         },
         {
           name: "owner",
-          signer: true,
           relations: ["player", "collection"],
         },
         {
@@ -12046,6 +12225,59 @@ export const DUNGEON_WARRIORS_IDL = {
       ],
     },
     {
+      name: "set_game_device",
+      discriminator: [157, 162, 57, 171, 67, 34, 142, 180],
+      accounts: [
+        {
+          name: "owner",
+          writable: true,
+          signer: true,
+          relations: ["player"],
+        },
+        {
+          name: "player",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [112, 108, 97, 121, 101, 114],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "access",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 100, 101, 118, 105, 99, 101],
+              },
+              {
+                kind: "account",
+                path: "owner",
+              },
+            ],
+          },
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111",
+        },
+      ],
+      args: [
+        {
+          name: "device",
+          type: "pubkey",
+        },
+      ],
+    },
+    {
       name: "set_house_buffer",
       discriminator: [134, 174, 158, 200, 163, 103, 85, 79],
       accounts: [
@@ -12588,7 +12820,6 @@ export const DUNGEON_WARRIORS_IDL = {
         },
         {
           name: "owner",
-          signer: true,
           relations: ["player"],
         },
         {
@@ -12708,6 +12939,113 @@ export const DUNGEON_WARRIORS_IDL = {
         },
       ],
     },
+    {
+      name: "withdraw_with_device",
+      discriminator: [235, 230, 185, 213, 128, 163, 235, 137],
+      accounts: [
+        {
+          name: "credit",
+          accounts: [
+            {
+              name: "config",
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [103, 97, 109, 101, 45, 99, 111, 110, 102, 105, 103],
+                  },
+                ],
+              },
+              relations: ["house"],
+            },
+            {
+              name: "owner",
+              relations: ["player"],
+            },
+            {
+              name: "player",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [112, 108, 97, 121, 101, 114],
+                  },
+                  {
+                    kind: "account",
+                    path: "owner",
+                  },
+                ],
+              },
+            },
+            {
+              name: "house",
+              writable: true,
+              pda: {
+                seeds: [
+                  {
+                    kind: "const",
+                    value: [104, 111, 117, 115, 101],
+                  },
+                ],
+              },
+            },
+            {
+              name: "vault",
+              writable: true,
+            },
+            {
+              name: "owner_tokens",
+              writable: true,
+            },
+            {
+              name: "usdc_mint",
+              address: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+            },
+            {
+              name: "token_program",
+              address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            },
+          ],
+        },
+        {
+          name: "device",
+          signer: true,
+          relations: ["access"],
+        },
+        {
+          name: "access",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [103, 97, 109, 101, 45, 100, 101, 118, 105, 99, 101],
+              },
+              {
+                kind: "account",
+                path: "credit.owner",
+                account: "TransferCredit",
+              },
+            ],
+          },
+        },
+      ],
+      args: [
+        {
+          name: "args",
+          type: {
+            defined: {
+              name: "AmountArgs",
+            },
+          },
+        },
+        {
+          name: "nonce",
+          type: "u64",
+        },
+      ],
+    },
   ],
   accounts: [
     {
@@ -12745,6 +13083,10 @@ export const DUNGEON_WARRIORS_IDL = {
     {
       name: "GameConfig",
       discriminator: [45, 146, 146, 33, 170, 69, 96, 133],
+    },
+    {
+      name: "GameDevice",
+      discriminator: [6, 154, 55, 78, 131, 235, 1, 248],
     },
     {
       name: "GameRulesVersion",
@@ -14066,6 +14408,26 @@ export const DUNGEON_WARRIORS_IDL = {
           {
             name: "allow_reservations",
             type: "bool",
+          },
+        ],
+      },
+    },
+    {
+      name: "GameDevice",
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "owner",
+            type: "pubkey",
+          },
+          {
+            name: "device",
+            type: "pubkey",
+          },
+          {
+            name: "next_withdrawal",
+            type: "u64",
           },
         ],
       },

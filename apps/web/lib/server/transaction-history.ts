@@ -40,6 +40,7 @@ const labels: Readonly<Record<string, TransactionActivity>> = {
   refundCapsule: "Capsule refund",
   deposit: "Deposit",
   withdraw: "Withdrawal",
+  withdrawWithDevice: "Withdrawal",
   createPlayer: "Player created",
   applyUpgrade: "Cat upgraded",
 };

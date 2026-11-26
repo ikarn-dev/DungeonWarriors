@@ -1,5 +1,6 @@
 import type { PlayerIntent } from "./custody-client";
 import { displayUsdc } from "./custody-client";
+import type { DeviceIntent } from "./device-intents";
 import { CAT_NAMES } from "./lobby-state";
 import type { LobbyIntent } from "./transaction-intents";
 
@@ -14,7 +15,7 @@ export type TransactionCopy = {
 };
 
 export function transactionCopy(
-  intent: LobbyIntent | PlayerIntent,
+  intent: LobbyIntent | PlayerIntent | DeviceIntent,
 ): TransactionCopy {
   const steps = (thing: string, done: string): TransactionCopy => ({
     preparing: `Preparing your ${thing}…`,
@@ -29,6 +30,14 @@ export function transactionCopy(
       return steps("starter cat", "Your starter cat is on its way");
     case "selectCat":
       return steps("cat choice", `${CAT_NAMES[intent.cat]} selected`);
+    case "depositWithDevice":
+      return steps("deposit", `Deposited ${displayUsdc(intent.amount)} USDC`);
+    case "setGameDevice":
+      return intent.device
+        ? steps("browser access", "Browser enabled")
+        : steps("revocation", "Browser access revoked");
+    case "withdrawWithDevice":
+      return steps("withdrawal", `Withdrew ${displayUsdc(intent.amount)} USDC`);
     case "game": {
       const action = intent.action;
       switch (action.kind) {

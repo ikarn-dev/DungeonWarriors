@@ -1,4 +1,4 @@
-use super::house::assert_vault;
+use super::{game_device::authorize_wager, house::assert_vault};
 use crate::{
     catalog::CatId,
     constants::*,
@@ -38,7 +38,8 @@ pub struct ReserveDungeon<'info> {
     pub config: Box<Account<'info, GameConfig>>,
     #[account(seeds=[DUNGEON_CONFIG_SEED],bump=dungeon.bump)]
     pub dungeon: Box<Account<'info, DungeonConfig>>,
-    pub owner: Signer<'info>,
+    /// CHECK: The owner signs directly or supplies their on-chain device grant.
+    pub owner: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut,seeds=[PLAYER_SEED,owner.key().as_ref()],bump=player.bump,has_one=owner)]
@@ -61,6 +62,7 @@ pub fn handle_reserve_dungeon(
     args: ReserveDungeonArgs,
 ) -> Result<()> {
     let a = ctx.accounts;
+    authorize_wager(&a.owner.to_account_info(), ctx.remaining_accounts)?;
     require!(
         a.dungeon.enabled && a.config.allow_reservations,
         ErrorCode::AdmissionClosed

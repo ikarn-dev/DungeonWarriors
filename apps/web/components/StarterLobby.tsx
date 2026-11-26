@@ -1,13 +1,9 @@
 "use client";
-import { VersionedTransaction } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { catalogManifestPath, verifyManifestBinding } from "../lib/game/assets";
-import {
-  type PlayerIntent,
-  validatePreparedPlayerAction,
-} from "../lib/game/custody-client";
+import type { PlayerIntent } from "../lib/game/custody-client";
+import type { DeviceIntent } from "../lib/game/device-intents";
 import {
   type CapsuleKind,
   decodeLobbyState,
@@ -17,15 +13,11 @@ import { RULES_V1 } from "../lib/game/rules";
 import { transactionCopy } from "../lib/game/transaction-copy";
 import {
   type LobbyIntent,
-  lobbyPreparedSchema,
   lobbySubmittedSchema,
-  validatePreparedTransaction,
 } from "../lib/game/transaction-intents";
 import {
-  decodeBase64,
   encodeBase64,
   pause,
-  readWebJson,
   WebApiError,
   webApi,
   webErrorMessage,
@@ -37,10 +29,11 @@ import type { LobbyTab } from "./LobbyMenu";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
 import { WalletChip } from "./LobbyWallet";
+import { approveLobbyTransaction } from "./lobby-approval";
 import { useWalletEntry } from "./useWalletEntry";
 import WalletDialog from "./WalletDialog";
 import { useHydratedWallet } from "./WalletProviders";
-import { signInWallet } from "./wallet-sign-in";
+import { signInGameDevice, signInWallet } from "./wallet-sign-in";
 
 const drawPollMs = 6_000;
 // One toast per transaction: loading, then confirmed or still pending.
@@ -125,9 +118,20 @@ export default function StarterPanel() {
           "/api/auth/session",
           undefined,
           signal,
-        );
+        ).catch((failure: unknown) => {
+          if (
+            failure instanceof WebApiError &&
+            failure.code === "AUTH_REQUIRED"
+          )
+            return null;
+          throw failure;
+        });
         if (controller.signal.aborted) return;
-        if (session.wallet !== walletAddress) return;
+        if (
+          session?.wallet !== walletAddress &&
+          !(await signInGameDevice(walletAddress, signal))
+        )
+          return;
         setSessionWallet(walletAddress);
         await reload(signal).catch((failure: unknown) => {
           if (
@@ -194,9 +198,13 @@ export default function StarterPanel() {
     }
   }
   async function signIn(signal: AbortSignal) {
-    if (address === null || wallet.signMessage === undefined)
-      throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
-    if (!(await signInWallet(address, wallet.signMessage, signal))) return;
+    if (address === null) throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
+    if (!(await signInGameDevice(address, signal))) {
+      if (signal.aborted) return;
+      if (wallet.signMessage === undefined)
+        throw new WebApiError("MESSAGE_SIGNING_REQUIRED");
+      if (!(await signInWallet(address, wallet.signMessage, signal))) return;
+    }
     setSessionWallet(address);
     await reload(signal);
     toast.success("Signed in", { id: "restore" });
@@ -251,44 +259,20 @@ export default function StarterPanel() {
     }
   }
   async function transact(
-    intent: LobbyIntent | PlayerIntent,
+    intent: LobbyIntent | PlayerIntent | DeviceIntent,
     signal: AbortSignal,
   ) {
-    if (address === null || wallet.signTransaction === undefined)
-      throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
+    if (address === null) throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
     const copy = transactionCopy(intent);
     toast.loading(copy.preparing, { id: TX_TOAST });
-    if (
-      intent.operation === "claimStarter" ||
-      (intent.operation === "game" && intent.action.kind === "purchaseCapsule")
-    ) {
-      if (state?.assetBinding == null)
-        throw new WebApiError("ASSETS_NOT_READY");
-      const response = await fetch(
-        catalogManifestPath(state.assetBinding.version),
-        { cache: "no-store", signal },
-      );
-      if (
-        !response.ok ||
-        Number(response.headers.get("content-length") ?? 0) > 262144
-      )
-        throw new WebApiError("ASSETS_NOT_READY");
-      await verifyManifestBinding(
-        await readWebJson(response),
-        state.assetBinding,
-      );
-    }
-    const prepared = lobbyPreparedSchema.parse(
-      await webApi("/api/tx/prepare", intent, signal),
+    const { signed, lastValidBlockHeight } = await approveLobbyTransaction(
+      address,
+      intent,
+      state?.assetBinding,
+      wallet.signTransaction,
+      () => toast.loading(copy.approve, { id: TX_TOAST }),
+      signal,
     );
-    const tx = VersionedTransaction.deserialize(
-      decodeBase64(prepared.transaction),
-    );
-    if (intent.operation === "game")
-      validatePreparedPlayerAction(tx, address, intent);
-    else validatePreparedTransaction(tx, address, intent);
-    toast.loading(copy.approve, { id: TX_TOAST });
-    const signed = await wallet.signTransaction(tx);
     if (signal.aborted) return;
     toast.loading(copy.confirming, { id: TX_TOAST });
     const result = lobbySubmittedSchema.parse(
@@ -317,15 +301,10 @@ export default function StarterPanel() {
     }
     setPending({
       signature: result.signature,
-      lastValidBlockHeight: prepared.lastValidBlockHeight,
+      lastValidBlockHeight,
       starter: intent.operation === "claimStarter",
     });
-    await reconcile(
-      result.signature,
-      prepared.lastValidBlockHeight,
-      signal,
-      copy.done,
-    );
+    await reconcile(result.signature, lastValidBlockHeight, signal, copy.done);
   }
   const paidDraw = state?.starter === "fulfilled";
   useEffect(() => {
@@ -417,7 +396,6 @@ export default function StarterPanel() {
           <LobbySections
             state={state}
             address={address}
-            sign={wallet.signTransaction}
             blocked={blocked}
             accountRevision={accountRevision}
             shopDraw={{

@@ -45,9 +45,17 @@ export default function WalletPanel({
   revision,
   blocked,
   transfer,
+  deviceReady,
+  hasGrant,
+  onEnable,
+  onRevoke,
 }: {
   readonly revision: number | undefined;
   readonly blocked: boolean;
+  readonly deviceReady: boolean;
+  readonly hasGrant: boolean;
+  readonly onEnable: () => void;
+  readonly onRevoke: () => void;
   readonly transfer: (
     kind: "deposit" | "withdraw",
     amount: string,
@@ -55,6 +63,7 @@ export default function WalletPanel({
 }) {
   const { value, failed, retry } = useFinalized(revision, readWallet);
   const [amount, setAmount] = useState("");
+  const [withdrawal, setWithdrawal] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // The transfer in progress; its button shows the loader beside its label.
   const [active, setActive] = useState<"deposit" | "withdraw" | null>(null);
@@ -84,6 +93,11 @@ export default function WalletPanel({
       return;
     }
     setProblem(null);
+    if (kind === "withdraw" && withdrawal === null) {
+      setWithdrawal(units.toString());
+      return;
+    }
+    setWithdrawal(null);
     setActive(kind);
     void transfer(kind, units.toString())
       .then(() => setAmount(""))
@@ -178,7 +192,10 @@ export default function WalletPanel({
                   value={amount}
                   aria-invalid={problem !== null}
                   aria-describedby={problem ? "transfer-problem" : undefined}
-                  onChange={(event) => setAmount(event.target.value)}
+                  onChange={(event) => {
+                    setAmount(event.target.value);
+                    setWithdrawal(null);
+                  }}
                   disabled={blocked}
                 />
                 <span>USDC</span>
@@ -193,6 +210,7 @@ export default function WalletPanel({
                   onClick={() => {
                     if (!funds) return;
                     setAmount(displayUsdc(funds.usdcBaseUnits));
+                    setWithdrawal(null);
                     setProblem(null);
                   }}
                 >
@@ -218,7 +236,13 @@ export default function WalletPanel({
                 type="button"
                 className="pixel-button"
                 aria-busy={active === "withdraw"}
-                disabled={!amount || blocked || value === null}
+                disabled={
+                  !deviceReady ||
+                  !amount ||
+                  blocked ||
+                  value === null ||
+                  withdrawal !== null
+                }
                 onClick={() => move("withdraw")}
               >
                 {active === "withdraw" ? (
@@ -229,12 +253,63 @@ export default function WalletPanel({
                 Withdraw
               </button>
             </div>
+            {withdrawal !== null && (
+              <>
+                <p className="lobby-section-note">
+                  Send {displayUsdc(withdrawal)} USDC to your wallet?
+                </p>
+                <button
+                  type="button"
+                  className="pixel-button"
+                  disabled={blocked || !deviceReady}
+                  onClick={() => move("withdraw")}
+                >
+                  Confirm withdrawal
+                </button>
+                <button
+                  type="button"
+                  className="pixel-button"
+                  disabled={blocked}
+                  onClick={() => setWithdrawal(null)}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
             {problem && (
               <p id="transfer-problem" role="alert" className="lobby-problem">
                 {problem}
               </p>
             )}
           </form>
+          {!deviceReady && (
+            <>
+              <p className="lobby-section-note">
+                Depositing lets this browser wager your game balance and send
+                withdrawals to your wallet.
+              </p>
+              {credits && BigInt(credits.availableBaseUnits) > 0n && (
+                <button
+                  type="button"
+                  className="pixel-button"
+                  disabled={blocked}
+                  onClick={onEnable}
+                >
+                  Enable this browser
+                </button>
+              )}
+            </>
+          )}
+          {hasGrant && (
+            <button
+              type="button"
+              className="pixel-button"
+              disabled={blocked}
+              onClick={onRevoke}
+            >
+              Revoke browser access
+            </button>
+          )}
         </>
       )}
     </div>

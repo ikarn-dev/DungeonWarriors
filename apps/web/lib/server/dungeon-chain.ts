@@ -4,12 +4,13 @@ import type { IdlAccounts } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { affordableDepth, dungeonRulesSchema, payout } from "../dungeon/rules";
 import { dungeonAccounts, expeditionAddress } from "../dungeon/transactions";
+import { deviceAddress } from "../game/device-intents";
 import { requiredVaultBalance } from "../game/economy";
 import { DEVNET } from "../solana/addresses";
 import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { coder, pda } from "../solana/program";
 import { browserVerifierKey } from "./browser-config";
-import { account } from "./chain-account";
+import { account, uninitialized } from "./chain-account";
 import type { DungeonRecord } from "./dungeon-store";
 import { ApiError } from "./runtime";
 import { checkedConnection } from "./transaction-network";
@@ -25,6 +26,7 @@ export async function dungeonSetup(owner: string) {
       keys.player,
       keys.collection,
       keys.house,
+      deviceAddress(keys.owner),
     ],
     "finalized",
   );
@@ -85,7 +87,20 @@ export async function dungeonSetup(owner: string) {
     BigInt(house.bufferBaseUnits.toString()),
   );
   const free = BigInt(vault.value.amount) - required;
-  return { rpc, config, dungeon, player, collection, rules, ruleHash, free };
+  const grant = uninitialized(infos[5] ?? null)
+    ? null
+    : account<Accounts["gameDevice"]>("gameDevice", infos[5] ?? null);
+  return {
+    rpc,
+    config,
+    dungeon,
+    player,
+    collection,
+    rules,
+    ruleHash,
+    free,
+    grant,
+  };
 }
 export function quoteDepth(
   stake: bigint,

@@ -261,6 +261,18 @@ pub mod dungeon_warriors {
         crate::instructions::credit::handle_withdraw(ctx, args)
     }
 
+    pub fn set_game_device(ctx: Context<SetGameDevice>, device: Pubkey) -> Result<()> {
+        crate::instructions::game_device::handle_set_game_device(ctx, device)
+    }
+
+    pub fn withdraw_with_device(
+        ctx: Context<WithdrawWithDevice>,
+        args: AmountArgs,
+        nonce: u64,
+    ) -> Result<()> {
+        crate::instructions::credit::handle_withdraw_with_device(ctx, args, nonce)
+    }
+
     pub fn initialize_config(
         ctx: Context<InitializeConfig>,
         args: InitializeConfigArgs,

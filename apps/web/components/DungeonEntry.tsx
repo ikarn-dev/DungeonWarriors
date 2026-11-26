@@ -1,5 +1,4 @@
 "use client";
-import type { VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -17,11 +16,11 @@ import { type DungeonPrepare, requestDungeon } from "../lib/dungeon/request";
 import {
   approveDungeonReservation,
   type DungeonApproval,
-  hasDungeonReservationFee,
 } from "../lib/dungeon/transactions";
 import { mergeDungeonView } from "../lib/dungeon/view-state";
 import type { CatId } from "../lib/game/catalog";
 import { displayUsdc, parseUsdc } from "../lib/game/custody-client";
+import { gameDeviceKey, signGameTransaction } from "../lib/game/device-key";
 import type { LobbyState } from "../lib/game/lobby-state";
 import { WebApiError, webErrorMessage } from "../lib/game/web-api";
 import DungeonScreen, { DungeonDialog } from "./DungeonScreen";
@@ -47,7 +46,9 @@ export default function DungeonEntry({
   cat,
   wallet,
   blocked,
-  sign,
+  device,
+  onEnable,
+  onDeposit,
   refresh,
   showMenu,
 }: {
@@ -55,9 +56,9 @@ export default function DungeonEntry({
   readonly cat: CatId;
   readonly wallet: string;
   readonly blocked: boolean;
-  readonly sign:
-    | ((tx: VersionedTransaction) => Promise<VersionedTransaction>)
-    | undefined;
+  readonly device: string | undefined;
+  readonly onEnable: () => void;
+  readonly onDeposit: () => void;
   readonly refresh: (signal: AbortSignal) => Promise<void>;
   readonly showMenu: () => void;
 }) {
@@ -295,15 +296,13 @@ export default function DungeonEntry({
       confirming ||
       funded ||
       pending ||
-      blocked
+      blocked ||
+      !device
     )
       return;
     const current = latest.current;
     let expedition = current && !current.settled ? current : null;
-    if (
-      !expedition &&
-      (!sign || !rawStake || !stake || stake > BigInt(state.available))
-    )
+    if (!expedition && (!rawStake || !stake || stake > BigInt(state.available)))
       return;
     const artCat = expedition?.cat ?? cat;
     const controller = new AbortController();
@@ -320,10 +319,7 @@ export default function DungeonEntry({
       signal.throwIfAborted();
       setArt(artwork);
       step = "prepare";
-      let request:
-        | DungeonPrepare
-        | Extract<DungeonRequest, { kind: "quote" }>
-        | null = null;
+      let request: DungeonPrepare | null = null;
       if (expedition?.phase === "preparing" && expedition.preparation) {
         const previous = expedition;
         expedition = await send(
@@ -332,20 +328,22 @@ export default function DungeonEntry({
         );
         if (
           (expedition?.phase === "cancelled" && expedition.settled) ||
-          (expedition?.preparation &&
-            !hasDungeonReservationFee(expedition.preparation.transaction))
+          expedition?.preparation
         ) {
           request = {
-            kind: "quote",
+            kind: "prepare",
             stake: previous.stake,
             cat: previous.cat,
-            maxRooms: previous.maxRooms,
-            maxGross: previous.maxGross,
-            rulesHash: previous.rulesHash,
+            device,
+            review: {
+              maxRooms: previous.maxRooms,
+              maxGross: previous.maxGross,
+              rulesHash: previous.rulesHash,
+            },
           };
         }
       } else if (!expedition && rawStake) {
-        request = { kind: "prepare", stake: rawStake, cat };
+        request = { kind: "prepare", stake: rawStake, cat, device };
       }
       if (request) {
         expedition = await send(request, signal);
@@ -353,24 +351,26 @@ export default function DungeonEntry({
           !expedition?.preparation ||
           expedition.stake !== request.stake ||
           expedition.cat !== request.cat ||
-          (request.kind === "quote" &&
-            (expedition.maxRooms !== request.maxRooms ||
-              expedition.maxGross !== request.maxGross ||
-              expedition.rulesHash !== request.rulesHash))
+          (request.review &&
+            (expedition.maxRooms !== request.review.maxRooms ||
+              expedition.maxGross !== request.review.maxGross ||
+              expedition.rulesHash !== request.review.rulesHash))
         )
           throw new WebApiError("INVALID_DUNGEON_QUOTE");
-        logDungeon("wager.prepared", { renewed: request.kind === "quote" });
+        logDungeon("wager.prepared", { renewed: request.review !== undefined });
       }
       if (!expedition) return;
       if (expedition.preparation) {
-        if (!sign) throw new WebApiError("TRANSACTION_SIGNING_REQUIRED");
-        step = "wallet";
-        setStage("wallet");
+        step = "sign";
+        const key = await gameDeviceKey(wallet);
+        if (!key || key.address !== device)
+          throw new WebApiError("GAME_DEVICE_UNAVAILABLE");
         approved.current = await approveDungeonReservation(
           wallet,
           expedition,
-          sign,
+          (tx) => signGameTransaction(key, tx),
           approved.current,
+          device,
         );
         signal.throwIfAborted();
         step = "submit";
@@ -439,7 +439,9 @@ export default function DungeonEntry({
           busy={busy}
           checking={checking}
           blocked={blocked}
-          canSign={sign !== undefined}
+          canSign={device !== undefined}
+          onEnable={onEnable}
+          onDeposit={onDeposit}
           onPlay={() => void begin()}
         />
       )}

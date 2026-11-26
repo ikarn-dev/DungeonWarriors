@@ -1,12 +1,21 @@
 import { z } from "zod";
 import { pause, WebApiError, webApi } from "../game/web-api";
+import { publicKeySchema } from "../solana/addresses";
 import { u64Input } from "../solana/program";
-import { catSchema, type DungeonRequest } from "./protocol";
+import { catSchema, type DungeonRequest, hashSchema } from "./protocol";
 
 export const dungeonPrepareSchema = z.strictObject({
   kind: z.literal("prepare"),
   stake: u64Input.refine((value) => BigInt(value) > 0n),
   cat: catSchema,
+  device: publicKeySchema.optional(),
+  review: z
+    .strictObject({
+      maxRooms: z.number().int().min(1).max(5),
+      maxGross: u64Input,
+      rulesHash: hashSchema,
+    })
+    .optional(),
 });
 export type DungeonPrepare = z.infer<typeof dungeonPrepareSchema>;
 

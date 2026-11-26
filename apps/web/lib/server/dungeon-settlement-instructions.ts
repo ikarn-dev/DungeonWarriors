@@ -68,9 +68,6 @@ export async function settlementInstructions(
       ),
     ],
   };
-  const { DUNGEON_ER_SETTLEMENT_ENABLED } = process.env;
-  if (DUNGEON_ER_SETTLEMENT_ENABLED !== "true") return direct;
-
   const settlement = settlementAddress(record.owner, record.nonce);
   if (receipt?.owner.equals(program)) {
     const saved = coder.accounts.decode("dungeonSettlement", receipt.data);

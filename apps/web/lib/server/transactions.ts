@@ -7,16 +7,15 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { z } from "zod";
+import { type DeviceIntent, deviceInstructions } from "../game/device-intents";
 import { decodeEscrowAccount, runAddresses } from "../game/run-accounts";
 import { runSponsor } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses.ts";
 import { verifyWalletSignature } from "./auth";
-import { coder, idl, nonceBytes, pda, program, u64Input } from "./chain";
+import { coder, idl, nonceBytes, pda, program } from "./chain";
 import { assertCurrentEntry } from "./entry-admission";
 import {
   gameInstructions,
-  gameIntentSchema,
   gameNetwork,
   programInstruction,
 } from "./game-transactions";
@@ -34,48 +33,10 @@ import {
 } from "./sponsorship";
 import { checkedConnection } from "./transaction-network";
 import { reviewedInstructions } from "./transaction-review";
+import type { Intent } from "./transaction-schema";
 
-export const intentSchema = z.discriminatedUnion("operation", [
-  gameIntentSchema,
-  z
-    .object({ operation: z.literal("createPlayer"), sponsored: z.boolean() })
-    .strict(),
-  z
-    .object({
-      operation: z.literal("claimStarter"),
-      nonce: u64Input,
-      inventoryVersion: u64Input,
-      catalogVersion: z.number().int().min(1).max(0xffffffff),
-      sponsored: z.literal(true),
-    })
-    .strict(),
-  z
-    .object({
-      operation: z.literal("selectCat"),
-      inventoryVersion: u64Input,
-      cat: z.enum(["collector", "acrobat", "guardian", "sprinter"]),
-      sponsored: z.literal(false),
-    })
-    .strict(),
-  z
-    .object({
-      operation: z.literal("owner"),
-      instruction: z.enum([
-        "deposit",
-        "withdraw",
-        "authorizeSession",
-        "revokeSession",
-        "reserveRun",
-        "selectCat",
-      ]),
-      sponsored: z.literal(false),
-    })
-    .strict(),
-]);
-export const submitInput = z
-  .object({ intent: intentSchema, transaction: z.string().min(1).max(1800) })
-  .strict();
-type Intent = z.infer<typeof intentSchema>;
+export { intentSchema, submitInput } from "./transaction-schema";
+
 const SPONSORED_FEE_LIMIT_LAMPORTS = 100_000n;
 const STARTER_SPONSORED_LIMIT_LAMPORTS = 5_000_000n;
 
@@ -92,7 +53,7 @@ function accountRoles(items: IdlInstructionAccountItem[]): string[] {
 }
 export function instructionFor(
   wallet: string,
-  intent: Exclude<Intent, { operation: "game" }>,
+  intent: Exclude<Intent, { operation: "game" } | DeviceIntent>,
 ) {
   if (intent.operation === "owner")
     throw new ApiError("PREPARE_NOT_SUPPORTED", 400);
@@ -192,6 +153,18 @@ function instructionsFor(wallet: string, intent: Intent) {
     }
     return gameInstructions(wallet, intent);
   }
+  if (
+    intent.operation === "depositWithDevice" ||
+    intent.operation === "setGameDevice" ||
+    intent.operation === "withdrawWithDevice"
+  )
+    return deviceInstructions(
+      wallet,
+      intent,
+      intent.sponsored
+        ? new PublicKey(sponsorshipConfig().SPONSOR_PUBLIC_KEY)
+        : undefined,
+    );
   const { instruction, ...built } = instructionFor(wallet, intent);
   return { ...built, instructions: [instruction] };
 }
@@ -318,7 +291,9 @@ export function validateTransaction(
   const walletMayAddFees =
     intent.sponsored ||
     intent.operation === "game" ||
-    intent.operation === "selectCat";
+    intent.operation === "selectCat" ||
+    intent.operation === "depositWithDevice" ||
+    intent.operation === "setGameDevice";
   const maxInstructions =
     intent.operation === "game"
       ? intent.playSponsor
@@ -327,9 +302,12 @@ export function validateTransaction(
             intent.action.expiresAtSeconds !== undefined
           ? 5 + fundingInstructions
           : 4 + fundingInstructions
-      : walletMayAddFees
-        ? 3
-        : 1;
+      : intent.operation === "withdrawWithDevice" ||
+          intent.operation === "depositWithDevice"
+        ? 4
+        : walletMayAddFees
+          ? 3
+          : 1;
   if (
     message.version !== 0 ||
     message.addressTableLookups.length > 0 ||
@@ -410,6 +388,20 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
   if (intent.operation === "game" && intent.playSponsor)
     return submitPlay(wallet, intent, tx, () => connectionFor(wallet, intent));
   const rpc = await connectionFor(wallet, intent);
+  if (intent.operation === "withdrawWithDevice") {
+    const sponsor = await dedicatedSponsor(rpc);
+    tx.sign([sponsor]);
+    const signature = utils.bytes.bs58.encode(
+      tx.signatures[0] ?? new Uint8Array(),
+    );
+    const cost = await checkPlaySpend(rpc, tx, sponsor.publicKey, "base", true);
+    await admitSponsorCost(
+      `withdraw:${wallet}:${intent.nonce}`,
+      cost,
+      signature,
+    );
+    return sendReviewed(rpc, tx, "base", signature, true);
+  }
   // The ER simulates v0 transactions, but its fee RPC cannot load v0 messages.
   const fee =
     network === "base"
@@ -463,7 +455,7 @@ export async function submit(wallet: string, intent: Intent, encoded: string) {
     if (BigInt(Math.max(0, balance - after)) > cost)
       throw new ApiError("SPONSOR_BUDGET_UNAVAILABLE", 503);
     checkSponsorHeadroom(balance, policy.SPONSOR_MIN_BALANCE_LAMPORTS, cost);
-    await admitSponsorCost(instructionFor(wallet, intent).operationId, cost);
+    await admitSponsorCost(instructionsFor(wallet, intent).operationId, cost);
     tx.sign([key]);
   } else {
     if (completionSponsor !== undefined) tx.sign([await dedicatedSponsor(rpc)]);

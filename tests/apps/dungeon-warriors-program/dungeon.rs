@@ -372,7 +372,7 @@ fn real_provider_reservation_is_sponsored_atomic_and_nonce_bound() {
     let owner = p.owner.pubkey();
     let key = pda(EXPEDITION_SEED, owner, 0);
     let make = |cap, cat, stake| {
-        ix(
+        let mut request = ix(
             instruction::ReserveDungeon {
                 args: ReserveDungeonArgs {
                     nonce: 0,
@@ -404,7 +404,9 @@ fn real_provider_reservation_is_sponsored_atomic_and_nonce_bound() {
                 slot_hashes: ephemeral_rollups_sdk::vrf::compat::slot_hashes::ID,
                 system_program: system_program::ID,
             },
-        )
+        );
+        request.accounts[2].is_signer = true;
+        request
     };
     let requests = [
         make(1, CatId::Collector, 1_000_000),

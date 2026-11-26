@@ -32,6 +32,7 @@ export const dungeonRecordSchema = dungeonViewSchema
         messageHash: hashSchema,
         signature: z.string().nullable(),
         cost: u64Input,
+        device: publicKeySchema.optional(),
       })
       .strict(),
     delivery: deliverySchema.nullable(),

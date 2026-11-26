@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameDeviceKey, signDeviceMessage } from "../lib/game/device-key";
 import { encodeBase64, WebApiError, webApi } from "../lib/game/web-api";
 
 const challengeSchema = z
@@ -15,6 +16,7 @@ export async function signInWallet(
   address: string,
   signMessage: (message: Uint8Array) => Promise<Uint8Array>,
   signal: AbortSignal,
+  device?: string,
 ): Promise<boolean> {
   const challenge = challengeSchema.parse(
     await webApi("/api/auth/challenge", { wallet: address }, signal),
@@ -38,8 +40,27 @@ export async function signInWallet(
   if (signal.aborted) return false;
   await webApi(
     "/api/auth/verify",
-    { challengeId: challenge.challengeId, signature: encodeBase64(signature) },
+    {
+      challengeId: challenge.challengeId,
+      signature: encodeBase64(signature),
+      ...(device ? { device } : {}),
+    },
     signal,
   );
   return !signal.aborted;
+}
+
+export async function signInGameDevice(wallet: string, signal: AbortSignal) {
+  const key = await gameDeviceKey(wallet);
+  if (!key || signal.aborted) return false;
+  return signInWallet(
+    wallet,
+    (message) => signDeviceMessage(key, message),
+    signal,
+    key.address,
+  ).catch((error: unknown) => {
+    if (error instanceof WebApiError && error.code === "INVALID_GAME_DEVICE")
+      return false;
+    throw error;
+  });
 }

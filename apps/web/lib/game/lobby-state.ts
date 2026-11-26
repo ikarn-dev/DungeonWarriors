@@ -40,7 +40,7 @@ const rawSchema = z
           })
           .strict(),
       )
-      .max(6),
+      .max(7),
   })
   .strict();
 // Display names (2026-11-24); the catalog type IDs stay the onchain identity.
@@ -139,6 +139,21 @@ export function decodeLobbyState(input: unknown, wallet: string) {
       collection.ownedMask > 15)
   )
     throw new Error("INVALID_ACCOUNT_RESPONSE");
+  const accessAddress = address("game-device", owner.toBytes());
+  const grant = parsed.accounts.some(
+    ({ address }) => address === accessAddress.toBase58(),
+  )
+    ? decode("gameDevice", accessAddress)
+    : null;
+  if (grant && !grant.owner.equals(owner))
+    throw new Error("INVALID_ACCOUNT_RESPONSE");
+  const gameDevice =
+    grant && !grant.device.equals(PublicKey.default)
+      ? {
+          address: grant.device.toBase58(),
+          nextWithdrawal: grant.nextWithdrawal.toString(),
+        }
+      : null;
   const cats = ids.flatMap((id, index) => {
     const owned = collection?.cats[index] ?? null;
     if (
@@ -206,6 +221,7 @@ export function decodeLobbyState(input: unknown, wallet: string) {
     slot: parsed.slot,
     configured: cfg !== null,
     hasPlayer: player !== null,
+    gameDevice,
     allowStarter: cfg?.allowStarter ?? false,
     allowPurchases: cfg?.allowPurchases ?? false,
     allowReservations: cfg?.allowReservations ?? false,

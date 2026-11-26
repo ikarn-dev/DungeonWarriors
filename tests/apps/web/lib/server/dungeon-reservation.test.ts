@@ -3,6 +3,7 @@ import {
   ComputeBudgetInstruction,
   ComputeBudgetProgram,
   Keypair,
+  PublicKey,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -14,6 +15,7 @@ import {
   hasDungeonReservationFee,
   reservationMessage,
 } from "../../../../../apps/web/lib/dungeon/transactions";
+import { signGameTransaction } from "../../../../../apps/web/lib/game/device-key";
 import { encodeBase64 } from "../../../../../apps/web/lib/game/web-api";
 import {
   quoteDungeon,
@@ -401,4 +403,54 @@ it("reports wallet fee edits before sending an approval to the server", async ()
   } finally {
     log.mockRestore();
   }
+});
+
+it("upgrades only the unsigned reservation and submits it with a browser key instead of the wallet", async () => {
+  const pair = await crypto.subtle.generateKey("Ed25519", false, [
+    "sign",
+    "verify",
+  ]);
+  if (!("privateKey" in pair)) throw new Error("Expected an Ed25519 key pair");
+  const key = new PublicKey(
+    new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)),
+  );
+  const device = { address: key.toBase58(), privateKey: pair.privateKey };
+  const setup = await mocks.setup();
+  const input = {
+    kind: "prepare",
+    stake: "1000000",
+    cat: "collector",
+  } as const;
+  const original = await quoteDungeon(owner, input);
+  const { maxRooms, maxGross, rulesHash } = original;
+  const request = {
+    ...input,
+    device: device.address,
+    review: { maxRooms, maxGross, rulesHash },
+  };
+  await expect(quoteDungeon(owner, request)).rejects.toThrow(
+    "INVALID_GAME_DEVICE",
+  );
+  mocks.setup.mockResolvedValue({
+    ...setup,
+    grant: { owner: new PublicKey(owner), device: key },
+  });
+  const quote = await quoteDungeon(owner, request);
+  const approved = await approveDungeonReservation(
+    owner,
+    quote,
+    (tx) => {
+      expect(
+        tx.message.staticAccountKeys
+          .slice(0, tx.message.header.numRequiredSignatures)
+          .map((signer) => signer.toBase58()),
+      ).toEqual([quote.preparation?.sponsor, device.address]);
+      return signGameTransaction(device, tx);
+    },
+    null,
+    device.address,
+  );
+  await submitDungeon(owner, quote.nonce, approved.transaction);
+  expect(mocks.stored?.reserve.signature).toBeTruthy();
+  await expect(quoteDungeon(owner, request)).rejects.toThrow("DUNGEON_ACTIVE");
 });

@@ -13,7 +13,11 @@ export async function POST(request: Request) {
     assertOrigin(request);
     await rateLimit("verify", clientIp(request));
     const input = await body(request, verifyInput);
-    const result = await verifyChallenge(input.challengeId, input.signature);
+    const result = await verifyChallenge(
+      input.challengeId,
+      input.signature,
+      input.device,
+    );
     return json(result.session, 200, { "Set-Cookie": cookie(result.token) });
   });
 }

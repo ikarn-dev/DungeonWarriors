@@ -9,7 +9,9 @@ use dungeon_warriors::{
     state::{collection::PlayerAccount, economy::HouseState},
 };
 use solana_keypair::Keypair;
+use solana_message::{Message, VersionedMessage};
 use solana_signer::Signer;
+use solana_transaction::versioned::VersionedTransaction;
 #[path = "support/oracle-binding.rs"]
 mod fixtures;
 #[path = "support/harness.rs"]
@@ -50,7 +52,8 @@ impl Custody {
             .to_account_metas(None),
         );
         h.send(init, &admin).unwrap();
-        let house = Pubkey::find_program_address(&[dungeon_warriors::HOUSE_SEED], &dungeon_warriors::ID).0;
+        let house =
+            Pubkey::find_program_address(&[dungeon_warriors::HOUSE_SEED], &dungeon_warriors::ID).0;
         let vault = anchor_spl::associated_token::get_associated_token_address(
             &house,
             &dungeon_warriors::USDC_MINT,
@@ -274,7 +277,9 @@ fn rejects_cross_owner_unsigned_wrong_mint_program_vault_and_decimals() {
     assert!(c.h.send(ix, &other).is_err());
     let mut mint = c.h.svm.get_account(&dungeon_warriors::USDC_MINT).unwrap();
     mint.data[44] = 9;
-    c.h.svm.set_account(dungeon_warriors::USDC_MINT, mint).unwrap();
+    c.h.svm
+        .set_account(dungeon_warriors::USDC_MINT, mint)
+        .unwrap();
     assert!(c.h.send(c.transfer(false, 1), &c.owner).is_err());
     let p: PlayerAccount = c.h.read(c.player);
     assert_eq!(p.available_base_units, 0);
@@ -330,4 +335,81 @@ fn overflow_and_external_vault_authorities_never_create_credit() {
         assert!(c.h.send(c.transfer(false, 1), &c.owner).is_err());
         c.h.svm.set_account(c.vault, original).unwrap();
     }
+}
+
+#[test]
+fn browser_withdrawal_needs_an_active_grant_and_can_only_return_credit_once() {
+    let mut c = Custody::new();
+    let device = Keypair::new();
+    let attacker = Keypair::new();
+    let sponsor = c.admin();
+    let owner = c.owner.pubkey();
+    let destination = anchor_spl::associated_token::get_associated_token_address(
+        &owner,
+        &dungeon_warriors::USDC_MINT,
+    );
+    let tokens = c.h.svm.get_account(&c.tokens).unwrap();
+    c.h.svm.set_account(destination, tokens).unwrap();
+    let access =
+        Pubkey::find_program_address(&[b"game-device", owner.as_ref()], &dungeon_warriors::ID).0;
+    let authorize = |device| {
+        Instruction::new_with_bytes(
+            dungeon_warriors::ID,
+            &dungeon_warriors::instruction::SetGameDevice { device }.data(),
+            dungeon_warriors::accounts::SetGameDevice {
+                owner,
+                player: c.player,
+                access,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        )
+    };
+    c.h.send(c.transfer(false, 3_000_000), &c.owner).unwrap();
+    c.h.send(authorize(device.pubkey()), &c.owner).unwrap();
+    let send = |h: &mut Harness, device: &Keypair, owner_tokens, nonce| {
+        let ix = Instruction::new_with_bytes(
+            dungeon_warriors::ID,
+            &dungeon_warriors::instruction::WithdrawWithDevice {
+                args: AmountArgs {
+                    amount_base_units: 1_000_000,
+                },
+                nonce,
+            }
+            .data(),
+            dungeon_warriors::accounts::WithdrawWithDevice {
+                credit: dungeon_warriors::accounts::TransferCredit {
+                    config: h.config,
+                    owner,
+                    player: c.player,
+                    house: c.house,
+                    vault: c.vault,
+                    owner_tokens,
+                    usdc_mint: dungeon_warriors::USDC_MINT,
+                    token_program: anchor_spl::token::ID,
+                },
+                device: device.pubkey(),
+                access,
+            }
+            .to_account_metas(None),
+        );
+        h.svm.expire_blockhash();
+        let message =
+            Message::new_with_blockhash(&[ix], Some(&sponsor.pubkey()), &h.svm.latest_blockhash());
+        let tx =
+            VersionedTransaction::try_new(VersionedMessage::Legacy(message), &[&sponsor, device])
+                .unwrap();
+        h.svm.send_transaction(tx)
+    };
+    assert!(send(&mut c.h, &attacker, destination, 0).is_err());
+    assert!(send(&mut c.h, &device, c.tokens, 0).is_err());
+    send(&mut c.h, &device, destination, 0).unwrap();
+    assert!(send(&mut c.h, &device, destination, 0).is_err());
+    c.h.send(authorize(Pubkey::default()), &c.owner).unwrap();
+    assert!(send(&mut c.h, &device, destination, 1).is_err());
+    assert_eq!(c.balance(destination), 11_000_000);
+    assert_eq!(
+        c.h.read::<PlayerAccount>(c.player).available_base_units,
+        2_000_000
+    );
 }

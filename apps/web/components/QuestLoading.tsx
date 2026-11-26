@@ -6,11 +6,10 @@ import LobbyBackdrop from "./LobbyBackdrop";
 
 // The steps between Play and the dungeon opening, in order. The bar fills by
 // real step, never by elapsed time.
-export const QUEST_STEPS = ["prepare", "wallet", "confirm", "open"] as const;
+export const QUEST_STEPS = ["prepare", "confirm", "open"] as const;
 export type QuestStep = (typeof QUEST_STEPS)[number];
 const LABELS: Readonly<Record<QuestStep, string>> = {
   prepare: "Preparing your quest",
-  wallet: "Approve in your wallet",
   confirm: "Confirming your wager",
   open: "Opening the catacombs",
 };

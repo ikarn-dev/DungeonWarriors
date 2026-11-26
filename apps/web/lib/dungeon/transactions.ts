@@ -8,6 +8,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { deviceAddress } from "../game/device-intents";
 import { decodeBase64, encodeBase64, WebApiError } from "../game/web-api";
 import { DEVNET } from "../solana/addresses";
 import { programInstruction } from "../solana/instruction";
@@ -45,8 +46,9 @@ export function reservationInstruction(
   quote: ReservationTerms,
   sponsor: string,
   maxPayerDebit: string,
+  device?: string,
 ) {
-  return programInstruction(
+  const instruction = programInstruction(
     "reserveDungeon",
     {
       ...dungeonAccounts(quote.owner, quote.nonce),
@@ -69,6 +71,20 @@ export function reservationInstruction(
       },
     },
   );
+  const owner = new PublicKey(quote.owner);
+  if (device) {
+    instruction.keys.push(
+      { pubkey: new PublicKey(device), isSigner: true, isWritable: false },
+      { pubkey: deviceAddress(owner), isSigner: false, isWritable: false },
+    );
+  } else {
+    const authority = instruction.keys.find((meta) =>
+      meta.pubkey.equals(owner),
+    );
+    if (!authority) throw new WebApiError("UNEXPECTED_DUNGEON_TRANSACTION");
+    authority.isSigner = true;
+  }
+  return instruction;
 }
 export function reservationMessage(
   quote: ReservationTerms,
@@ -76,6 +92,7 @@ export function reservationMessage(
   maxPayerDebit: string,
   recentBlockhash: string,
   fixedFees = true,
+  device?: string,
 ) {
   return new TransactionMessage({
     payerKey: new PublicKey(sponsor),
@@ -85,7 +102,7 @@ export function reservationMessage(
       ...(fixedFees
         ? [ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 0n })]
         : []),
-      reservationInstruction(quote, sponsor, maxPayerDebit),
+      reservationInstruction(quote, sponsor, maxPayerDebit, device),
     ],
   }).compileToV0Message();
 }
@@ -107,6 +124,7 @@ export function validateDungeonReservation(
   tx: VersionedTransaction,
   owner: string,
   quote: DungeonView,
+  device?: string,
 ) {
   const prepared = quote.preparation;
   if (
@@ -124,6 +142,7 @@ export function validateDungeonReservation(
     prepared.maxPayerDebit,
     tx.message.recentBlockhash,
     budgetInstructions(tx).length > 0,
+    device,
   );
   const bytes = expected.serialize(),
     actual = tx.message.serialize();
@@ -140,17 +159,19 @@ export async function approveDungeonReservation(
   quote: DungeonView,
   sign: (tx: VersionedTransaction) => Promise<VersionedTransaction>,
   previous: DungeonApproval | null,
+  device?: string,
 ): Promise<DungeonApproval> {
   if (!quote.preparation || quote.owner !== owner)
     throw new WebApiError("INVALID_DUNGEON_QUOTE");
   const source = quote.preparation.transaction;
   const tx = VersionedTransaction.deserialize(decodeBase64(source));
-  validateDungeonReservation(tx, owner, quote);
+  validateDungeonReservation(tx, owner, quote, device);
   if (previous?.source === source) {
     validateDungeonReservation(
       VersionedTransaction.deserialize(decodeBase64(previous.transaction)),
       owner,
       quote,
+      device,
     );
     return previous;
   }
@@ -198,7 +219,7 @@ export async function approveDungeonReservation(
     );
   }
   const ownerIndex = signed.message.staticAccountKeys.findIndex(
-    (key) => key.toBase58() === owner,
+    (key) => key.toBase58() === (device ?? owner),
   );
   if (!signed.signatures[ownerIndex]?.some((byte) => byte !== 0))
     throw new WebApiError("INVALID_SIGNATURE");

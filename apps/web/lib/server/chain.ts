@@ -365,6 +365,7 @@ export async function readState(
         pda("player", owner.toBytes()),
         pda("collection", owner.toBytes()),
         pda("house"),
+        pda("game-device", owner.toBytes()),
       ];
       break;
     case "draw":
@@ -392,9 +393,10 @@ export async function readState(
   const accounts = entries.map((entry, i) => {
     // The delegated base mirror may lag and cannot establish gameplay or payouts.
     const value =
-      input.kind === "run" &&
-      i === 1 &&
-      entry?.owner.equals(DELEGATION_PROGRAM_ID)
+      (input.kind === "run" &&
+        i === 1 &&
+        entry?.owner.equals(DELEGATION_PROGRAM_ID)) ||
+      (input.kind === "wallet" && i === 4 && uninitialized(entry))
         ? null
         : entry;
     const address = addresses[i];

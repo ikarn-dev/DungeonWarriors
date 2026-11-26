@@ -173,7 +173,8 @@ export function playerInstructions(wallet: string, action: PlayerAction) {
     return [
       {
         pubkey,
-        isSigner: "signer" in meta && meta.signer === true,
+        isSigner:
+          meta.name === "owner" || ("signer" in meta && meta.signer === true),
         isWritable: "writable" in meta && meta.writable === true,
       },
     ];

@@ -49,9 +49,8 @@ vi.mock("../../../../../apps/web/lib/server/sponsorship", () => ({
   admitSponsorCost: mocks.admit,
   sendReviewed: mocks.send,
 }));
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
-  vi.stubEnv("DUNGEON_ER_SETTLEMENT_ENABLED", "false");
   vi.stubEnv(
     "BROWSER_VERIFIER_SECRET_KEY",
     Buffer.from(verifier.secretKey).toString("base64"),
@@ -70,6 +69,16 @@ beforeEach(() => {
   mocks.rpc.getLatestBlockhash.mockResolvedValue({
     blockhash: Keypair.generate().publicKey.toBase58(),
     lastValidBlockHeight: 100,
+  });
+  mocks.rpc.getAccountInfo.mockResolvedValue({
+    owner: program,
+    data: await coder.accounts.encode("dungeonSettlement", {
+      expedition: expeditionAddress(owner, "0"),
+      verifier: verifier.publicKey,
+      crank: Keypair.generate().publicKey,
+      outcome: 1,
+      result: null,
+    }),
   });
   mocks.rpc.getSignatureStatuses.mockResolvedValue({ value: [null] });
   mocks.rpc.getBlockHeight.mockResolvedValue(50);
@@ -131,7 +140,6 @@ it("reconciles finalized settlement without sending or crediting again", async (
 });
 
 it("schedules on base, commits on ER, and recovers a delayed Hydra trigger without another wallet signature", async () => {
-  vi.stubEnv("DUNGEON_ER_SETTLEMENT_ENABLED", "true");
   vi.stubEnv("MAGICBLOCK_ER_HTTP_URL", "https://devnet-us.magicblock.app");
   vi.stubEnv("MAGICBLOCK_VALIDATOR_IDENTITY", owner);
   const hydra = new PublicKey("Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea");
