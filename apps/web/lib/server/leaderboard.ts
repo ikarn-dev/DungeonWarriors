@@ -1,10 +1,10 @@
 import "server-only";
 import type { IdlAccounts } from "@anchor-lang/core";
 import { runAddresses } from "../game/run-accounts";
-import type { PurrpsGame } from "../solana/purrps-game";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { ApiError } from "./runtime";
 
-export type Leaderboard = IdlAccounts<PurrpsGame>["leaderboard"];
+export type Leaderboard = IdlAccounts<DungeonWarriors>["leaderboard"];
 
 export function leaderboardView(board: Leaderboard | null, bump: number) {
   if (board === null) return [];

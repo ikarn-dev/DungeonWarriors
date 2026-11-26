@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { validatePreparedTransaction } from "../../../apps/web/lib/game/transaction-intents.ts";
 import { readWebJson } from "../../../apps/web/lib/game/web-api.ts";
 import { DEVNET } from "../../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../../apps/web/lib/solana/dungeon-warriors.ts";
 
 const require = createRequire(
   new URL("../../../apps/web/package.json", import.meta.url),
@@ -94,7 +94,7 @@ async function verifyGame(owner, program) {
     new PublicKey(DEVNET.usdcMint),
     owner,
   );
-  const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+  const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
   const decoded = withdraw && coder.instruction.decode(withdraw.data);
   if (
     prepared.network !== "base" ||
@@ -194,7 +194,7 @@ async function verify() {
   if (!/^[0-9a-f]{64}$/.test(c?.challengeId) || typeof c.message !== "string")
     throw new Error("Invalid challenge.");
   const issued = c.message.match(/\nIssued At: ([^\n]+)\n/)?.[1];
-  const expected = `${url.host} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to PURRPS. This does not authorize transactions.\n\nURI: ${target}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${c.challengeId}\nIssued At: ${issued}\nExpiration Time: ${c.expiresAt}`;
+  const expected = `${url.host} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to Dungeon Warriors. This does not authorize transactions.\n\nURI: ${target}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${c.challengeId}\nIssued At: ${issued}\nExpiration Time: ${c.expiresAt}`;
   if (
     c.message !== expected ||
     Date.parse(c.expiresAt) - Date.parse(issued) !== 300000

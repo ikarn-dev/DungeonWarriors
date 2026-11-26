@@ -147,7 +147,7 @@ export default function StarterPanel() {
           setSessionWallet(null);
         } else {
           setRestoreFailed(true);
-          toast.error("Couldn't reconnect to PURRPS.", {
+          toast.error("Couldn't reconnect to Dungeon Warriors.", {
             id: "restore",
             action: {
               label: "Retry",

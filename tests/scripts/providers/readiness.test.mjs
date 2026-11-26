@@ -183,7 +183,9 @@ test("readiness checks the deployed scheduler without passing the integration ga
     ),
   );
   assert.ok(
-    report.unmeasured.includes("purrps_live_crank_and_settlement_latency"),
+    report.unmeasured.includes(
+      "dungeon_warriors_live_crank_and_settlement_latency",
+    ),
   );
   assert.ok(report.liveChecksOutsideProbe.includes("starter_vrf_fulfillment"));
   assert.ok(

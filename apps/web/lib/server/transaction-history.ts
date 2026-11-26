@@ -76,8 +76,15 @@ function activities(
           instruction.accounts[i]?.equals(accounts[name]),
       );
     if (!scoped) continue;
-    if (decoded.name === "settleDungeon") {
-      const { args } = settlement.parse(decoded.data);
+    if (
+      decoded.name === "settleDungeon" ||
+      decoded.name === "finalizeDungeonSettlement"
+    ) {
+      const value =
+        decoded.name === "settleDungeon"
+          ? decoded.data
+          : { args: decoded.data };
+      const { args } = settlement.parse(value);
       result.add(outcomes[args.outcome]);
     } else {
       const label = Object.hasOwn(labels, decoded.name)

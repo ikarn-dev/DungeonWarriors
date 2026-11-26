@@ -30,7 +30,7 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   DUNGEON_WALLET_FAILED:
     "Your wallet could not approve this Devnet wager. Check that it is connected to Devnet.",
   DUNGEON_WALLET_PAYER_CHANGED:
-    "Your wallet replaced the PURRPS fee payer. Use a wallet that supports sponsored Devnet transactions.",
+    "Your wallet replaced the Dungeon Warriors fee payer. Use a wallet that supports sponsored Devnet transactions.",
   DUNGEON_WALLET_FEE_CHANGED:
     "Your wallet changed the sponsored network fee. Use the transaction’s original fee when approving.",
   DUNGEON_WALLET_BLOCKHASH_CHANGED:
@@ -63,11 +63,11 @@ const FRIENDLY: Readonly<Record<string, string>> = {
 };
 export function webErrorMessage(code: string) {
   if (code === "ORIGIN_REJECTED")
-    return "Sign-in could not start on this site address. Please contact the PURRPS team.";
+    return "Sign-in could not start on this site address. Please contact the Dungeon Warriors team.";
   if (code === "SERVICE_NOT_CONFIGURED")
-    return "PURRPS is temporarily unavailable. Please try again once service is restored.";
+    return "Dungeon Warriors is temporarily unavailable. Please try again once service is restored.";
   if (code === "SPONSOR_BUDGET_UNAVAILABLE")
-    return "PURRPS cannot cover the Devnet fees right now. Try again when sponsorship is available.";
+    return "Dungeon Warriors cannot cover the Devnet fees right now. Try again when sponsorship is available.";
   return FRIENDLY[code] ?? "Something went wrong. Please try again.";
 }
 export async function readWebJson(response: Response): Promise<unknown> {

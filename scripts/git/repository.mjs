@@ -12,7 +12,7 @@ export const maxFileBytes = 50 * 1024 * 1024;
 
 const roots = [
   "apps/web/",
-  "apps/purrps-game-program/",
+  "apps/dungeon-warriors-program/",
   "packages/",
   "scripts/",
   "tests/",
@@ -43,7 +43,7 @@ export function run(command, args, options = {}) {
     encoding: "utf8",
     timeout: 60_000,
     maxBuffer: 8 * 1024 * 1024,
-    env: { ...process.env, PURRPS_NODE: process.execPath },
+    env: { ...process.env, DUNGEON_WARRIORS_NODE: process.execPath },
     ...options,
   });
   if (result.error) throw result.error;
@@ -175,7 +175,9 @@ export function gitPath(name) {
 export function assertIdle() {
   const branch = run("git", ["symbolic-ref", "--quiet", "HEAD"]);
   if (branch.status !== 0 || branch.stdout.trim() !== "refs/heads/main")
-    throw new Error("PURRPS task commits require the local main branch.");
+    throw new Error(
+      "Dungeon Warriors task commits require the local main branch.",
+    );
   for (const name of [
     "MERGE_HEAD",
     "CHERRY_PICK_HEAD",

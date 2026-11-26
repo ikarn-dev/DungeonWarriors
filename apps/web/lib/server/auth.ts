@@ -53,7 +53,7 @@ export async function createChallenge(wallet: string) {
   const now = Date.now();
   const expiresAt = now + 300000;
   const challengeId = randomBytes(32).toString("hex");
-  const message = `${new URL(r.config.APP_ORIGIN).host} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to PURRPS. This does not authorize transactions.\n\nURI: ${r.config.APP_ORIGIN}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${challengeId}\nIssued At: ${new Date(now).toISOString()}\nExpiration Time: ${new Date(expiresAt).toISOString()}`;
+  const message = `${new URL(r.config.APP_ORIGIN).host} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to Dungeon Warriors. This does not authorize transactions.\n\nURI: ${r.config.APP_ORIGIN}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${challengeId}\nIssued At: ${new Date(now).toISOString()}\nExpiration Time: ${new Date(expiresAt).toISOString()}`;
   if (!PublicKey.isOnCurve(new PublicKey(wallet).toBytes()))
     throw new ApiError("INVALID_WALLET", 400);
   const stored = await r.redis.set(

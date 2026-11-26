@@ -7,7 +7,7 @@ import {
   REQUIRED_PROGRAM_INSTRUCTIONS,
   validatedClientSource,
 } from "../../../apps/web/lib/solana/build-artifacts.mts";
-import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../../apps/web/lib/solana/dungeon-warriors.ts";
 
 function artifacts() {
   const instructions = REQUIRED_PROGRAM_INSTRUCTIONS.map((name) => ({
@@ -21,24 +21,29 @@ function artifacts() {
   return {
     idl: {
       address: DEVNET.program,
-      metadata: { name: "purrps_game", version: "0.1.0", spec: "0.1.0" },
+      metadata: { name: "dungeon_warriors", version: "0.1.0", spec: "0.1.0" },
       instructions,
       accounts: [{ name: "GameConfig", discriminator: Array(8).fill(1) }],
       types: [{ name: "GameConfig", type: { kind: "struct", fields: [] } }],
     },
-    typeSource: `export type PurrpsGame = { address: "${DEVNET.program}"; instructions: [${instructions.map(({ name }) => `"${name}"`).join(",")}]; };`,
+    typeSource: `export type DungeonWarriors = { address: "${DEVNET.program}"; instructions: [${instructions.map(({ name }) => `"${name}"`).join(",")}]; };`,
   };
 }
 
 test("the retained public ABI works without target files or an ignored generated client", () => {
   const source = readFileSync(
-    new URL("../../../apps/web/lib/solana/purrps-game.ts", import.meta.url),
+    new URL(
+      "../../../apps/web/lib/solana/dungeon-warriors.ts",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.ok(
-    validatedClientSource(PURRPS_GAME_IDL, source).includes("PURRPS_GAME_IDL"),
+    validatedClientSource(DUNGEON_WARRIORS_IDL, source).includes(
+      "DUNGEON_WARRIORS_IDL",
+    ),
   );
-  const accounts = PURRPS_GAME_IDL.accounts.map((account) =>
+  const accounts = DUNGEON_WARRIORS_IDL.accounts.map((account) =>
     account.name.replace(/_/g, "").toLowerCase(),
   );
   assert.ok(accounts.includes("rungamestate"));
@@ -50,7 +55,7 @@ test("exports actual artifact content with a checked runtime IDL and its generat
   const { idl, typeSource } = artifacts();
   const output = validatedClientSource(idl, typeSource);
   assert.ok(output.includes(typeSource));
-  assert.ok(output.includes("export const PURRPS_GAME_IDL"));
+  assert.ok(output.includes("export const DUNGEON_WARRIORS_IDL"));
   assert.ok(output.includes("satisfies AnchorIdl"));
 });
 
@@ -72,7 +77,7 @@ test("rejects stale counter artifacts, wrong addresses, mismatched types and dis
   assert.throws(() =>
     validatedClientSource(
       idl,
-      `export type PurrpsGame = { address: "${DEVNET.program}" };`,
+      `export type DungeonWarriors = { address: "${DEVNET.program}" };`,
     ),
   );
   const corrupted = structuredClone(idl);
@@ -85,7 +90,7 @@ test("rejects stale counter artifacts, wrong addresses, mismatched types and dis
   foreignAccount.accounts.push({ name: "ProgramData", discriminator: [] });
   assert.ok(
     validatedClientSource(foreignAccount, typeSource).includes(
-      "PURRPS_GAME_IDL",
+      "DUNGEON_WARRIORS_IDL",
     ),
   );
   const duplicate = structuredClone(idl);
@@ -99,6 +104,6 @@ test("rejects stale counter artifacts, wrong addresses, mismatched types and dis
     ),
   }));
   assert.ok(
-    validatedClientSource(camel, typeSource).includes("PURRPS_GAME_IDL"),
+    validatedClientSource(camel, typeSource).includes("DUNGEON_WARRIORS_IDL"),
   );
 });

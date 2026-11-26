@@ -79,7 +79,7 @@ export default function WalletPanel({
       setProblem(
         kind === "deposit"
           ? "That is more USDC than your wallet holds."
-          : "That is more than your available PURRPS balance.",
+          : "That is more than your available Dungeon Warriors balance.",
       );
       return;
     }
@@ -105,12 +105,15 @@ export default function WalletPanel({
       ) : (
         <>
           <div className="vault-grid">
-            <section className="vault-card" aria-labelledby="vault-purrps">
-              <h3 id="vault-purrps" className="vault-head">
+            <section
+              className="vault-card"
+              aria-labelledby="vault-dungeon-warriors"
+            >
+              <h3 id="vault-dungeon-warriors" className="vault-head">
                 <span className="vault-mark" aria-hidden="true">
                   <WarriorIcon name="chest" />
                 </span>
-                In PURRPS
+                In Dungeon Warriors
               </h3>
               <p className="vault-figure">
                 <span>Available</span>

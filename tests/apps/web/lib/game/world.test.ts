@@ -170,7 +170,7 @@ const cases = cats.flatMap((cat, catIndex) =>
     })),
   ).flat(),
 );
-const { PURRPS_WORLD_TRACE: traceEnabled } = process.env;
+const { DUNGEON_WARRIORS_WORLD_TRACE: traceEnabled } = process.env;
 const trace =
   traceEnabled === "1"
     ? readFileSync(

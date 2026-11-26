@@ -47,8 +47,8 @@ export function checkChangedFiles(paths) {
   if (
     paths.some(
       (path) =>
-        (path.startsWith("apps/purrps-game-program/") ||
-          path.startsWith("tests/apps/purrps-game-program/")) &&
+        (path.startsWith("apps/dungeon-warriors-program/") ||
+          path.startsWith("tests/apps/dungeon-warriors-program/")) &&
         /\.(?:rs|toml)$/.test(path),
     )
   ) {
@@ -58,7 +58,7 @@ export function checkChangedFiles(paths) {
       "cargo",
       "fmt",
       "--manifest-path",
-      join(root, "apps/purrps-game-program/Cargo.toml"),
+      join(root, "apps/dungeon-warriors-program/Cargo.toml"),
       "--all",
       "--",
       "--check",

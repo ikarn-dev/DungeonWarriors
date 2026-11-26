@@ -7,7 +7,7 @@ import {
 
 test("centralized tests and fixtures are publishable project source", () => {
   const paths = [
-    "tests/apps/purrps-game-program/rule-contracts.rs",
+    "tests/apps/dungeon-warriors-program/rule-contracts.rs",
     "tests/apps/web/lib/game/contracts.test.ts",
     "tests/fixtures/game-v1/physics.csv",
     "tests/tsconfig.json",
@@ -21,7 +21,7 @@ test("allowing tests preserves ignored-secret and unrelated-file restrictions", 
     "tests/.env",
     "tests/wallet.json",
     "tests/test-keypair.json",
-    "Local-only_Docs/PURRPS_PRD_v3.3.md",
+    "Local-only_Docs/DUNGEON_WARRIORS_PRD_v3.3.md",
     "unrelated/output.txt",
   ]) {
     assert.throws(() => assertPublishable([path]));

@@ -2,10 +2,10 @@ import { BorshCoder, convertIdlToCamelCase, utils } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { DEVNET } from "./addresses.ts";
-import { PURRPS_GAME_IDL } from "./purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "./dungeon-warriors.ts";
 
 export const program = new PublicKey(DEVNET.program);
-export const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
+export const idl = convertIdlToCamelCase(DUNGEON_WARRIORS_IDL);
 export const coder = new BorshCoder(idl);
 export const u64Input = z
   .string()

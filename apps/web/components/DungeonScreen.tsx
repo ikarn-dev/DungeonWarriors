@@ -25,7 +25,7 @@ export function DungeonDialog({
   return createPortal(
     <dialog
       ref={dialog}
-      className="run-dialog dungeon-dialog"
+      className="dungeon-dialog"
       aria-label="Catacomb Quest"
       onCancel={(event) => {
         event.preventDefault();

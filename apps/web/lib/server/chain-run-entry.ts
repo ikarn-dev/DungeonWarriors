@@ -10,8 +10,8 @@ import { RULES_V1, rulesForVersion, U64_MAX } from "../game/rules";
 import { enumTag, runAddresses } from "../game/run-accounts";
 import type { CompletionOffer } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { coder, pda } from "../solana/program";
-import type { PurrpsGame } from "../solana/purrps-game";
 import { browserConfigured } from "./browser-config";
 import {
   account,
@@ -22,7 +22,7 @@ import {
 } from "./chain-account";
 import { sponsorshipConfig } from "./runtime";
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 export async function readRunEntry(rpc: Connection, owner: PublicKey) {
   const configAddress = pda("game-config");
   const houseAddress = pda("house");

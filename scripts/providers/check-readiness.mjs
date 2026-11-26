@@ -290,8 +290,8 @@ export async function runReadiness(environment) {
       "web_sessions_nonce_atomicity",
     ],
     unmeasured: [
-      "purrps_live_crank_and_settlement_latency",
-      "purrps_live_compute_fees_capacity",
+      "dungeon_warriors_live_crank_and_settlement_latency",
+      "dungeon_warriors_live_compute_fees_capacity",
     ],
   };
 }

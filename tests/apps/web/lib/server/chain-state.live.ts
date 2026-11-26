@@ -19,7 +19,7 @@ it("reads a fresh wallet without creating a player or requesting receipt pages",
   });
 });
 
-const { PURRPS_DEVNET_ACCOUNT_WALLET: testWallet } = process.env;
+const { DUNGEON_WARRIORS_DEVNET_ACCOUNT_WALLET: testWallet } = process.env;
 
 it("reads the single shared board from finalized Devnet", async () => {
   const result = await readState(

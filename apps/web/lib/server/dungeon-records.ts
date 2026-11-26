@@ -2,13 +2,13 @@ import "server-only";
 import type { IdlAccounts } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { expeditionAddress } from "../dungeon/transactions";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { pda } from "../solana/program";
-import type { PurrpsGame } from "../solana/purrps-game";
 import { account } from "./chain-account";
 import { ApiError } from "./runtime";
 import { checkedConnection } from "./transaction-network";
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 export async function dungeonHistory(owner: string, fromNonce?: string) {
   const rpc = await checkedConnection("base");
   const player = account<Accounts["playerAccount"]>(

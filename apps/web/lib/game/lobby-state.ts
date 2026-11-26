@@ -8,11 +8,16 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { DEVNET, publicKeySchema } from "../solana/addresses";
-import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game";
+import {
+  DUNGEON_WARRIORS_IDL,
+  type DungeonWarriors,
+} from "../solana/dungeon-warriors";
 import type { CatId } from "./catalog";
 
-const coder = new BorshAccountsCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
-type Accounts = IdlAccounts<PurrpsGame>;
+const coder = new BorshAccountsCoder(
+  convertIdlToCamelCase(DUNGEON_WARRIORS_IDL),
+);
+type Accounts = IdlAccounts<DungeonWarriors>;
 const rawSchema = z
   .object({
     network: z.literal("solana-devnet"),

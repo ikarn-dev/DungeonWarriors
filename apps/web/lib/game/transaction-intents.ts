@@ -12,7 +12,7 @@ import {
 } from "@solana/web3.js";
 import { z } from "zod";
 import { DEVNET } from "../solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../solana/dungeon-warriors.ts";
 import type { CatId } from "./catalog";
 export type LobbyIntent =
   | { operation: "createPlayer"; sponsored: boolean }
@@ -46,7 +46,7 @@ export const lobbySubmittedSchema = z
     network: z.literal("base").default("base"),
   })
   .strict();
-const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
+const idl = convertIdlToCamelCase(DUNGEON_WARRIORS_IDL);
 const coder = new BorshInstructionCoder(idl);
 export function validatePreparedTransaction(
   tx: VersionedTransaction,

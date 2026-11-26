@@ -19,9 +19,9 @@ import {
 } from "../../../../../apps/web/lib/game/web-api";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
 import {
-  PURRPS_GAME_IDL,
-  type PurrpsGame,
-} from "../../../../../apps/web/lib/solana/purrps-game";
+  DUNGEON_WARRIORS_IDL,
+  type DungeonWarriors,
+} from "../../../../../apps/web/lib/solana/dungeon-warriors";
 import { config, wallet } from "../server/fixtures";
 
 vi.mock(
@@ -37,7 +37,9 @@ vi.mock(
 
 import { instructionFor } from "../../../../../apps/web/lib/server/transactions";
 
-const coder = new BorshAccountsCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshAccountsCoder(
+  convertIdlToCamelCase(DUNGEON_WARRIORS_IDL),
+);
 function fixture(name: string) {
   const lines = readFileSync(
     new URL(`../../../../fixtures/starter-${name}.csv`, import.meta.url),
@@ -93,7 +95,7 @@ describe("finalized starter presentation", () => {
     expect(() => decodeLobbyState(f.response, wallet().address)).toThrow();
     const c = f.response.accounts[2];
     if (c === undefined) throw new Error("fixture");
-    const decoded = coder.decode<IdlAccounts<PurrpsGame>["collection"]>(
+    const decoded = coder.decode<IdlAccounts<DungeonWarriors>["collection"]>(
       "collection",
       Buffer.from(c.account.data, "base64"),
     );
@@ -107,7 +109,7 @@ describe("finalized starter presentation", () => {
     const f = fixture("pending");
     const c = f.response.accounts[2];
     if (c === undefined) throw new Error("fixture");
-    const decoded = coder.decode<IdlAccounts<PurrpsGame>["collection"]>(
+    const decoded = coder.decode<IdlAccounts<DungeonWarriors>["collection"]>(
       "collection",
       Buffer.from(c.account.data, "base64"),
     );

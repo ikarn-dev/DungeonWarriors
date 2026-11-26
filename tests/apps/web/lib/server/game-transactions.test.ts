@@ -38,12 +38,12 @@ import {
   DEVNET,
   LEADERBOARD_SEED,
 } from "../../../../../apps/web/lib/solana/addresses.ts";
+import type { DungeonWarriors } from "../../../../../apps/web/lib/solana/dungeon-warriors.ts";
 import {
   crankAddress,
   hydraProgram,
   program,
 } from "../../../../../apps/web/lib/solana/program";
-import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game.ts";
 
 const rpc = vi.hoisted(() => ({
   base: vi.fn(),
@@ -465,10 +465,9 @@ const fixture = (name: string): AccountInfo<Buffer> => ({
 describe("recovery from finalized base state", () => {
   it("pins ER activation to the frozen regional validator and play key", async () => {
     const info = fixture("reserved");
-    const decoded = coder.accounts.decode<IdlAccounts<PurrpsGame>["runEscrow"]>(
-      "runEscrow",
-      info.data,
-    );
+    const decoded = coder.accounts.decode<
+      IdlAccounts<DungeonWarriors>["runEscrow"]
+    >("runEscrow", info.data);
     const snapshot = {
       ...decoded.snapshot,
       inputPermission: {
@@ -560,7 +559,7 @@ describe("recovery from finalized base state", () => {
 
   it("uses the finalized Clock boundary for base refunds and matches the retained receipt", async () => {
     const escrowAccount = fixture("reserved");
-    const e = coder.accounts.decode<IdlAccounts<PurrpsGame>["runEscrow"]>(
+    const e = coder.accounts.decode<IdlAccounts<DungeonWarriors>["runEscrow"]>(
       "runEscrow",
       escrowAccount.data,
     );
@@ -585,7 +584,7 @@ describe("recovery from finalized base state", () => {
     ).resolves.toEqual({ status: "refundReady" });
 
     const terminal = coder.accounts.decode<
-      IdlAccounts<PurrpsGame>["runGameState"]
+      IdlAccounts<DungeonWarriors>["runGameState"]
     >("runGameState", fixture("terminal").data);
     const receipt = {
       ...fixture("refunded"),

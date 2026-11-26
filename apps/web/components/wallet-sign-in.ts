@@ -19,7 +19,7 @@ export async function signInWallet(
   const challenge = challengeSchema.parse(
     await webApi("/api/auth/challenge", { wallet: address }, signal),
   );
-  const prefix = `${window.location.host} wants you to sign in with your Solana account:\n${address}\n\nSign in to PURRPS. This does not authorize transactions.\n\nURI: ${window.location.origin}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${challenge.challengeId}\nIssued At: `;
+  const prefix = `${window.location.host} wants you to sign in with your Solana account:\n${address}\n\nSign in to Dungeon Warriors. This does not authorize transactions.\n\nURI: ${window.location.origin}\nVersion: 1\nChain ID: solana:devnet\nNonce: ${challenge.challengeId}\nIssued At: `;
   const suffix = `\nExpiration Time: ${challenge.expiresAt}`;
   if (
     !challenge.message.startsWith(prefix) ||

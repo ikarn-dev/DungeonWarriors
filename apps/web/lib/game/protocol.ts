@@ -146,19 +146,6 @@ export const terminalReasonSchema = z.enum([
   "surrender",
   "technicalAbort",
 ]);
-export const runUiStatusSchema = z.enum([
-  "activating",
-  "active",
-  "suspended",
-  "requested",
-  "accepted",
-  "lost",
-  "settling",
-  "settled",
-  "refunded",
-  "recoveryPending",
-  "error",
-]);
 
 // A projection of a decoded/owner-checked account, not a substitute for IDL
 // account decoding or signature/commit provenance. Final funds need base finality.
@@ -194,4 +181,3 @@ export const runAccountObservationSchema = runSnapshotStructure.pipe(
 );
 
 export type RunAccountObservation = z.infer<typeof runAccountObservationSchema>;
-export type RunUiStatus = z.infer<typeof runUiStatusSchema>;

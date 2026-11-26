@@ -15,8 +15,8 @@ import {
   runAddresses,
 } from "../game/run-accounts";
 import { DEVNET, LEADERBOARD_SEED } from "../solana/addresses.ts";
+import type { DungeonWarriors } from "../solana/dungeon-warriors.ts";
 import { nonceBytes, pda, program, u64Input } from "../solana/program";
-import type { PurrpsGame } from "../solana/purrps-game.ts";
 import { type Leaderboard, leaderboardView } from "./leaderboard";
 import { ApiError, baseRpcConfig } from "./runtime";
 import { providerFetch } from "./telemetry";
@@ -64,7 +64,7 @@ export const stateInput = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 
 function walletView(player: Accounts["playerAccount"] | null) {
   if (player === null) return null;

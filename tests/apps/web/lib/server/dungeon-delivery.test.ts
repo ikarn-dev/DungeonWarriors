@@ -1,12 +1,17 @@
-import { Keypair } from "@solana/web3.js";
+import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
+import { Keypair, PublicKey, TransactionMessage } from "@solana/web3.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { expeditionAddress } from "../../../../../apps/web/lib/dungeon/transactions";
 import { deliverDungeon } from "../../../../../apps/web/lib/server/dungeon-delivery";
+import { settlementAddress } from "../../../../../apps/web/lib/server/dungeon-settlement-instructions";
 import type { DungeonRecord } from "../../../../../apps/web/lib/server/dungeon-store";
+import { coder, program } from "../../../../../apps/web/lib/solana/program";
 import { owner, record, verifier } from "../dungeon/fixtures";
 
 const mocks = vi.hoisted(() => ({
   stored: null as DungeonRecord | null,
   rpc: {
+    getAccountInfo: vi.fn(),
     getLatestBlockhash: vi.fn(),
     getSignatureStatuses: vi.fn(),
     getBlockHeight: vi.fn(),
@@ -46,6 +51,7 @@ vi.mock("../../../../../apps/web/lib/server/sponsorship", () => ({
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("DUNGEON_ER_SETTLEMENT_ENABLED", "false");
   vi.stubEnv(
     "BROWSER_VERIFIER_SECRET_KEY",
     Buffer.from(verifier.secretKey).toString("base64"),
@@ -122,4 +128,64 @@ it("reconciles finalized settlement without sending or crediting again", async (
   expect(mocks.send).not.toHaveBeenCalled();
   await deliverDungeon(owner, "0");
   expect(mocks.read).toHaveBeenCalledTimes(1);
+});
+
+it("schedules on base, commits on ER, and recovers a delayed Hydra trigger without another wallet signature", async () => {
+  vi.stubEnv("DUNGEON_ER_SETTLEMENT_ENABLED", "true");
+  vi.stubEnv("MAGICBLOCK_ER_HTTP_URL", "https://devnet-us.magicblock.app");
+  vi.stubEnv("MAGICBLOCK_VALIDATOR_IDENTITY", owner);
+  const hydra = new PublicKey("Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea");
+  const receipt = settlementAddress(owner, "0");
+  const crank = Keypair.generate().publicKey;
+  const result = {
+    secret: Array(32).fill(7),
+    gates: Array(5).fill(255),
+    gateCount: 0,
+    outcome: 1,
+  };
+  mocks.rpc.getAccountInfo
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce({ owner: program })
+    .mockResolvedValueOnce({ owner: DELEGATION_PROGRAM_ID });
+  await deliverDungeon(owner, "0");
+  expect(mocks.send.mock.calls.map((call) => call[2])).toEqual(["base", "er"]);
+  const names = (tx: Parameters<typeof TransactionMessage.decompile>[0]) =>
+    TransactionMessage.decompile(tx)
+      .instructions.filter((ix) => ix.programId.equals(program))
+      .map((ix) => coder.instruction.decode(ix.data)?.name);
+  expect(names(mocks.send.mock.calls[0]?.[1].message)).toEqual([
+    "prepareDungeonSettlement",
+  ]);
+  expect(names(mocks.send.mock.calls[1]?.[1].message)).toEqual([
+    "recordDungeonSettlement",
+  ]);
+  expect(
+    mocks.rpc.getAccountInfo.mock.calls.map(([key]) => key.toBase58()),
+  ).toEqual(Array(3).fill(receipt.toBase58()));
+  const data = await coder.accounts.encode("dungeonSettlement", {
+    expedition: expeditionAddress(owner, "0"),
+    verifier: verifier.publicKey,
+    crank,
+    outcome: 1,
+    result,
+  });
+  mocks.rpc.getAccountInfo.mockResolvedValueOnce({ owner: program, data });
+  await deliverDungeon(owner, "0");
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  if (!mocks.stored?.delivery)
+    throw new Error("expected persisted ER delivery");
+  mocks.stored.delivery.sentAt = Date.now() - 20_000;
+  mocks.rpc.getAccountInfo
+    .mockResolvedValueOnce({ owner: program, data })
+    .mockResolvedValueOnce({ owner: hydra });
+  await deliverDungeon(owner, "0");
+  const trigger = mocks.send.mock.calls[2];
+  expect(trigger?.[2]).toBe("base");
+  const instructions = TransactionMessage.decompile(
+    trigger?.[1].message,
+  ).instructions;
+  expect(instructions[1]?.programId.equals(hydra)).toBe(true);
+  expect(instructions[1]?.keys[0]?.pubkey.equals(crank)).toBe(true);
+  expect(names(trigger?.[1].message)).toEqual(["finalizeDungeonSettlement"]);
+  expect(trigger?.[1].signatures).toHaveLength(1);
 });

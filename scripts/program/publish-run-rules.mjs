@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { RULES_V2, RULES_V3, RULES_V4 } from "../../apps/web/lib/game/rules.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../apps/web/lib/solana/dungeon-warriors.ts";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
 
 const { BorshCoder, convertIdlToCamelCase } = requireWeb("@anchor-lang/core");
@@ -16,7 +16,7 @@ const {
   TransactionInstruction,
 } = requireWeb("@solana/web3.js");
 const program = new PublicKey(DEVNET.program);
-const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
 const pda = (seed, ...parts) =>
   PublicKey.findProgramAddressSync([Buffer.from(seed), ...parts], program)[0];
 const config = pda("game-config");

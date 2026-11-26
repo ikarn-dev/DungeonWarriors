@@ -5,7 +5,7 @@ import { DUNGEON_V2 } from "../../../../../apps/web/lib/dungeon/rules";
 import { runAddresses } from "../../../../../apps/web/lib/game/run-accounts";
 import { coder, pda } from "../../../../../apps/web/lib/server/chain";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
-import type { PurrpsGame } from "../../../../../apps/web/lib/solana/purrps-game";
+import type { DungeonWarriors } from "../../../../../apps/web/lib/solana/dungeon-warriors";
 
 export const owner = Keypair.generate().publicKey;
 export const wallet = owner.toBase58();
@@ -13,7 +13,7 @@ const playerSeed = [Buffer.from("player"), owner.toBytes()];
 export const program = new PublicKey(DEVNET.program);
 export const playerAddress = pda("player", owner.toBytes());
 export const slot = 200;
-export type Accounts = IdlAccounts<PurrpsGame>;
+export type Accounts = IdlAccounts<DungeonWarriors>;
 
 export async function player(
   nextRunNonce = "10",

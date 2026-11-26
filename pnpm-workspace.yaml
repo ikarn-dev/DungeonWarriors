@@ -1,5 +1,5 @@
 packages:
-  # Rust/Anchor lives in apps/purrps-game-program and is managed by Cargo.
+  # Rust/Anchor lives in apps/dungeon-warriors-program and is managed by Cargo.
   - apps/web
   - packages/*
 

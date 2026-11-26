@@ -17,7 +17,7 @@ function shellQuote(value) {
 function isTaskCommitHandler(handler) {
   return (
     handler?.type === "command" &&
-    handler.statusMessage === "Committing completed PURRPS task" &&
+    handler.statusMessage === "Committing completed Dungeon Warriors task" &&
     typeof handler.command === "string" &&
     handler.command.includes("/scripts/git/task-commit.mjs")
   );
@@ -76,7 +76,7 @@ function localHookConfig() {
         type: "command",
         command,
         timeout: 240,
-        statusMessage: "Committing completed PURRPS task",
+        statusMessage: "Committing completed Dungeon Warriors task",
       },
     ],
   };
@@ -119,7 +119,7 @@ try {
   }
   process.stdout.write(
     "Git guards installed. Local Codex Stop hook registered.\n" +
-      "PURRPS task commits run on local main.\n" +
+      "Dungeon Warriors task commits run on local main.\n" +
       "Review and trust the hook in Codex Settings > Hooks (or /hooks) before relying on automatic commits.\n" +
       'Manual completion: pnpm task:commit -- "feat(game): describe the completed change"\n' +
       "Automatic pushing is not configured.\n",

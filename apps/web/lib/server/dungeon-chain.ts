@@ -6,15 +6,15 @@ import { affordableDepth, dungeonRulesSchema, payout } from "../dungeon/rules";
 import { dungeonAccounts, expeditionAddress } from "../dungeon/transactions";
 import { requiredVaultBalance } from "../game/economy";
 import { DEVNET } from "../solana/addresses";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { coder, pda } from "../solana/program";
-import type { PurrpsGame } from "../solana/purrps-game";
 import { browserVerifierKey } from "./browser-config";
 import { account } from "./chain-account";
 import type { DungeonRecord } from "./dungeon-store";
 import { ApiError } from "./runtime";
 import { checkedConnection } from "./transaction-network";
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 export async function dungeonSetup(owner: string) {
   const rpc = await checkedConnection("base"),
     keys = dungeonAccounts(owner, "0");

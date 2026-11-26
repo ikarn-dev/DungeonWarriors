@@ -7,6 +7,9 @@ export const REQUIRED_PROGRAM_INSTRUCTIONS = [
   "reserve_dungeon",
   "fulfill_dungeon",
   "settle_dungeon",
+  "prepare_dungeon_settlement",
+  "record_dungeon_settlement",
+  "finalize_dungeon_settlement",
   "refund_dungeon_randomness",
   "initialize_config",
   "publish_rules",
@@ -95,8 +98,8 @@ export function validatedClientSource(
 ): string {
   const idl = idlSchema.parse(idlInput);
   if (
-    normalized(idl.metadata.name) !== "purrpsgame" ||
-    !/export\s+type\s+PurrpsGame\s*=/.test(typeSource) ||
+    normalized(idl.metadata.name) !== "dungeonwarriors" ||
+    !/export\s+type\s+DungeonWarriors\s*=/.test(typeSource) ||
     !typeSource.includes(DEVNET.program)
   ) {
     throw new Error("WRONG_PROGRAM_ARTIFACTS");
@@ -123,5 +126,5 @@ export function validatedClientSource(
     )
       throw new Error("STALE_PROGRAM_ARTIFACTS");
   }
-  return `// Generated from user-built Anchor artifacts. Regenerate with program:export-client.\nimport type { Idl as AnchorIdl } from "@anchor-lang/core";\n${typeSource.trim()}\n\nexport const PURRPS_GAME_IDL = ${JSON.stringify(idl, null, 2)} satisfies AnchorIdl;\n`;
+  return `// Generated from user-built Anchor artifacts. Regenerate with program:export-client.\nimport type { Idl as AnchorIdl } from "@anchor-lang/core";\n${typeSource.trim()}\n\nexport const DUNGEON_WARRIORS_IDL = ${JSON.stringify(idl, null, 2)} satisfies AnchorIdl;\n`;
 }

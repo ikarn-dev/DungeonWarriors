@@ -106,11 +106,14 @@ export function WalletChip({
   return (
     <div className="lobby-topbar">
       {available !== null && (
-        <p className="lobby-funds" title="Available to play in PURRPS">
+        <p
+          className="lobby-funds"
+          title="Available to play in Dungeon Warriors"
+        >
           <span className="lobby-funds-mark" aria-hidden="true">
             <WarriorIcon name="coins" />
           </span>
-          <span className="sr-only">Available in PURRPS: </span>
+          <span className="sr-only">Available in Dungeon Warriors: </span>
           <strong>{displayUsdc(available)}</strong>
           <span className="lobby-funds-unit">USDC</span>
         </p>

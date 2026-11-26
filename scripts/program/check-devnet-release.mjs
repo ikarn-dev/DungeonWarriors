@@ -14,7 +14,7 @@ const program = new PublicKey(DEVNET.program);
 const usdc = new PublicKey(DEVNET.usdcMint);
 const tokenProgram = new PublicKey(DEVNET.tokenProgram);
 const target = new URL(
-  "../../apps/purrps-game-program/target/",
+  "../../apps/dungeon-warriors-program/target/",
   import.meta.url,
 );
 
@@ -63,8 +63,8 @@ export function deployedBytes(entry, data, dataAddress, artifact) {
 
 async function verifyRelease(starterOpen) {
   const [artifact, idl, buildId] = await Promise.all([
-    readFile(new URL("deploy/purrps_game.so", target)),
-    readFile(new URL("idl/purrps_game.json", target), "utf8"),
+    readFile(new URL("deploy/dungeon_warriors.so", target)),
+    readFile(new URL("idl/dungeon_warriors.json", target), "utf8"),
     readFile(new URL("../../apps/web/.next/BUILD_ID", import.meta.url), "utf8"),
   ]);
   check(

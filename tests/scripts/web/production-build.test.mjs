@@ -39,7 +39,7 @@ test("the starter route renders the game lobby before wallet hydration", () => {
   const html = readFileSync(join(output, "server/app/starter.html"), "utf8");
   assert.match(html, /alt="Dungeon Warriors"/);
   assert.match(html, /<output class="dots-loader">/);
-  assert.match(html, /class="sr-only">Loading/);
+  assert.match(html, /class="sr-only">Connecting your wallet/);
   assert.match(html, /class="lobby-backdrop-image"/);
   assert.doesNotMatch(html, /capsule-(lid|base)\.svg/);
 });

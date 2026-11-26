@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import {
   type AccountInfo,
-  type Connection,
   PublicKey,
   TransactionMessage,
   VersionedTransaction,
@@ -19,18 +18,9 @@ import {
   submitSponsoredPlay,
 } from "../../../../../apps/web/lib/game/run-client";
 import {
-  RunState,
-  subscribeRun,
-} from "../../../../../apps/web/lib/game/run-feed";
-import {
   ENTITY_VECTOR_OFFSET,
   guardRunLayout,
 } from "../../../../../apps/web/lib/game/run-layout";
-import {
-  formatRunPrice,
-  mergeRunPrices,
-  runPricePath,
-} from "../../../../../apps/web/lib/game/run-price";
 import {
   type GameIntent,
   gameInstructions,
@@ -218,19 +208,6 @@ it("distinguishes an expired signature from a finalized transaction failure", as
   }
 });
 
-it("plots only consumed price observations, retaining precision and showing gaps", () => {
-  const start = { sequence: 1n, price: 20_000_123n, exponent: -6 };
-  const later = { ...start, sequence: 2n, price: 20_010_123n };
-  const afterGap = { ...start, sequence: 5n, price: 20_020_123n };
-  const series = mergeRunPrices([start], [start, later, afterGap]);
-  expect(series).toEqual([start, later, afterGap]);
-  expect(runPricePath(series)).toBe("M2 34 L41 18 M158 2");
-  expect(formatRunPrice(start)).toBe("20.000123");
-  const live = { sequence: 1n, price: 6_062_100_350_011n, exponent: 8 };
-  expect(formatRunPrice(live)).toBe("60,621.00350011");
-  expect(formatRunPrice(live, true)).toBe("60,621.00");
-});
-
 describe("Rust account delivery", () => {
   it("decodes real Rust Borsh/IDL bytes into the predictor without losing precision", async () => {
     const r = await run();
@@ -282,108 +259,5 @@ describe("Rust account delivery", () => {
     for (const n of [0, 830, 1000, 2000])
       expect(() => guardRunLayout(good.subarray(0, n))).toThrow();
     expect(() => guardRunLayout(Buffer.alloc(10241))).toThrow();
-  });
-  it("requires finalized base escrow for settled/refunded and refuses regressions", async () => {
-    const s = new RunState();
-    s.requested(1n);
-    expect(s.view().status).toBe("activating");
-    s.applyRun(5, await run());
-    expect(s.view().status).toBe("requested");
-    s.applyFinalizedEscrow(6, await escrow());
-    expect(s.view().status).toBe("requested");
-    const terminal = await run("terminal");
-    s.applyRun(7, terminal);
-    expect(s.view().status).toBe("settling");
-    expect(() =>
-      s.applyRun(8, {
-        ...terminal,
-        observation: {
-          ...terminal.observation,
-          terminalReason: null,
-          phase: "active",
-        },
-      }),
-    ).toThrow("RUN_REGRESSION");
-    s.applyFinalizedEscrow(8, await escrow("refunded"));
-    expect(s.view().status).toBe("refunded");
-    const reserved = await escrow();
-    expect(() => s.applyFinalizedEscrow(9, reserved)).toThrow(
-      "ESCROW_CONFLICT",
-    );
-    s.applyRun(1, await run());
-    expect(s.view().status).toBe("refunded");
-    const copy = s.view();
-    copy.status = "active";
-    expect(s.view().status).toBe("refunded");
-  });
-  it("pins subscriptions to separate ER and finalized base reads and cleans up", async () => {
-    const commitments: string[] = [];
-    const removed: number[] = [];
-    const connection = (name: string) =>
-      ({
-        onAccountChange: (
-          _key: PublicKey,
-          _fn: unknown,
-          commitment: string,
-        ) => {
-          commitments.push(commitment);
-          return name === "active" ? 1 : 2;
-        },
-        getAccountInfoAndContext: async () => ({
-          context: { slot: 1 },
-          value: info(name),
-        }),
-        removeAccountChangeListener: async (id: number) => {
-          removed.push(id);
-        },
-      }) as unknown as Connection;
-    const views: string[] = [];
-    const feed = await subscribeRun(
-      identity,
-      connection("active"),
-      connection("reserved"),
-      (v) => views.push(v.status),
-    );
-    expect(commitments).toEqual(["confirmed", "finalized"]);
-    expect(views.at(-1)).toBe("active");
-    await feed.close();
-    expect(removed.sort()).toEqual([1, 2]);
-  });
-  it("cleans up both listeners after an initial RPC failure", async () => {
-    let removed = 0;
-    const connection = {
-      onAccountChange: () => 1,
-      getAccountInfoAndContext: async () => {
-        throw new Error("RPC_DOWN");
-      },
-      removeAccountChangeListener: async () => {
-        removed++;
-      },
-    } as unknown as Connection;
-    await expect(
-      subscribeRun(identity, connection, connection, () => {}),
-    ).rejects.toThrow("SUBSCRIPTION_FAILED");
-    expect(removed).toBe(2);
-  });
-  it("bounds stalled initial reads and releases subscriptions", async () => {
-    vi.useFakeTimers();
-    let removed = 0;
-    try {
-      const connection = {
-        onAccountChange: () => 1,
-        getAccountInfoAndContext: () => new Promise(() => {}),
-        removeAccountChangeListener: async () => {
-          removed++;
-        },
-      } as unknown as Connection;
-      const failure = expect(
-        subscribeRun(identity, connection, connection, () => {}),
-      ).rejects.toThrow("SUBSCRIPTION_FAILED");
-      await vi.advanceTimersByTimeAsync(5001);
-      await failure;
-      expect(removed).toBe(2);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });

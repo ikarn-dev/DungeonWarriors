@@ -16,6 +16,8 @@ export const deliverySchema = z
     signature: z.string().min(64).max(88),
     lastValidBlockHeight: z.number().int().positive(),
     cost: u64Input,
+    stage: z.enum(["schedule", "commit", "trigger"]).optional(),
+    sentAt: z.number().int().optional(),
   })
   .strict();
 export const dungeonRecordSchema = dungeonViewSchema

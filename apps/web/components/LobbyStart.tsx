@@ -84,7 +84,7 @@ export default function LobbyStart({
         <>
           <p>
             {restoreFailed
-              ? "PURRPS couldn't reach your session."
+              ? "Dungeon Warriors couldn't reach your session."
               : "Your wallet didn't sign in."}
           </p>
           <button

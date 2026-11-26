@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -138,6 +139,9 @@ test("the complete warrior pack is ready without legacy runner dependencies", as
   );
   const result = await checkGameAssets(root, 3);
   assert.equal(result.ready, true);
-  assert.equal(result.checkedFiles, 16);
+  const manifest = JSON.parse(
+    readFileSync(join(root, "game-assets/v3/manifest.json"), "utf8"),
+  );
+  assert.equal(result.checkedFiles, manifest.assets.length);
   assert.deepEqual(result.missing, []);
 });

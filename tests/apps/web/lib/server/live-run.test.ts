@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { runAddresses } from "../../../../../apps/web/lib/game/run-accounts";
 import { readLiveRun } from "../../../../../apps/web/lib/server/live-run";
 import { DEVNET } from "../../../../../apps/web/lib/solana/addresses";
-import { PURRPS_GAME_IDL } from "../../../../../apps/web/lib/solana/purrps-game";
+import { DUNGEON_WARRIORS_IDL } from "../../../../../apps/web/lib/solana/dungeon-warriors";
 
 const rpc = vi.hoisted(() => ({
   base: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("../../../../../apps/web/lib/server/transaction-network", () => ({
   checkedConnection: rpc.er,
 }));
 
-const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
 const program = new PublicKey(DEVNET.program);
 const wallet = new PublicKey(new Uint8Array(32).fill(1)).toBase58();
 const addresses = runAddresses({ owner: wallet, nonce: 1n });

@@ -20,7 +20,7 @@ import {
   sessionTokenSpace,
 } from "../game/run-transactions";
 import { DEVNET } from "../solana/addresses";
-import type { PurrpsGame } from "../solana/purrps-game";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { account, coder, pda, program, u64Input } from "./chain";
 import {
   type GameIntent,
@@ -137,7 +137,7 @@ export async function dedicatedSponsor(rpc: Connection) {
   return key;
 }
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 type Reserve = Extract<GameIntent["action"], { kind: "reserveRun" }>;
 
 export async function playSessionRent(
@@ -176,6 +176,7 @@ export async function checkPlaySpend(
   sponsor: PublicKey,
   network: "base" | "er",
   verify: boolean,
+  allowReward = false,
 ) {
   const balance =
     network === "base"
@@ -208,11 +209,11 @@ export async function checkPlaySpend(
   if (
     after === undefined ||
     ![balance.value, after].every((n) => Number.isSafeInteger(n) && n >= 0) ||
-    after > balance.value
+    (!allowReward && after > balance.value)
   )
     throw new ApiError("INVALID_CHAIN_AMOUNT", 502);
   const policy = sponsorshipConfig();
-  const cost = BigInt(balance.value - after);
+  const cost = BigInt(Math.max(0, balance.value - after));
   checkSponsorHeadroom(
     balance.value,
     policy.SPONSOR_MIN_BALANCE_LAMPORTS,

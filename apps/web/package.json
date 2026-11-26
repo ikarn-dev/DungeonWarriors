@@ -1,5 +1,5 @@
 {
-  "name": "@purrps/web",
+  "name": "@dungeon-warriors/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
-    "@purrps/config": "workspace:*",
+    "@dungeon-warriors/config": "workspace:*",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",

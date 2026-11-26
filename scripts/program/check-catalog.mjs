@@ -5,7 +5,7 @@ import { assetManifestBytes } from "../../apps/web/lib/game/assets.ts";
 import { CATALOG_V1 } from "../../apps/web/lib/game/catalog.ts";
 import { rpcConfigSchema } from "../../apps/web/lib/providers/config.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../apps/web/lib/solana/dungeon-warriors.ts";
 import { checkGameAssets } from "../assets/check-assets.mjs";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
 
@@ -27,7 +27,7 @@ const {
   VersionedTransaction,
 } = requireWeb("@solana/web3.js");
 const program = new PublicKey(DEVNET.program);
-const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
 const publicDir = fileURLToPath(
   new URL("../../apps/web/public", import.meta.url),
 );

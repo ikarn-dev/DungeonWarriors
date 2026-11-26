@@ -1,10 +1,10 @@
 export const publicKey = "3qbR1eZRqXUWroWKKYhbDmR3FfqTHfqSU8zZSxtANzYh";
 
 export const environment = {
-  APP_ORIGIN: "https://purrps.example",
+  APP_ORIGIN: "https://dungeon-warriors.example",
   HELIUS_DEVNET_RPC_URL:
     "https://devnet.helius-rpc.com/?api-key=TEST_ONLY_RPC_CREDENTIAL",
-  UPSTASH_REDIS_REST_URL: "https://purrps-test.upstash.io",
+  UPSTASH_REDIS_REST_URL: "https://dungeon-warriors-test.upstash.io",
   UPSTASH_REDIS_REST_TOKEN: "TEST_ONLY_REDIS_CREDENTIAL",
   MAGICBLOCK_ROUTER_HTTP_URL: "https://devnet-router.magicblock.app",
   MAGICBLOCK_ER_HTTP_URL: "https://devnet-as.magicblock.app",

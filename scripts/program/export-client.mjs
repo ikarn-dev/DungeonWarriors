@@ -11,9 +11,9 @@ import { checkEngine } from "./dungeon-engine.mjs";
 export function exportClient() {
   checkEngine();
   const root = fileURLToPath(new URL("../../", import.meta.url));
-  const target = join(root, "apps/purrps-game-program/target");
-  const jsonPath = join(target, "idl/purrps_game.json");
-  const typePath = join(target, "types/purrps_game.ts");
+  const target = join(root, "apps/dungeon-warriors-program/target");
+  const jsonPath = join(target, "idl/dungeon_warriors.json");
+  const typePath = join(target, "types/dungeon_warriors.ts");
   for (const path of [jsonPath, typePath]) {
     const info = statSync(path);
     if (!info.isFile() || info.size > 2 * 1024 * 1024)
@@ -25,7 +25,7 @@ export function exportClient() {
   );
   // The public ABI is runtime source required by clean web/Vercel checkouts.
   // Wallets, binaries and the rest of target/ remain local build artifacts.
-  const output = join(root, "apps/web/lib/solana/purrps-game.ts");
+  const output = join(root, "apps/web/lib/solana/dungeon-warriors.ts");
   const formatted = spawnSync(
     process.execPath,
     [

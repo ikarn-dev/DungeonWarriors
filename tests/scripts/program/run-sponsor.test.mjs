@@ -6,7 +6,7 @@ import {
   DEVNET,
   LEADERBOARD_SEED,
 } from "../../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../../apps/web/lib/solana/dungeon-warriors.ts";
 import { execute } from "../../../scripts/program/run-sponsor.mjs";
 import {
   existingBudgetPlan,
@@ -20,7 +20,7 @@ import {
 const { BN, BorshCoder, convertIdlToCamelCase } =
   requireWeb("@anchor-lang/core");
 const { Keypair, PublicKey } = requireWeb("@solana/web3.js");
-const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
 const owner = Keypair.generate().publicKey;
 const sponsor = Keypair.generate();
 const scope = runScope(owner.toBase58(), "9007199254740993");
@@ -169,7 +169,7 @@ test("completion retry uses the terminal's own attempt and stops when it returns
     original.snapshot.owner.toBase58(),
     original.snapshot.nonce.toString(),
   );
-  const program = new PublicKey(PURRPS_GAME_IDL.address);
+  const program = new PublicKey(DUNGEON_WARRIORS_IDL.address);
   const crankOffset = fixture.indexOf(
     coder.types.encode("crankState", original.crank),
   );

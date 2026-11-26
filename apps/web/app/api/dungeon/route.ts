@@ -27,6 +27,8 @@ import {
 
 const requestSchema = z.union([dungeonPrepareSchema, dungeonRequestSchema]);
 
+export const maxDuration = 60;
+
 export function GET() {
   return json({
     version: DUNGEON_V2.version,

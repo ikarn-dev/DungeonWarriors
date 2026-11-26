@@ -6,11 +6,11 @@ import {
   PublicKey,
   SystemProgram,
 } from "@solana/web3.js";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { coder, pda, program } from "../solana/program";
-import type { PurrpsGame } from "../solana/purrps-game";
 import { ApiError } from "./runtime";
 
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 export const invalidChainAccount = () =>
   new ApiError("INVALID_CHAIN_ACCOUNT", 502);
 const invalidAccount = invalidChainAccount;

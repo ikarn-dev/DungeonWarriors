@@ -27,7 +27,7 @@ const display = Cinzel({
   subsets: ["latin"],
 });
 export const metadata: Metadata = {
-  title: "PURRPS",
+  title: "Dungeon Warriors",
   description:
     "Explore timed catacombs with collectible cats, treasure gates and MagicBlock-verifiable randomness on Solana Devnet.",
 };

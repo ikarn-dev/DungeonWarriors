@@ -85,7 +85,7 @@ function stageAndCommit(paths, message, before) {
 }
 
 function createCommit(paths, message) {
-  const lock = gitPath("purrps-task-commit.lock");
+  const lock = gitPath("dungeon-warriors-task-commit.lock");
   const handle = openSync(lock, "wx", 0o600);
   try {
     writeFileSync(handle, `${String(process.pid)}\n`);
@@ -125,7 +125,7 @@ try {
     const output = result?.commit
       ? {
           systemMessage:
-            "PURRPS task committed locally: " +
+            "Dungeon Warriors task committed locally: " +
             result.commit +
             ". Nothing was pushed.",
         }
@@ -146,7 +146,7 @@ try {
   if (hookMode) {
     process.stdout.write(
       `${JSON.stringify({
-        systemMessage: `PURRPS task was not committed: ${message}`,
+        systemMessage: `Dungeon Warriors task was not committed: ${message}`,
       })}\n`,
     );
   } else {

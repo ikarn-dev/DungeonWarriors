@@ -1,12 +1,15 @@
 import "server-only";
 import { utils } from "@anchor-lang/core";
+import { DELEGATION_PROGRAM_ID } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { TransactionMessage, VersionedTransaction } from "@solana/web3.js";
-import { dungeonAccounts } from "../dungeon/transactions";
-import { programInstruction } from "../solana/instruction";
-import { pda } from "../solana/program";
+import { pause } from "../game/web-api";
+import { program } from "../solana/program";
 import { browserVerifierKey } from "./browser-config";
 import { matchExpedition, readExpedition } from "./dungeon-chain";
-import { dungeonSecret } from "./dungeon-randomness";
+import {
+  settlementAddress,
+  settlementInstructions,
+} from "./dungeon-settlement-instructions";
 import { type DungeonRecord, withDungeon } from "./dungeon-store";
 import { ApiError } from "./runtime";
 import {
@@ -97,15 +100,36 @@ export async function refreshDungeon(record: DungeonRecord) {
     }
   }
 }
-export async function deliverDungeon(owner: string, nonce: string) {
-  const pending = await withDungeon(owner, nonce, async (record) => {
+function prepareDelivery(owner: string, nonce: string) {
+  return withDungeon(owner, nonce, async (record) => {
     if (!record || record.settled || record.outcome === null)
       return { record, value: null };
     await refreshDungeon(record);
     if (record.settled) return { record, value: null };
-    const rpc = await checkedConnection("base");
+    const base = await checkedConnection("base");
+    const { DUNGEON_ER_SETTLEMENT_ENABLED } = process.env;
+    const rollup = DUNGEON_ER_SETTLEMENT_ENABLED === "true";
+    const receipt = rollup
+      ? await base.getAccountInfo(settlementAddress(owner, nonce), "confirmed")
+      : null;
+    const returned = receipt?.owner.equals(program);
+    if (
+      (record.delivery?.stage === "schedule" &&
+        (returned || receipt?.owner.equals(DELEGATION_PROGRAM_ID))) ||
+      (!rollup && record.delivery?.stage === "commit")
+    )
+      record.delivery = null;
+    if (record.delivery?.stage === "commit" && returned) {
+      // Prefer the independent cranker. Recovery submits the same Hydra
+      // trigger if the scheduler has not finished by the next wallet visit.
+      if (Date.now() - (record.delivery.sentAt ?? 0) < 15_000)
+        return { record, value: null };
+      record.delivery = null;
+    }
     if (record.delivery) {
       const delivery = record.delivery;
+      const rpc =
+        delivery.stage === "commit" ? await checkedConnection("er") : base;
       let status = (
         await rpc.getSignatureStatuses([delivery.signature], {
           searchTransactionHistory: true,
@@ -122,77 +146,101 @@ export async function deliverDungeon(owner: string, nonce: string) {
         ).value[0];
         if (!status) record.delivery = null;
       }
+      if (
+        delivery.stage === "commit" &&
+        !status?.err &&
+        (status?.confirmationStatus === "confirmed" ||
+          status?.confirmationStatus === "finalized")
+      ) {
+        if (!delivery.sentAt || Date.now() - delivery.sentAt < 30_000)
+          return { record, value: null };
+        record.delivery = null;
+      }
       if (status?.err && status.confirmationStatus === "finalized")
         record.delivery = null;
-      else if (status?.confirmationStatus === "finalized") {
+      else if (
+        status?.confirmationStatus === "finalized" ||
+        (delivery.stage === "schedule" &&
+          !status?.err &&
+          status?.confirmationStatus === "confirmed")
+      ) {
         await refreshDungeon(record);
         if (record.settled) return { record, value: null };
         record.delivery = null;
       } else if (record.delivery) return { record, value: record.delivery };
     }
-    const verifier = browserVerifierKey(),
-      sponsor = await dedicatedSponsor(rpc);
-    const accounts = dungeonAccounts(owner, nonce);
-    let ix: ReturnType<typeof programInstruction>;
-    if (!record.randomness) {
-      if (record.reason !== "vrfTimeout") return { record, value: null };
-      ix = programInstruction("refundDungeonRandomness", accounts, {});
-    } else {
-      const gates = [...record.gates];
-      while (gates.length < 5) gates.push(255);
-      ix = programInstruction(
-        "settleDungeon",
-        {
-          ...accounts,
-          verifier: verifier.publicKey,
-          payer: sponsor.publicKey,
-          leaderboard: pda("dungeon-leaderboard"),
-        },
-        {
-          args: {
-            secret: Array.from(dungeonSecret(owner, nonce)),
-            gates,
-            gateCount: record.gates.length,
-            outcome: record.outcome,
-          },
-        },
-      );
-    }
+    const verifier = browserVerifierKey();
+    const sponsor = await dedicatedSponsor(base);
+    const plan = await settlementInstructions(
+      base,
+      record,
+      sponsor.publicKey,
+      verifier.publicKey,
+      receipt,
+    );
+    if (!plan) return { record, value: null };
+    const network = plan.stage === "commit" ? "er" : "base";
+    const rpc = network === "er" ? await checkedConnection("er") : base;
     const block = await rpc.getLatestBlockhash("confirmed");
     const tx = new VersionedTransaction(
       new TransactionMessage({
         payerKey: sponsor.publicKey,
         recentBlockhash: block.blockhash,
-        instructions: [ix],
+        instructions: plan.instructions,
       }).compileToV0Message(),
     );
-    tx.sign(record.randomness ? [sponsor, verifier] : [sponsor]);
-    const cost = await checkPlaySpend(rpc, tx, sponsor.publicKey, "base", true);
+    tx.sign(
+      record.randomness && plan.stage !== "trigger"
+        ? [sponsor, verifier]
+        : [sponsor],
+    );
+    const cost = await checkPlaySpend(
+      rpc,
+      tx,
+      sponsor.publicKey,
+      network,
+      true,
+      plan.stage === "trigger",
+    );
     record.delivery = {
       transaction: Buffer.from(tx.serialize()).toString("base64"),
       signature: utils.bytes.bs58.encode(tx.signatures[0] ?? new Uint8Array()),
       lastValidBlockHeight: block.lastValidBlockHeight,
       cost: cost.toString(),
+      ...(plan.stage ? { stage: plan.stage, sentAt: Date.now() } : {}),
     };
     return { record, value: record.delivery };
   });
-  if (pending) {
+}
+
+export async function deliverDungeon(owner: string, nonce: string) {
+  // Send the rollup write in the same background invocation when the base
+  // delegation confirms. Saved transactions let the next recovery resume it.
+  for (let step = 0; step < 2; step++) {
+    const pending = await prepareDelivery(owner, nonce);
+    if (!pending) return;
     const cost = BigInt(pending.cost);
     if (cost > 0n)
       await admitSponsorCost(
-        `dungeon:${owner}:${nonce}:settle`,
+        `dungeon:${owner}:${nonce}:${pending.stage ?? "settle"}`,
         cost,
         pending.signature,
       );
-    const rpc = await checkedConnection("base");
-    await sendReviewed(
-      rpc,
-      VersionedTransaction.deserialize(
-        Buffer.from(pending.transaction, "base64"),
-      ),
-      "base",
-      pending.signature,
-      true,
+    const network = pending.stage === "commit" ? "er" : "base";
+    const rpc = await checkedConnection(network);
+    const tx = VersionedTransaction.deserialize(
+      Buffer.from(pending.transaction, "base64"),
     );
+    await sendReviewed(rpc, tx, network, pending.signature, true);
+    if (pending.stage !== "schedule") return;
+    const er = await checkedConnection("er");
+    const receipt = settlementAddress(owner, nonce);
+    const deadline = AbortSignal.timeout(6000);
+    while (!deadline.aborted) {
+      const visible = await er.getAccountInfo(receipt, "confirmed");
+      if (visible?.owner.equals(program)) break;
+      await pause(500, deadline);
+    }
+    if (deadline.aborted) return;
   }
 }

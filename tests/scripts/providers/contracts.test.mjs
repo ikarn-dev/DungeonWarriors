@@ -97,8 +97,8 @@ test("provider configuration parses exact budgets and rejects unsafe or mismatch
     { ORACLE_MAX_AGE_SECONDS: "0" },
     { ORACLE_MAX_AGE_SECONDS: "invalid" },
     { ORACLE_MIN_EXPONENT: "1", ORACLE_MAX_EXPONENT: "0" },
-    { APP_ORIGIN: "https://purrps.example/path" },
-    { APP_ORIGIN: "http://purrps.example" },
+    { APP_ORIGIN: "https://dungeon-warriors.example/path" },
+    { APP_ORIGIN: "http://dungeon-warriors.example" },
     { APP_ORIGIN: "http://192.168.1.4:3000" },
     { APP_ORIGIN: "http://localhost:3000/" },
   ])

@@ -1,4 +1,4 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": ["@purrps/config/biome"]
+  "extends": ["./packages/config/biome.shared.json"]
 }

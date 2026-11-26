@@ -7,7 +7,10 @@ import {
 } from "@anchor-lang/core";
 import { type AccountInfo, PublicKey } from "@solana/web3.js";
 import { DEVNET, publicKeySchema } from "../solana/addresses.ts";
-import { PURRPS_GAME_IDL, type PurrpsGame } from "../solana/purrps-game.ts";
+import {
+  DUNGEON_WARRIORS_IDL,
+  type DungeonWarriors,
+} from "../solana/dungeon-warriors.ts";
 import { type CatId, catStats } from "./catalog";
 import { parsePredictionSnapshot } from "./predictor";
 import { runAccountObservationSchema } from "./protocol";
@@ -15,10 +18,10 @@ import { rulesForVersion, U64_MAX } from "./rules";
 import { guardRunLayout, SNAPSHOT_END, SNAPSHOT_START } from "./run-layout";
 
 const program = new PublicKey(DEVNET.program);
-const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
+const idl = convertIdlToCamelCase(DUNGEON_WARRIORS_IDL);
 const accounts = new BorshAccountsCoder(idl);
 const types = new BorshCoder(idl).types;
-type Accounts = IdlAccounts<PurrpsGame>;
+type Accounts = IdlAccounts<DungeonWarriors>;
 type GameAccount = Pick<AccountInfo<Buffer>, "owner" | "data" | "executable">;
 export type RunIdentity = { owner: string; nonce: bigint };
 export class RunAccountError extends Error {

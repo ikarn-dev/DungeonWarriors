@@ -5,7 +5,7 @@ import {
   DEVNET,
   LEADERBOARD_SEED,
 } from "../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../apps/web/lib/solana/dungeon-warriors.ts";
 
 export const requireWeb = createRequire(
   new URL("../../apps/web/package.json", import.meta.url),
@@ -23,7 +23,7 @@ const { PublicKey, SystemProgram, TransactionInstruction } =
   requireWeb("@solana/web3.js");
 const { getAssociatedTokenAddressSync } = requireWeb("@solana/spl-token");
 
-const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
+const idl = convertIdlToCamelCase(DUNGEON_WARRIORS_IDL);
 const coder = new BorshCoder(idl);
 const program = new PublicKey(DEVNET.program);
 const hydra = new PublicKey("eHyd5BU8QffvHi4GnXwxrK4WpS7pM2x9UGKHBWii7mf");

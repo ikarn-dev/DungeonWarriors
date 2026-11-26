@@ -1,8 +1,19 @@
 .dungeon-dialog {
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  overflow: hidden;
   padding: 0;
   border: 0;
   background: #322e48;
   color: #fff1cf;
+  font-family: var(--font-pixel), var(--font-geist-sans), sans-serif;
+}
+.dungeon-dialog::backdrop {
+  background: #0b0a14;
 }
 /* Every layer (stage, Lobby key, toaster, notices) shares one grid cell,
    so nothing in flow can push the stage down and crop its bottom edge

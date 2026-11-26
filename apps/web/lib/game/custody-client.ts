@@ -18,7 +18,7 @@ import {
 } from "@solana/web3.js";
 import { z } from "zod";
 import { DEVNET } from "../solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../solana/dungeon-warriors.ts";
 import { USDC_DECIMALS } from "./economy";
 import { checkedU64, U64_MAX } from "./rules";
 
@@ -59,7 +59,7 @@ export type PlayerIntent = {
 
 const scale = 10n ** BigInt(USDC_DECIMALS);
 const number = new Intl.NumberFormat("en-US");
-const idl = convertIdlToCamelCase(PURRPS_GAME_IDL);
+const idl = convertIdlToCamelCase(DUNGEON_WARRIORS_IDL);
 const coder = new BorshInstructionCoder(idl);
 
 export function parseUsdc(input: string) {

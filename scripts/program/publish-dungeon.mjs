@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { DUNGEON_V2, ENGINE } from "../../apps/web/lib/dungeon/rules.ts";
 import { DEVNET } from "../../apps/web/lib/solana/addresses.ts";
-import { PURRPS_GAME_IDL } from "../../apps/web/lib/solana/purrps-game.ts";
+import { DUNGEON_WARRIORS_IDL } from "../../apps/web/lib/solana/dungeon-warriors.ts";
 import { checkEngine } from "./dungeon-engine.mjs";
 import { waitForFinalized } from "./publication-status.mjs";
 import { check, requireWeb } from "./run-sponsor-state.mjs";
@@ -24,7 +24,7 @@ check(
   "Usage: node --env-file=apps/web/.env scripts/program/publish-dungeon.mjs [--stage|--publish admin-keypair.json]",
 );
 const engineHash = checkEngine();
-const coder = new BorshCoder(convertIdlToCamelCase(PURRPS_GAME_IDL));
+const coder = new BorshCoder(convertIdlToCamelCase(DUNGEON_WARRIORS_IDL));
 const program = new PublicKey(DEVNET.program);
 const pda = (seed) =>
   PublicKey.findProgramAddressSync([Buffer.from(seed)], program)[0];

@@ -13,7 +13,7 @@ import {
 import { RULES_V4, rulesForVersion } from "../game/rules";
 import { decodeRunAccount, runAddresses } from "../game/run-accounts";
 import { initializeWorld } from "../game/world";
-import type { PurrpsGame } from "../solana/purrps-game";
+import type { DungeonWarriors } from "../solana/dungeon-warriors";
 import { witnessBrowserPrice } from "./browser-prices";
 import { type BrowserSession, withBrowserSession } from "./browser-store";
 import { account } from "./chain";
@@ -55,7 +55,7 @@ export async function startSession(
     address,
     info,
   );
-  const raw = account<IdlAccounts<PurrpsGame>["runGameState"]>(
+  const raw = account<IdlAccounts<DungeonWarriors>["runGameState"]>(
     "runGameState",
     info,
   );
@@ -153,7 +153,7 @@ export async function updateBrowserRun(owner: string, input: BrowserRequest) {
       if (live.run.status === "settled" || live.run.status === "refunded")
         throw new ApiError("RUN_ALREADY_SETTLED", 409);
       if (live.er) {
-        const raw = account<IdlAccounts<PurrpsGame>["runGameState"]>(
+        const raw = account<IdlAccounts<DungeonWarriors>["runGameState"]>(
           "runGameState",
           {
             owner: new PublicKey(live.er.owner),

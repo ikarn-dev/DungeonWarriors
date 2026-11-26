@@ -26,7 +26,7 @@ export function wallet() {
   };
 }
 export const environment = {
-  APP_ORIGIN: "https://purrps.example",
+  APP_ORIGIN: "https://dungeon-warriors.example",
   HELIUS_DEVNET_RPC_URL: "https://devnet.helius-rpc.com/?api-key=test",
   UPSTASH_REDIS_REST_URL: "https://test.upstash.io",
   UPSTASH_REDIS_REST_TOKEN: "test",
