@@ -86,6 +86,26 @@ export function WalletPicker({
   );
 }
 
+export function WalletLogoutStatus({
+  pending,
+  onRetry,
+}: {
+  readonly pending: boolean;
+  readonly onRetry: () => void;
+}) {
+  if (pending) return <output className="sr-only">Signing out</output>;
+  return (
+    <div className="lobby-body">
+      <section className="lobby-start pixel-panel" aria-label="Sign out">
+        <p role="alert">Couldn't sign out.</p>
+        <button type="button" className="pixel-button" onClick={onRetry}>
+          Sign out
+        </button>
+      </section>
+    </div>
+  );
+}
+
 // Top-right bar: the in-game funds badge (settled Available credit, shown
 // once the player account exists), then the wallet pill to copy the address
 // or disconnect with the power icon.

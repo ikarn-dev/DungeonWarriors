@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { beforeEach, expect, it, vi } from "vitest";
+import { WalletLogoutStatus } from "../../../../apps/web/components/LobbyWallet";
 import WalletDialog from "../../../../apps/web/components/WalletDialog";
 import { useHydratedWallet } from "../../../../apps/web/components/WalletProviders";
 
@@ -76,4 +77,16 @@ it("renders discovered wallets only when the dialog opens", () => {
   );
   expect(open).toContain("Extension wallet");
   expect(open).not.toContain("No Solana wallet found");
+});
+
+it("replaces logout progress with a retry action when revocation cannot be confirmed", () => {
+  const render = (pending: boolean) =>
+    renderToStaticMarkup(
+      createElement(WalletLogoutStatus, { pending, onRetry: noop }),
+    );
+  expect(render(true)).toContain("Signing out");
+  const failed = render(false);
+  expect(failed).toContain('role="alert"');
+  expect(failed).toContain('type="button"');
+  expect(failed).not.toContain("Signing out");
 });

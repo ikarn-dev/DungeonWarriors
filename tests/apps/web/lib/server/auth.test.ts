@@ -53,6 +53,7 @@ vi.mock(
 );
 
 import { POST as challengeRoute } from "../../../../../apps/web/app/api/auth/challenge/route";
+import { POST as logoutRoute } from "../../../../../apps/web/app/api/auth/logout/route";
 import { GET as sessionRoute } from "../../../../../apps/web/app/api/auth/session/route";
 import { POST as verifyRoute } from "../../../../../apps/web/app/api/auth/verify/route";
 import { signInWallet } from "../../../../../apps/web/components/wallet-sign-in";
@@ -97,6 +98,51 @@ describe("wallet authentication", () => {
       expect(await response.json()).toBeNull();
       expect(response.headers.get("cache-control")).toBe("private, no-store");
     }
+  });
+  it("revokes the server session and expires the cookie on repeated logout", async () => {
+    const owner = wallet();
+    const challenge = await createChallenge(owner.address);
+    const { token } = await verifyChallenge(
+      challenge.challengeId,
+      owner
+        .sign(new TextEncoder().encode(challenge.message))
+        .toString("base64"),
+    );
+    const cookieHeader = cookie(token).split(";")[0] ?? "";
+    const signOut = (value: string, origin = config.APP_ORIGIN) =>
+      logoutRoute(
+        new Request(`${config.APP_ORIGIN}/api/auth/logout`, {
+          method: "POST",
+          headers: { Origin: origin, Cookie: value },
+        }),
+      );
+
+    expect((await signOut(cookieHeader, "https://other.example")).status).toBe(
+      403,
+    );
+    await expect(authenticate(token)).resolves.toMatchObject({
+      wallet: owner.address,
+    });
+
+    for (const value of [cookieHeader, cookieHeader, ""]) {
+      const response = await signOut(value);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ loggedOut: true });
+      expect(response.headers.get("set-cookie")).toBe(cookie("", 0));
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      await expect(authenticate(token)).rejects.toThrow("AUTH_REQUIRED");
+    }
+  });
+  it("keeps the session cookie available for retry when logout storage fails", async () => {
+    store.del.mockRejectedValueOnce(new Error("Storage unavailable"));
+    const response = await logoutRoute(
+      new Request(`${config.APP_ORIGIN}/api/auth/logout`, {
+        method: "POST",
+        headers: { Origin: config.APP_ORIGIN, Cookie: cookie("x".repeat(43)) },
+      }),
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
   it("accepts only the configured exact origin, independent of spoofed host or referrer headers", () => {
     expect(() =>

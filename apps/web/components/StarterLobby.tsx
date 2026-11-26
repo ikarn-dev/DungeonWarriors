@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PlayerIntent } from "../lib/game/custody-client";
@@ -28,11 +27,12 @@ import LobbyBackdrop from "./LobbyBackdrop";
 import type { LobbyTab } from "./LobbyMenu";
 import LobbySections from "./LobbySections";
 import LobbyStart from "./LobbyStart";
-import { WalletChip } from "./LobbyWallet";
+import { WalletChip, WalletLogoutStatus } from "./LobbyWallet";
 import { approveLobbyTransaction } from "./lobby-approval";
 import { useWalletEntry } from "./useWalletEntry";
 import WalletDialog from "./WalletDialog";
 import { useHydratedWallet } from "./WalletProviders";
+import { finishWalletLogout } from "./wallet-logout";
 import { signInGameDevice, signInWallet } from "./wallet-sign-in";
 
 const drawPollMs = 6_000;
@@ -44,10 +44,11 @@ type DrawView = { owner: string; nonce: bigint; kind: CapsuleKind };
 
 export default function StarterPanel() {
   const wallet = useHydratedWallet();
-  const router = useRouter();
-  const address = wallet.connected
-    ? (wallet.publicKey?.toBase58() ?? null)
-    : null;
+  const [signOut, setSignOut] = useState<"idle" | "pending" | "failed">("idle");
+  const address =
+    signOut === "idle" && wallet.connected
+      ? (wallet.publicKey?.toBase58() ?? null)
+      : null;
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
   const [restoreFailed, setRestoreFailed] = useState(false);
@@ -359,12 +360,29 @@ export default function StarterPanel() {
       await navigator.clipboard.writeText(address);
       toast.success("Address copied");
     });
-  const disconnect = () =>
-    void perform(async (signal) => {
-      if (authenticated) await webApi("/api/auth/logout", {}, signal);
-      await wallet.disconnect();
-      router.replace("/");
-    });
+  async function disconnect() {
+    if (signOut === "pending") return;
+    setSignOut("pending");
+    work.current?.abort();
+    toast.dismiss();
+    try {
+      await webApi("/api/auth/logout", {}, AbortSignal.timeout(10000));
+    } catch {
+      setSignOut("failed");
+      return;
+    }
+    finishWalletLogout(wallet.disconnect);
+  }
+  if (signOut !== "idle")
+    return (
+      <>
+        <LobbyBackdrop />
+        <WalletLogoutStatus
+          pending={signOut === "pending"}
+          onRetry={() => void disconnect()}
+        />
+      </>
+    );
   const ready =
     authenticated &&
     state?.configured === true &&
@@ -381,7 +399,7 @@ export default function StarterPanel() {
           }
           busy={busy || restoring}
           onCopy={copy}
-          onDisconnect={disconnect}
+          onDisconnect={() => void disconnect()}
         />
       )}
       <div className="lobby-body" aria-busy={busy}>

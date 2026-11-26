@@ -13,7 +13,6 @@ import { decodeBase64, encodeBase64, WebApiError } from "../game/web-api";
 import { DEVNET } from "../solana/addresses";
 import { programInstruction } from "../solana/instruction";
 import { nonceBytes, pda } from "../solana/program";
-import { logDungeon } from "./debug";
 import type { DungeonView } from "./protocol";
 import { payout } from "./rules";
 
@@ -177,10 +176,6 @@ export async function approveDungeonReservation(
   }
   const reviewed = tx.message.serialize();
   const before = walletSummary(tx);
-  logDungeon("wallet.request", {
-    network: "devnet",
-    fixedFee: before.budget !== "",
-  });
   let signed: VersionedTransaction;
   try {
     signed = await sign(tx);
@@ -204,10 +199,7 @@ export async function approveDungeonReservation(
       blockhashChanged: before.blockhash !== after.blockhash,
       feePayerChanged: before.payer !== after.payer,
       feeInstructionsChanged: before.budget !== after.budget,
-      instructionCountBefore: before.instructions,
-      instructionCountAfter: after.instructions,
     };
-    logDungeon("wallet.message_changed", changes);
     throw new WebApiError(
       changes.feePayerChanged
         ? "DUNGEON_WALLET_PAYER_CHANGED"
@@ -223,7 +215,6 @@ export async function approveDungeonReservation(
   );
   if (!signed.signatures[ownerIndex]?.some((byte) => byte !== 0))
     throw new WebApiError("INVALID_SIGNATURE");
-  logDungeon("wallet.approved", { messageUnchanged: true });
   return { source, transaction: encodeBase64(signed.serialize()) };
 }
 
@@ -234,6 +225,5 @@ function walletSummary(tx: VersionedTransaction) {
     budget: budgetInstructions(tx)
       .map((instruction) => instruction.data.join(","))
       .join(";"),
-    instructions: tx.message.compiledInstructions.length,
   };
 }

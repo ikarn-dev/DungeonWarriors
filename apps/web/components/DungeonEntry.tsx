@@ -5,7 +5,6 @@ import {
   type DungeonArtwork,
   loadDungeonArtwork,
 } from "../lib/dungeon/artwork";
-import { logDungeon } from "../lib/dungeon/debug";
 import { clearDeparture, savedDeparture } from "../lib/dungeon/departure";
 import {
   type DungeonRequest,
@@ -312,7 +311,6 @@ export default function DungeonEntry({
     setHidden(false);
     setStage("prepare");
     setNotice(null);
-    logDungeon("play.start", { network: "devnet", saved: expedition !== null });
     let step = "artwork";
     try {
       const artwork = await loadDungeonArtwork(artCat);
@@ -357,7 +355,6 @@ export default function DungeonEntry({
               expedition.rulesHash !== request.review.rulesHash))
         )
           throw new WebApiError("INVALID_DUNGEON_QUOTE");
-        logDungeon("wager.prepared", { renewed: request.review !== undefined });
       }
       if (!expedition) return;
       if (expedition.preparation) {
@@ -386,7 +383,6 @@ export default function DungeonEntry({
       }
       if (expedition?.phase === "cancelled")
         throw new WebApiError("TRANSACTION_FAILED");
-      logDungeon("play.accepted", { phase: expedition?.phase ?? "unknown" });
     } catch (error) {
       if (signal.aborted) return;
       const code =
@@ -397,7 +393,6 @@ export default function DungeonEntry({
             : step === "submit"
               ? "DUNGEON_SUBMIT_UNCONFIRMED"
               : "DUNGEON_PREPARE_FAILED";
-      logDungeon("play.failed", { step, code });
       problem(webErrorMessage(code));
       if (step === "artwork") returnToMenu();
       if (step !== "submit" && step !== "prepare") return;

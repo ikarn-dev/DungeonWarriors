@@ -392,13 +392,7 @@ it("reports wallet fee edits before sending an approval to the server", async ()
         null,
       ),
     ).rejects.toMatchObject({ code: "DUNGEON_WALLET_FEE_CHANGED" });
-    expect(log).toHaveBeenCalledWith("[dungeon] wallet.message_changed", {
-      blockhashChanged: false,
-      feePayerChanged: false,
-      feeInstructionsChanged: true,
-      instructionCountBefore: 2,
-      instructionCountAfter: 2,
-    });
+    expect(log).not.toHaveBeenCalled();
     expect(mocks.stored?.reserve.signature).toBeNull();
   } finally {
     log.mockRestore();

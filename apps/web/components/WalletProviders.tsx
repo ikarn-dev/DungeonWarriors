@@ -6,12 +6,15 @@ import {
   WalletProvider,
   type WalletProviderProps,
 } from "@solana/wallet-adapter-react";
-import { type ReactNode, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useSyncExternalStore } from "react";
+import { walletSelectionKey, watchWalletLogout } from "./wallet-logout";
 
 // No adapters are registered by hand: the list holds only wallets the browser
 // announces (Wallet Standard), plus Mobile Wallet Adapter on phones.
 const wallets: WalletProviderProps["wallets"] = [];
 const noSubscription = () => () => {};
+// Connection and signing callers display their errors in the UI.
+const handleWalletError = () => {};
 // The app's RPC proxy on this origin. The server render has no origin, so it
 // uses the public Devnet URL; no request is made from that render, and the
 // endpoint only tells Mobile Wallet Adapter which cluster to use.
@@ -55,9 +58,15 @@ export default function WalletProviders({
     proxyEndpoint,
     serverEndpoint,
   );
+  useEffect(watchWalletLogout, []);
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider
+        wallets={wallets}
+        autoConnect
+        localStorageKey={walletSelectionKey}
+        onError={handleWalletError}
+      >
         {children}
       </WalletProvider>
     </ConnectionProvider>

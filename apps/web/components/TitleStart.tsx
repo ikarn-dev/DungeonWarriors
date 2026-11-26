@@ -1,6 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { WebApiError, webApi, webErrorMessage } from "../lib/game/web-api";
 import WalletDialog from "./WalletDialog";
@@ -56,6 +62,7 @@ export default function TitleStart() {
         )
           return;
       }
+      if (signal.aborted) return;
       if (adapter?.publicKey?.toBase58() !== walletAddress)
         throw new WebApiError("SIGN_IN_ACCOUNT_CHANGED");
       setStep("entering");
@@ -92,7 +99,18 @@ export default function TitleStart() {
         if (running.current === controller) running.current = null;
       });
   }, [wanted, address, enter, select]);
-  useEffect(() => () => running.current?.abort(), []);
+  // Next.js preserves state when it hides a cached route.
+  useLayoutEffect(() => {
+    return () => {
+      running.current?.abort();
+      running.current = null;
+      setWanted(false);
+      setPicking(false);
+      setStep("idle");
+      toast.dismiss(PROGRESS_TOAST);
+      toast.dismiss(ERROR_TOAST);
+    };
+  }, []);
   // A silent reconnect that was still running when Start was pressed failed:
   // fall back to the wallet pop-up.
   useEffect(() => {
@@ -119,7 +137,6 @@ export default function TitleStart() {
     if (progress === null) toast.dismiss(PROGRESS_TOAST);
     else toast.loading(progress, { id: PROGRESS_TOAST });
   }, [progress]);
-  useEffect(() => () => void toast.dismiss(PROGRESS_TOAST), []);
   return (
     <>
       <button

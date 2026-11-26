@@ -29,9 +29,7 @@ type Options = {
   reduced: () => boolean;
   onReady: () => void;
   onError: () => void;
-  // The gas or a fall in battle ended the room.
   onRoomOver: () => void;
-  // The gate the server reported as the trap, once it has.
   trap: () => number | null;
   preloaded: ReadonlyMap<string, Blob>;
 };
@@ -487,6 +485,7 @@ export function renderDungeon(
     width: Math.max(1, parent.clientWidth),
     height: Math.max(1, parent.clientHeight),
     antialias: true,
+    banner: false,
     scene: [scene],
     audio: { noAudio: true },
   });

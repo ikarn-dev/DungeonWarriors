@@ -85,16 +85,21 @@ export async function body<T>(
     throw new ApiError("INVALID_REQUEST", 400);
   }
 }
-export function sessionToken(request: Request) {
+export function optionalSessionToken(request: Request) {
   const name = sessionCookieName();
   const matches = (request.headers.get("cookie") ?? "")
     .split(";")
     .map((value) => value.trim())
     .filter((value) => value.startsWith(`${name}=`));
-  if (matches.length !== 1) throw new ApiError("AUTH_REQUIRED", 401);
+  if (matches.length !== 1) return null;
   const token = matches[0]?.slice(name.length + 1);
-  if (token === undefined || !/^[A-Za-z0-9_-]{43}$/.test(token))
-    throw new ApiError("AUTH_REQUIRED", 401);
+  return token !== undefined && /^[A-Za-z0-9_-]{43}$/.test(token)
+    ? token
+    : null;
+}
+export function sessionToken(request: Request) {
+  const token = optionalSessionToken(request);
+  if (token === null) throw new ApiError("AUTH_REQUIRED", 401);
   return token;
 }
 export function json(
