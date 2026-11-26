@@ -8,12 +8,16 @@ import { useHydratedWallet } from "./WalletProviders";
 import { signInGameDevice, signInWallet } from "./wallet-sign-in";
 
 type Step = "idle" | "connecting" | "signing" | "entering";
-const LABELS: Record<Step, string> = {
-  idle: "Start",
-  connecting: "Connecting…",
-  signing: "Check your wallet…",
-  entering: "Entering…",
+// Progress shows in one live toast that updates in place (2026-11-26); the
+// key keeps its one word and spins a loader beside it. Failures use their
+// own toast id so clearing progress never removes them.
+const PROGRESS: Record<Exclude<Step, "idle">, string> = {
+  connecting: "Connecting your wallet",
+  signing: "Approve the sign-in in your wallet",
+  entering: "Entering the catacombs",
 };
+const PROGRESS_TOAST = "start";
+const ERROR_TOAST = "start-error";
 
 // Start on the title screen: pick a wallet in a pop-up if none is connected,
 // sign the domain-bound challenge in the wallet if there is no session, then
@@ -71,7 +75,7 @@ export default function TitleStart() {
           failure instanceof WebApiError
             ? webErrorMessage(failure.code)
             : "Your wallet didn't sign in. Press Start to try again.",
-          { id: "start" },
+          { id: ERROR_TOAST },
         );
       })
       .finally(() => {
@@ -96,14 +100,25 @@ export default function TitleStart() {
 
   const connecting = wanted && wallet.connecting;
   const busy = step !== "idle" || connecting || (wanted && address !== null);
+  const progress = !busy
+    ? null
+    : PROGRESS[
+        step === "idle" ? "connecting" : connecting ? "connecting" : step
+      ];
+  useEffect(() => {
+    if (progress === null) toast.dismiss(PROGRESS_TOAST);
+    else toast.loading(progress, { id: PROGRESS_TOAST });
+  }, [progress]);
+  useEffect(() => () => void toast.dismiss(PROGRESS_TOAST), []);
   return (
     <>
       <button
         type="button"
-        className="title-start"
+        className="metal-key title-start"
         disabled={busy}
         aria-busy={busy}
         onClick={() => {
+          toast.dismiss(ERROR_TOAST);
           setWanted(true);
           if (address === null) {
             if (wallet.connecting) setStep("connecting");
@@ -111,7 +126,8 @@ export default function TitleStart() {
           }
         }}
       >
-        {LABELS[connecting ? "connecting" : step]}
+        {busy && <span className="key-spinner" aria-hidden="true" />}
+        Start
       </button>
       <WalletDialog
         open={picking}

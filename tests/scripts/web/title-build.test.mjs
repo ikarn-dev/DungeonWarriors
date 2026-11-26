@@ -6,7 +6,7 @@ const output = new URL("../../../apps/web/.next/", import.meta.url);
 const readPage = (name) =>
   readFileSync(new URL(`server/app/${name}.html`, output), "utf8");
 
-test("the prerendered title has Start in the frame and no notification grid item", () => {
+test("the prerendered title has Start under the logo and no notification grid item", () => {
   const html = readPage("index");
   const main = html.match(
     /<main\b[^>]*data-screen="title"[^>]*>(.*?)<\/main>/s,
@@ -14,7 +14,7 @@ test("the prerendered title has Start in the frame and no notification grid item
   assert.ok(main, "Missing the title screen");
   assert.match(
     main,
-    /class="title-frame".*class="title-start"[^>]*>Start<\/button>/s,
+    /class="title-stage".*class="metal-key title-start"[^>]*>Start<\/button>/s,
   );
   assert.doesNotMatch(main, /wallet-picker|aria-label="Notifications/);
   assert.match(html, /aria-label="Notifications/);

@@ -414,3 +414,22 @@
 .quest-note-mark svg {
   transform: rotate(-45deg);
 }
+.quest-note-mark .warrior-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+/* Info tone (2026-11-26): the same row in teal, for the one-time browser
+   access step; amber stays for the forfeit warning. */
+.quest-note[data-tone="info"] {
+  border-color: #5fe0c833;
+  border-left-color: #5fe0c8;
+  background: linear-gradient(90deg, #5fe0c814, #5fe0c805 70%);
+  color: var(--cream);
+}
+.quest-note[data-tone="info"] .quest-note-mark {
+  border-color: #5fe0c899;
+  color: #8ff0dc;
+}
+.quest-note + .quest-note {
+  margin-top: -0.25rem;
+}

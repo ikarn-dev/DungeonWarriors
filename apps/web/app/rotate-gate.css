@@ -1,0 +1,82 @@
+/* Rotate gate (2026-11-26): on touch devices held upright the app is hidden
+   behind a full-screen prompt to turn the device. The query matches
+   PORTRAIT_TOUCH in lib/game/orientation.ts. Modal dialogs (the game and the
+   quest loading screen) sit in the top layer above any z-index, so they and
+   the toaster are hidden too; nothing behind the prompt can be seen or
+   tapped. The viewport keeps the on-screen keyboard from resizing the
+   layout, so typing in landscape never trips the query. */
+.rotate-gate {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: max(1.5rem, env(safe-area-inset-top))
+      max(1.5rem, env(safe-area-inset-right))
+      max(1.5rem, env(safe-area-inset-bottom))
+      max(1.5rem, env(safe-area-inset-left));
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 42%, #1f4a4359, transparent 70%),
+      #06100f;
+    color: var(--cream);
+    text-align: center;
+    touch-action: none;
+  }
+  body > :not(.rotate-gate),
+  dialog,
+  dialog::backdrop {
+    visibility: hidden;
+  }
+  html,
+  body {
+    overflow: hidden;
+  }
+}
+.rotate-gate-device {
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: 0.5rem;
+  color: var(--gold-hi);
+  filter: drop-shadow(0 0 0.75rem #f7c84f40);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rotate-gate-device {
+    animation: rotate-gate-turn 2.4s ease-in-out infinite;
+  }
+}
+@keyframes rotate-gate-turn {
+  0%,
+  25% {
+    transform: rotate(0deg);
+  }
+  55%,
+  85% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+.rotate-gate-title {
+  margin: 0;
+  background: var(--metal-ink);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font:
+    700 1.625rem / 1.2 var(--font-display),
+    serif;
+  letter-spacing: 0.04em;
+}
+.rotate-gate-text {
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}

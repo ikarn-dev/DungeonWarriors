@@ -131,9 +131,11 @@ export default function LobbyStart({
           disabled={
             blocked || !state.allowStarter || state.catalogVersion === null
           }
+          aria-busy={gettingCat || undefined}
           onClick={onClaimStarter}
         >
-          {gettingCat ? "Getting your cat…" : "Get starter cat"}
+          {gettingCat && <span className="key-spinner" aria-hidden="true" />}
+          Get starter cat
         </button>
         {(!state.allowStarter || state.catalogVersion === null) && (
           <p>

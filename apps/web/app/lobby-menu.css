@@ -226,8 +226,10 @@
   flex-direction: column;
   align-self: center;
   justify-self: center;
-  width: min(40rem, 100%);
-  height: min(36rem, 100%);
+  /* 2026-11-26: shorter (33rem, from 36rem), and inset by half the close
+     medallion so the medallion on the corner is never clipped. */
+  width: min(40rem, 100% - 2.75rem);
+  height: min(33rem, 100% - 2.75rem);
 }
 .lobby-section-view > .lobby-panel {
   flex: 1 1 auto;
@@ -249,17 +251,33 @@
   width: 2.5rem;
   height: 2.5rem;
 }
+/* Close: a gold-rimmed medallion seated on the window's top-right corner
+   (2026-11-26), centred on the frame so both frame edges run into its rim
+   with no gap. Inside the corner on small screens, so it never clips. */
 .pixel-button.lobby-close {
   position: absolute;
   z-index: 2;
-  top: -0.375rem;
-  right: -0.375rem;
+  top: calc(1.5px - 1.375rem);
+  right: calc(1.5px - 1.375rem);
   width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 35%, #2a4a45, #0c1a18 75%) padding-box,
+    var(--metal) border-box;
   box-shadow:
-    inset 0 1px 0 #ffffff26,
-    0 0 0 3px #08100f,
+    inset 0 1px 0 #ffffff1f,
+    0 0 0 1px #000000a6,
     0 4px 12px #000000b3;
+  color: var(--cream);
+}
+@media (max-width: 44rem), (max-height: 40rem) {
+  .pixel-button.lobby-close {
+    top: 0.625rem;
+    right: 0.625rem;
+  }
 }
 /* Section titles sit over a gold rule and clear the close button. */
 .lobby-section-view :is(.lobby-section-head, .lobby-window-head) {

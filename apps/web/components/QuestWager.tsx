@@ -1,8 +1,11 @@
 import { displayUsdc } from "../lib/game/custody-client";
 import DotsLoader from "./DotsLoader";
 import { UiIcon } from "./UiIcon";
+import { WarriorIcon } from "./WarriorIcon";
 
-// The Begin quest wager field, the Play key and the forfeit note.
+// The Begin quest wager field, the Play key, the browser access note (when
+// the balance is funded but this browser cannot play yet) and the forfeit
+// note.
 export function QuestWager({
   id,
   available,
@@ -81,8 +84,11 @@ export function QuestWager({
         )}
       </button>
       {!canSign && funded && (
-        <p className="lobby-section-note">
-          Funded already? Approve browser access once to play.
+        <p className="quest-note" data-tone="info">
+          <span className="quest-note-mark" aria-hidden="true">
+            <WarriorIcon name="lock" />
+          </span>
+          Approve once in your wallet so this browser can play.
         </p>
       )}
       <p className="quest-note">

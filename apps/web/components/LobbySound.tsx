@@ -49,7 +49,7 @@ export function LobbyClickSounds() {
       if (control.matches(START)) lobbySounds.start();
       else if (
         control.matches(
-          ".pixel-button, .metal-key, .title-start, .lobby-option, .dungeon-key",
+          ".pixel-button, .metal-key, .history-tab, .title-start, .lobby-option, .dungeon-key",
         )
       )
         lobbySounds.blip();

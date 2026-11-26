@@ -12,11 +12,10 @@ export default function HistoryTabs({
   return (
     <section className="lobby-section">
       <h2>History</h2>
-      <fieldset className="lobby-history-tabs">
+      <fieldset className="lobby-history-tabs" data-view={view}>
         <legend className="sr-only">History view</legend>
         <button
-          className="pixel-button"
-          data-tone={view === "game" ? "gold" : undefined}
+          className="history-tab"
           aria-pressed={view === "game"}
           type="button"
           onClick={() => setView("game")}
@@ -24,8 +23,7 @@ export default function HistoryTabs({
           Game
         </button>
         <button
-          className="pixel-button"
-          data-tone={view === "transactions" ? "gold" : undefined}
+          className="history-tab"
           aria-pressed={view === "transactions"}
           type="button"
           onClick={() => setView("transactions")}

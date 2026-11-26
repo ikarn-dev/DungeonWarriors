@@ -288,187 +288,88 @@ tr[data-result="lost"] .history-result {
   }
 }
 
-/* Wallet (2026-11-24): two treasury cards, each with a metal-rimmed icon
-   well, one large figure and ruled rows, then a minimal transfer row. */
-.vault-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  gap: 1rem;
-}
-.vault-card {
-  display: grid;
-  align-content: start;
-  gap: 0.875rem;
-  padding: 1rem;
-  border: 1px solid #c9a04e3d;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #16302c, #0c1a18);
-  box-shadow:
-    inset 0 1px 0 #ffffff0f,
-    0 6px 18px #00000059;
-}
-.vault-head {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  color: var(--gold-hi);
-  font-family: var(--font-display), serif;
-  font-size: 1rem;
-  letter-spacing: 0.04em;
-}
-.vault-mark {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background:
-    radial-gradient(circle at 50% 35%, #24806f, #0d1f1c 75%) padding-box,
-    var(--metal) border-box;
-  box-shadow:
-    inset 0 0 0 2px #050908aa,
-    0 3px 8px #000000aa;
-  color: #e9fff8;
-}
-.vault-mark .warrior-icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-.vault-figure {
-  display: grid;
-  gap: 0.125rem;
-  margin: 0;
-}
-.vault-figure > span {
-  color: var(--soft);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
-.vault-figure strong {
-  color: var(--gold-hi);
-  font:
-    600 1.625rem / 1.15 var(--font-geist-mono),
-    monospace;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.vault-unit {
-  color: var(--soft);
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-.vault-rows {
-  display: grid;
-  margin: 0;
-  border-top: 1px solid #c9a04e24;
-}
-.vault-rows > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-block: 0.5rem;
-  border-bottom: 1px solid #c9a04e1a;
-}
-.vault-rows dt {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--soft);
-  font-size: 0.8125rem;
-}
-.vault-rows dt .warrior-icon {
-  width: 0.875rem;
-  height: 0.875rem;
-  color: var(--gold);
-}
-.vault-rows dd {
-  margin: 0;
-  color: var(--cream);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.vault-transfer {
-  display: grid;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
-}
-.vault-transfer label {
-  color: var(--cream);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-/* The amount field spans the row; Deposit and Withdraw share the row below. */
-.vault-transfer-row {
-  display: grid;
+/* History filter (2026-11-26): one segmented control. A dark well with a
+   thin gold rim holds two equal segments; a polished gold thumb slides
+   under the chosen one, whose Cinzel label turns dark, while the other
+   reads soft cream. */
+.lobby-history-tabs {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.625rem;
+  justify-self: start;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(#050b0a, #0a1514) padding-box,
+    linear-gradient(160deg, #c9973f, #6e5420 55%, #e7c06a) border-box;
+  box-shadow:
+    inset 0 2px 6px #000000b3,
+    0 4px 12px #00000066;
 }
-.vault-transfer-row .bet-amount {
-  grid-column: 1 / -1;
+.lobby-history-tabs::before {
+  position: absolute;
+  z-index: -1;
+  inset: 4px auto 4px 4px;
+  width: calc(50% - 4px);
+  content: "";
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    #fff3b0 0%,
+    #ffd95e 30%,
+    #e9a52e 55%,
+    #f6c04f 100%
+  );
+  box-shadow:
+    inset 0 1px 0 #fffbe6,
+    inset 0 -1px 0 #9c5f12b3,
+    0 0 0.75rem #f7c84f40;
 }
-.vault-transfer .bet-amount > span {
-  padding-right: 0.625rem;
+.lobby-history-tabs[data-view="transactions"]::before {
+  transform: translateX(100%);
 }
-/* Max: a quiet text key inside the field, after the unit and a divider. */
-.vault-transfer .vault-max {
-  min-width: 0;
-  min-height: 2.75rem;
-  margin-right: 0.125rem;
-  padding: 0 0.75rem;
+@media (prefers-reduced-motion: no-preference) {
+  .lobby-history-tabs::before {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+.lobby-panel .history-tab {
+  min-width: 7.5rem;
+  min-height: 2.5rem;
+  padding: 0 1.25rem;
   border: 0;
-  border-left: 1px solid #c9a04e33;
-  border-radius: 0 5px 5px 0;
+  border-radius: 999px;
   background: none;
   box-shadow: none;
-  color: var(--gold-hi);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  color: var(--soft);
+  font:
+    700 0.9375rem / 1 var(--font-display),
+    serif;
+  letter-spacing: 0.06em;
   text-shadow: none;
+  white-space: nowrap;
+  transition: color 200ms ease-out;
+}
+.lobby-panel .history-tab[aria-pressed="true"] {
+  color: #3b2204;
+  text-shadow: 0 1px 0 #fff6cc;
+}
+.lobby-panel .history-tab:not(:disabled) {
+  cursor: var(--cursor-pointer);
 }
 @media (hover: hover) {
-  .vault-transfer .vault-max:not(:disabled):hover {
-    background: #e2b04e14;
+  .lobby-panel .history-tab[aria-pressed="false"]:not(:disabled):hover {
+    color: var(--gold-hi);
     filter: none;
   }
 }
-.vault-transfer .vault-max:disabled {
-  color: var(--soft);
-  filter: none;
-  opacity: 0.5;
-}
-.vault-transfer-row .pixel-button {
-  min-height: 3rem;
-  padding-inline: 1rem;
-}
-.vault-transfer-row .warrior-icon {
-  width: 1rem;
-  height: 1rem;
-}
-/* The loader takes the icon's place beside the label. */
-.vault-transfer-row .dots-loader {
-  gap: 0.1875rem;
-  height: 1rem;
-}
-.vault-transfer-row .dots-loader > span[aria-hidden] {
-  width: 0.3125rem;
-  height: 0.3125rem;
-}
-
-.lobby-history-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.lobby-panel .history-tab:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
 }
 .lobby-transactions .lobby-table td {
   white-space: normal;

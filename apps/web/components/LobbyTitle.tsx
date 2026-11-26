@@ -1,9 +1,8 @@
 import Image from "next/image";
-import BrandBadges from "./BrandBadges";
 
 // Server-rendered brand header so the wordmark paints before wallet hydration.
-// The title screen shows the large logo with badges; the lobby centres a
-// smaller logo at the top.
+// The title screen shows the large logo (its partner badges sit at the foot
+// of the page); the lobby centres a smaller logo at the top.
 export default function LobbyTitle({
   bar = false,
 }: {
@@ -17,12 +16,11 @@ export default function LobbyTitle({
           alt="Dungeon Warriors"
           width={1774}
           height={887}
-          sizes={bar ? "26rem" : "(max-height: 40rem) 14rem, 21rem"}
+          sizes={bar ? "26rem" : "(max-height: 40rem) 20rem, 36rem"}
           preload
           className="lobby-logo"
         />
       </h1>
-      {!bar && <BrandBadges />}
     </header>
   );
 }

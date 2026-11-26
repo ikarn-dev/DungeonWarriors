@@ -6,6 +6,7 @@
 @import "./lobby-backdrop.css";
 @import "./lobby-menu.css";
 @import "./lobby-sections.css";
+@import "./lobby-wallet.css";
 @import "./lobby-play.css";
 @import "./lobby-topbar.css";
 @import "./lobby-quest.css";
@@ -16,6 +17,7 @@
 @import "./capsule-reveal.css";
 @import "./dungeon.css";
 @import "./dungeon-hud.css";
+@import "./rotate-gate.css";
 
 :root {
   --background: #ffffff;

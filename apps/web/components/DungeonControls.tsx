@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Control } from "../lib/dungeon/simulation";
 import type { Weapon } from "../lib/dungeon/warriors";
+import { PORTRAIT_TOUCH } from "../lib/game/orientation";
 import { WarriorIcon } from "./WarriorIcon";
 
 // Control bar: movement keys on the left, actions on the right, each with its
@@ -83,14 +84,21 @@ export default function DungeonControls({
       pressed.current.clear();
       update();
     };
+    // Turning a phone upright hides the game; held controls go neutral.
+    const upright = window.matchMedia(PORTRAIT_TOUCH);
+    const turned = () => {
+      if (upright.matches) clear();
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", clear);
+    upright.addEventListener("change", turned);
     return () => {
       clear();
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", clear);
+      upright.removeEventListener("change", turned);
     };
   }, [enabled, onControl, onEnter, update]);
   const hold = (direction: "left" | "right", down: boolean) => {
