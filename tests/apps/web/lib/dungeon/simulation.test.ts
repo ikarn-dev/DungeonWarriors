@@ -225,8 +225,7 @@ describe("base-control routes", () => {
     expect(nearbyGate(frame, room), detail).toBe(2);
     expect(frame.timedOut, detail).toBe(false);
     expect(frame.fallen, detail).toBe(false);
-    // The autopilot stops to fight every foe, so it is slower than a player
-    // who jumps past optional ones; it must still finish with time left.
+    // The route uses ordinary controls and leaves time for player reactions.
     expect(used, detail).toBeLessThan(budget * 0.97);
     expect(replayRoom(room, cat, DUNGEON_V3, frame.tick, inputs)).toEqual(
       frame,
