@@ -1,0 +1,1045 @@
+{
+  "schemaVersion": 1,
+  "version": 1,
+  "assets": [
+    {
+      "id": "background-forest-far",
+      "path": "/game-assets/v1/background-forest-far.svg",
+      "sha256": "917fb583310a4d25e02c05285bae2a24c4acd2ab7ef3e0e35f8b431f4cef7475",
+      "bytes": 3134,
+      "width": 960,
+      "height": 540,
+      "frameWidth": 960,
+      "frameHeight": 540,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "background-forest-near",
+      "path": "/game-assets/v1/background-forest-near.svg",
+      "sha256": "3223aa921261c4394954164c8ddc0301352906c6677ccbb49f8ac85aeabd4cba",
+      "bytes": 3134,
+      "width": 960,
+      "height": 540,
+      "frameWidth": 960,
+      "frameHeight": 540,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "background-sky",
+      "path": "/game-assets/v1/background-sky.svg",
+      "sha256": "4deeed1cedbc162289e69b846a3bb037c41f798d35d22854109923c996219ae6",
+      "bytes": 458,
+      "width": 960,
+      "height": 540,
+      "frameWidth": 960,
+      "frameHeight": 540,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "booster-double-jump",
+      "path": "/game-assets/v1/booster-double-jump.svg",
+      "sha256": "65dbd92456bb11f88ba8234c1252bddc003593729d8e20e9dbdd392b4630f379",
+      "bytes": 314,
+      "width": 24,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "booster-extra-dash",
+      "path": "/game-assets/v1/booster-extra-dash.svg",
+      "sha256": "751d651e1e4567e5643b356dc1f1b84f2180ca4fd14f779dd257d9b91e0854a7",
+      "bytes": 328,
+      "width": 24,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "booster-magnet",
+      "path": "/game-assets/v1/booster-magnet.svg",
+      "sha256": "ad59cb778f03c6306d9700be82f61f3aef9ed5d99ffb296256c3d25c06833124",
+      "bytes": 322,
+      "width": 24,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "booster-shield",
+      "path": "/game-assets/v1/booster-shield.svg",
+      "sha256": "53ec26ab638cf29fad44f9ffbfc9b9711b458299912596d06b0c17deed619f54",
+      "bytes": 325,
+      "width": 24,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "bridge-deck",
+      "path": "/game-assets/v1/bridge-deck.svg",
+      "sha256": "db167c400c9febfe1f66e69dec4bd683047e104520fa0a20aad724208f98dbe1",
+      "bytes": 259,
+      "width": 32,
+      "height": 16,
+      "frameWidth": 32,
+      "frameHeight": 16,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "bridge-left",
+      "path": "/game-assets/v1/bridge-left.svg",
+      "sha256": "5818c7815e42a72b42e900d1c4835f42a7f5551ed74a9c90c6a4ad9d0528f960",
+      "bytes": 202,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "bridge-right",
+      "path": "/game-assets/v1/bridge-right.svg",
+      "sha256": "6db35211692284c96402605f3737b2b68afdfb9a7fdb862c52060400f0f24466",
+      "bytes": 204,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "bridge-support",
+      "path": "/game-assets/v1/bridge-support.svg",
+      "sha256": "93bc42bdbf2f08636b28142d5b4208c2e7364b9068955a820023895448a7b5cb",
+      "bytes": 204,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "capsule-base",
+      "path": "/game-assets/v1/capsule-base.svg",
+      "sha256": "b55d58c1f7b22d2b932340aa6a60ce8ba446547420e7f6b617fa1b7105265ea6",
+      "bytes": 943,
+      "width": 160,
+      "height": 160,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "capsule-lid",
+      "path": "/game-assets/v1/capsule-lid.svg",
+      "sha256": "e4f8101f1bd1d563b03cf949fe38fe24720948a0ddfbcc2a1781b8ab33c1bb3e",
+      "bytes": 466,
+      "width": 160,
+      "height": 160,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "cat-acrobat",
+      "path": "/game-assets/v1/cat-acrobat.svg",
+      "sha256": "99d0f02e897901309eee5e0532988761674126fbc5b6bf878e26b4511b4c9539",
+      "bytes": 45683,
+      "width": 1152,
+      "height": 48,
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "frames": 24,
+      "anchor": {
+        "x": 24,
+        "y": 40
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "dash",
+          "start": 16,
+          "count": 2,
+          "fps": 16,
+          "loop": false
+        },
+        {
+          "name": "defeat",
+          "start": 20,
+          "count": 4,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "start": 14,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "hit",
+          "start": 18,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "idle",
+          "start": 0,
+          "count": 4,
+          "fps": 6,
+          "loop": true
+        },
+        {
+          "name": "jump",
+          "start": 12,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "run",
+          "start": 4,
+          "count": 8,
+          "fps": 12,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "id": "cat-collector",
+      "path": "/game-assets/v1/cat-collector.svg",
+      "sha256": "6d1375983680b3484a60f85fcb8c516bb18a07295657897e24e668c4e4688fda",
+      "bytes": 45683,
+      "width": 1152,
+      "height": 48,
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "frames": 24,
+      "anchor": {
+        "x": 24,
+        "y": 40
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "dash",
+          "start": 16,
+          "count": 2,
+          "fps": 16,
+          "loop": false
+        },
+        {
+          "name": "defeat",
+          "start": 20,
+          "count": 4,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "start": 14,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "hit",
+          "start": 18,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "idle",
+          "start": 0,
+          "count": 4,
+          "fps": 6,
+          "loop": true
+        },
+        {
+          "name": "jump",
+          "start": 12,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "run",
+          "start": 4,
+          "count": 8,
+          "fps": 12,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "id": "cat-guardian",
+      "path": "/game-assets/v1/cat-guardian.svg",
+      "sha256": "1ad2133c2ed16fe5619827d589ab6c27f8846b6096795a9ed1672661c36c52fb",
+      "bytes": 45683,
+      "width": 1152,
+      "height": 48,
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "frames": 24,
+      "anchor": {
+        "x": 24,
+        "y": 40
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "dash",
+          "start": 16,
+          "count": 2,
+          "fps": 16,
+          "loop": false
+        },
+        {
+          "name": "defeat",
+          "start": 20,
+          "count": 4,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "start": 14,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "hit",
+          "start": 18,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "idle",
+          "start": 0,
+          "count": 4,
+          "fps": 6,
+          "loop": true
+        },
+        {
+          "name": "jump",
+          "start": 12,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "run",
+          "start": 4,
+          "count": 8,
+          "fps": 12,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "id": "cat-sprinter",
+      "path": "/game-assets/v1/cat-sprinter.svg",
+      "sha256": "1c720482de6c4e417e4cf08f2276664f51f415894135a43c90228fc67cbbc4bc",
+      "bytes": 45683,
+      "width": 1152,
+      "height": 48,
+      "frameWidth": 48,
+      "frameHeight": 48,
+      "frames": 24,
+      "anchor": {
+        "x": 24,
+        "y": 40
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "dash",
+          "start": 16,
+          "count": 2,
+          "fps": 16,
+          "loop": false
+        },
+        {
+          "name": "defeat",
+          "start": 20,
+          "count": 4,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "fall",
+          "start": 14,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "hit",
+          "start": 18,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "idle",
+          "start": 0,
+          "count": 4,
+          "fps": 6,
+          "loop": true
+        },
+        {
+          "name": "jump",
+          "start": 12,
+          "count": 2,
+          "fps": 10,
+          "loop": false
+        },
+        {
+          "name": "run",
+          "start": 4,
+          "count": 8,
+          "fps": 12,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "id": "coin-shadow",
+      "path": "/game-assets/v1/coin-shadow.svg",
+      "sha256": "c2e43f5ebbee5b65795f911d225da9d955a83536fda617b68833ef5b07a573de",
+      "bytes": 176,
+      "width": 16,
+      "height": 6,
+      "frameWidth": 16,
+      "frameHeight": 6,
+      "frames": 1,
+      "anchor": {
+        "x": 8,
+        "y": 3
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "coin-spin",
+      "path": "/game-assets/v1/coin-spin.svg",
+      "sha256": "e4264a0e67087a52dfc2b4d871d93fe56fe9470568b989dead23f9e18611680d",
+      "bytes": 12267,
+      "width": 512,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 16,
+      "anchor": {
+        "x": 16,
+        "y": 28
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "spin",
+          "start": 0,
+          "count": 16,
+          "fps": 16,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "id": "effects-actions",
+      "path": "/game-assets/v1/effects-actions.svg",
+      "sha256": "a1f19acea39471092ca2c4aa1cabf76f855c9db04f252ee260316e4b79ea17f6",
+      "bytes": 4975,
+      "width": 512,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 16,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "dash",
+          "start": 0,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "hit",
+          "start": 4,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "landing",
+          "start": 8,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "pickup",
+          "start": 12,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        }
+      ]
+    },
+    {
+      "id": "effects-powers",
+      "path": "/game-assets/v1/effects-powers.svg",
+      "sha256": "a38f8d26115b0ab13dc73cb56adceb0175c5088df22760dd189fc5d90a150a24",
+      "bytes": 7301,
+      "width": 1280,
+      "height": 64,
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "frames": 20,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "double-jump",
+          "start": 0,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "extra-dash",
+          "start": 4,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "magnet",
+          "start": 8,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "shield-active",
+          "start": 12,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        },
+        {
+          "name": "shield-contact",
+          "start": 16,
+          "count": 4,
+          "fps": 12,
+          "loop": false
+        }
+      ]
+    },
+    {
+      "id": "hazard-obstacle",
+      "path": "/game-assets/v1/hazard-obstacle.svg",
+      "sha256": "afa98089a3d9038b8a538206aad2d025d6df993c16dd431971c1e2cd005262a6",
+      "bytes": 313,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 16,
+        "y": 30
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "hazard-pit-edge",
+      "path": "/game-assets/v1/hazard-pit-edge.svg",
+      "sha256": "e973f2da7479b5b9df8486a39b90077aa8b5a82203aa1f28f9789a152c569af5",
+      "bytes": 211,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "hud-controls",
+      "path": "/game-assets/v1/hud-controls.svg",
+      "sha256": "1421d142198d80c8ace945d1193a43929e342d95af26d4af9d8d37c24649d0d5",
+      "bytes": 2238,
+      "width": 312,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 13,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "boost",
+          "start": 11,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "cash-out",
+          "start": 5,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "dash",
+          "start": 12,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "double-jump",
+          "start": 0,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "extra-dash",
+          "start": 1,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "jump",
+          "start": 4,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "magnet",
+          "start": 2,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "mute",
+          "start": 8,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "pause",
+          "start": 6,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "rotate-device",
+          "start": 9,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "shield",
+          "start": 3,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "sound",
+          "start": 7,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        },
+        {
+          "name": "status",
+          "start": 10,
+          "count": 1,
+          "fps": 1,
+          "loop": false
+        }
+      ]
+    },
+    {
+      "id": "portrait-acrobat",
+      "path": "/game-assets/v1/portrait-acrobat.svg",
+      "sha256": "37fdf01133e4d2c82b66d2d565fdefdebd172b251e38e28b38028c00f086c77a",
+      "bytes": 2018,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "portrait-collector",
+      "path": "/game-assets/v1/portrait-collector.svg",
+      "sha256": "b4da00d87f3a6a1b1683b304748f70adb8d7df3cfc1a8b1f86f1cf7dd56cb4ed",
+      "bytes": 2018,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "portrait-guardian",
+      "path": "/game-assets/v1/portrait-guardian.svg",
+      "sha256": "08ad56b4d7c8b8bd8333efe451ecbb4c964c9c4786cf0e0bb354390d679edb17",
+      "bytes": 2018,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "portrait-sprinter",
+      "path": "/game-assets/v1/portrait-sprinter.svg",
+      "sha256": "4f1767bb6986d9ca23e305914fff09d389fe5fe7d3f3cb88b8afb5e3bcf12fed",
+      "bytes": 2018,
+      "width": 96,
+      "height": 96,
+      "frameWidth": 96,
+      "frameHeight": 96,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "star",
+      "path": "/game-assets/v1/star.svg",
+      "sha256": "5ceedcda41b2cc1191a88dcd330a34f7334ee79b0ddb97c6161b649e7543122b",
+      "bytes": 229,
+      "width": 24,
+      "height": 24,
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 1,
+      "anchor": {
+        "x": 12,
+        "y": 12
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "terrain-fill",
+      "path": "/game-assets/v1/terrain-fill.svg",
+      "sha256": "c9d477a832e9982c6ccb24b089a3bb28c05742eb90537e65b56435b2934a5e5c",
+      "bytes": 445,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "xy",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "terrain-grass",
+      "path": "/game-assets/v1/terrain-grass.svg",
+      "sha256": "cdc28c0acc55107ebe3fc2a77f16bbc01078858a07369c15e841ae689f6cd983",
+      "bytes": 299,
+      "width": 32,
+      "height": 8,
+      "frameWidth": 32,
+      "frameHeight": 8,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "terrain-left",
+      "path": "/game-assets/v1/terrain-left.svg",
+      "sha256": "0db6e468926b199fc83b4006f178154b8707be3865b1e4a2a4d2cf859bc1464a",
+      "bytes": 508,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "terrain-right",
+      "path": "/game-assets/v1/terrain-right.svg",
+      "sha256": "472e1290f4f1aaf904f5a9f55416d1d68325b2b530cb0f58921834bef53df4cc",
+      "bytes": 509,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "terrain-underside",
+      "path": "/game-assets/v1/terrain-underside.svg",
+      "sha256": "2078ade096bca2d8c259f6f2191616c855f15b96651d943409379ad7218188aa",
+      "bytes": 502,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "upgrade-item",
+      "path": "/game-assets/v1/upgrade-item.svg",
+      "sha256": "7929a7f21979058d877fb491e9251db4cefa37fd63d6dc4a15f755945c7aecf0",
+      "bytes": 317,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "none",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "water-fill",
+      "path": "/game-assets/v1/water-fill.svg",
+      "sha256": "96e552cf269168a28725d4f9663d05165d13eb833b4bf52e7c73aae1b71207c8",
+      "bytes": 203,
+      "width": 32,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "xy",
+      "reducedMotionFrame": 0,
+      "clips": []
+    },
+    {
+      "id": "water-surface",
+      "path": "/game-assets/v1/water-surface.svg",
+      "sha256": "ebcb398e39a4b82498a0392335729c3f3584f315ebf53a3954b8615c26a56070",
+      "bytes": 1071,
+      "width": 128,
+      "height": 32,
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 4,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "repeat": "x",
+      "reducedMotionFrame": 0,
+      "clips": [
+        {
+          "name": "wave",
+          "start": 0,
+          "count": 4,
+          "fps": 6,
+          "loop": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-// Every asset the app uses sits in one folder (2026-11-26): the dungeon art
-// manifest, its SVGs and the capsule upgrade item. The onchain catalog still
-// binds media version 2 by manifest hash, so that manifest is kept, unchanged,
-// as catalog-manifest-v2.json; its runner art files are retired.
+// Dungeon artwork uses manifest.json. The versioned catalog manifests retain
+// their published hashes for starter claims and capsule purchases.
 export const MEDIA_ROOT = "/game-assets";
 export const MEDIA_VERSION = 3;
 export const catalogManifestPath = (version: number) =>

@@ -77,7 +77,7 @@ test("a folder without a manifest leaves the scene pending", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
-test("the retained catalog manifest keeps the hash the Devnet catalog binds", () => {
+test("catalog manifests preserve the active v1 and staged v2 bindings", () => {
   const publicDirectory = fileURLToPath(
     new URL("../../../apps/web/public", import.meta.url),
   );
@@ -86,7 +86,11 @@ test("the retained catalog manifest keeps the hash the Devnet catalog binds", ()
     contentHash:
       "de6abd09a8057b1f768cc361aae2e7287f23f8026e00f56d1a4bf87e22f4fb9b",
   });
-  assert.throws(() => catalogManifestBinding(publicDirectory, 1));
+  assert.deepEqual(catalogManifestBinding(publicDirectory, 1), {
+    version: 1,
+    contentHash:
+      "29d00d80ea5b0338943ead4345ab31b363243f83c863a600d0a960cab65c5786",
+  });
 });
 test("active SVG content is rejected even when its digest matches", async () =>
   fixture(async ({ root, folder, image, save }) => {
