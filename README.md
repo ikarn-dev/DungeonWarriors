@@ -34,7 +34,7 @@ flowchart TD
 
 | Technology | Role |
 | --- | --- |
-| <a href="https://solana.com/"><img src="https://solana.com/src/img/branding/solanaLogoMark.svg" width="33" alt="Solana logo"></a> **Solana** | Anchor program for cat ownership, USDC custody, wagers, and payouts. |
+| <a href="https://solana.com/"><img src="apps/web/public/brand_logos/solanaLogo.svg" width="116" alt="Solana"></a> | Anchor program for cat ownership, USDC custody, wagers, and payouts. |
 | <a href="https://www.magicblock.xyz/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://www.magicblock.xyz/assets/magicblock-logotype-white.png"><img src="apps/web/public/brand_logos/MagicBlock-Logo-Black.svg" width="116" alt="MagicBlock"></picture></a> | VRF supplies randomness for runs and capsule draws. Ephemeral Rollups record terminal results, and Hydra triggers settlement. |
 | **Next.js and Phaser** | The browser runs movement and combat. The server replays submitted inputs before signing the result. |
 
